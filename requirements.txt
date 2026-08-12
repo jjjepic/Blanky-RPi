@@ -1,0 +1,8 @@
+PySide6
+sounddevice
+scipy
+numpy
+openai
+paho-mqtt
+opcua
+openwakeword

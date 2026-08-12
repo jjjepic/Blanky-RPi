@@ -1,0 +1,75 @@
+{
+  "pt": {
+    "activate": ["ativar", "ativa", "ligar", "liga", "trabalhar", "trabalha", "avancar", "avanca", "subir", "sobe", "colocar a funcionar", "poe a funcionar"],
+    "deactivate": ["desativar", "desativa", "desligar", "desliga", "parar", "para", "descer", "desce", "cortar", "interromper"],
+
+    "start": ["comeca", "comecar", "avanca", "avancar", "start", "marcha", "marchar", "inicia", "iniciar", "arranca", "arrancar", "inicia o sistema", "poe o sistema a trabalhar"],
+    "stop": ["para", "parar", "stop", "pausa", "pausar", "parou", "termina", "terminar", "interrompe", "interromper", "desliga o sistema", "para o sistema"],
+
+    "motor_word": ["motor"],
+
+    "cylinder_word": ["cilindro", "valvula", "valve", "pistao", "atuador"],
+    "cylinder_retract": ["recuar", "recua", "descer", "desce", "recolher", "recolhe"],
+
+    "light_on": ["acender", "acende", "liga", "ligar", "ativar", "ativa"],
+    "light_off": ["apagar", "apaga", "desligar", "desliga", "desativar", "desativa"],
+
+    "light_green": ["luz verde", "verde", "luz de cor verde"],
+    "light_red": ["luz vermelha", "vermelha", "luz de cor vermelha"],
+
+    "robot_word": ["robo"],
+    "robot_go": ["avanca", "avancar", "trabalha", "trabalhar", "vai", "manda", "mandar"],
+    "metal": ["metal", "metais", "metalica", "metalicas", "metalico", "metalicos"],
+    "nonmetal": ["nao metal", "nao-metal"],
+
+    "mode_fast_ph": ["modo rapido", "alta velocidade", "modo de alta velocidade", "modo acelerado"],
+    "mode_ideal_ph": ["modo ideal", "modo automatico", "modo auto", "modo normal", "modo otimizado"],
+    "mode_manual_ph": ["modo manual", "modo de operacao manual"],
+
+    "mode_fast_words": ["rapido", "acelerado", "veloz", "fast"],
+    "mode_ideal_words": ["ideal", "automatico", "auto", "normal", "otimo", "otimizado", "optimal", "optimo"],
+    "mode_manual_words": ["manual", "operator", "hand"],
+
+    "change_mode_ph": ["mudar modo", "trocar modo", "alterar modo", "muda modo", "troca modo", "altera modo", "alterna modo", "quero mudar de modo"],
+    "change_mode_words": ["mudar", "muda", "trocar", "troca", "alterar", "altera"]
+  },
+
+  "en": {
+    "activate": ["activate", "enable", "start", "run", "go", "forward", "advance", "power on", "put into operation"],
+    "deactivate": ["deactivate", "disable", "stop", "halt", "power off", "shut down"],
+    "activate_ph": ["turn on"],
+    "deactivate_ph": ["turn off"],
+
+    "start": ["start", "begin", "run", "go", "launch", "init", "initialize", "start the system", "begin operation"],
+    "stop": ["stop", "pause", "halt", "end", "finish", "terminate", "stop the system", "shut the system down"],
+
+    "motor_word": ["motor"],
+
+    "cylinder_word": ["cylinder", "valve", "actuator", "piston"],
+    "cylinder_retract": ["retract", "back", "reverse", "pull back"],
+
+    "light_on_words": ["activate", "enable", "on"],
+    "light_off_words": ["deactivate", "disable", "off"],
+    "light_on_ph": ["turn on", "switch on"],
+    "light_off_ph": ["turn off", "switch off"],
+
+    "light_green": ["green light", "green"],
+    "light_red": ["red light", "red"],
+
+    "robot_word": ["robot"],
+    "robot_go": ["go", "move", "send", "advance", "run", "work"],
+    "nonmetal": ["non metal", "non-metal", "nonmetal", "non metallic", "non-metallic", "nonmetallic"],
+    "metal": ["metal", "metallic"],
+
+    "mode_fast_ph": ["fast mode", "quick mode", "high speed", "high speed mode"],
+    "mode_ideal_ph": ["ideal mode", "optimal mode", "normal mode", "auto mode", "automatic mode"],
+    "mode_manual_ph": ["manual mode", "operator mode", "manual operation mode"],
+
+    "mode_fast_words": ["fast", "quick", "turbo"],
+    "mode_ideal_words": ["ideal", "optimal", "normal", "automatic", "auto"],
+    "mode_manual_words": ["manual", "operator"],
+
+    "change_mode_ph": ["change mode", "switch mode", "set mode", "change the mode", "switch operating mode"],
+    "change_mode_words": ["change", "switch", "set"]
+  }
+}

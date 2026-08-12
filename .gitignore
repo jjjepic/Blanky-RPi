@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+
+# Credentials and local settings
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Runtime audio and generated exports
+audio/*.wav
+exports/
+*.csv
+*.pdf
+
+# Operating-system and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
