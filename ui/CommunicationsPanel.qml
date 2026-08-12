@@ -73,6 +73,18 @@ Rectangle {
         return "#ff6b6b"
     }
 
+    function stateSurfaceColor(state) {
+        if (state === "connected")
+            return panel.dark ? "#0c3423" : "#d7f4df"
+        if (state === "communicating")
+            return panel.dark ? "#0b3040" : "#d9effa"
+        if (state === "standby" || state === "checking")
+            return panel.dark ? "#1e2b34" : "#e1e9ed"
+        if (state === "silent")
+            return panel.dark ? "#382c0d" : "#fff0c5"
+        return panel.dark ? "#38161d" : "#ffe0e3"
+    }
+
     function stateGlyph(state) {
         if (state === "communicating")
             return "⇄"
@@ -128,10 +140,12 @@ Rectangle {
             Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: panel.borderColor }
         }
 
-        Column {
+        GridLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            spacing: panel.contentSpacing
+            columns: 2
+            columnSpacing: panel.compact ? 14 : 18
+            rowSpacing: panel.compact ? 12 : 16
 
             Repeater {
                 model: [
@@ -143,54 +157,101 @@ Rectangle {
 
                 Rectangle {
                     readonly property string communicationStatus: panel.stateFor(modelData.key)
-                    width: parent.width
-                    height: panel.cardHeight
+                    Layout.column: (modelData.key === "mqtt_base" || modelData.key === "mqtt_phone") ? 1 : 0
+                    Layout.row: (modelData.key === "mqtt_phone" || modelData.key === "opcua") ? 1 : 0
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    Layout.preferredHeight: panel.compact ? 62 : 70
+                    Layout.minimumHeight: panel.compact ? 58 : 66
                     radius: 9
                     color: panel.dark ? "#06121d" : "#e4edf2"
                     border.color: panel.stateColor(communicationStatus)
                     border.width: 1
 
-                    RowLayout {
+                    ColumnLayout {
                         anchors.fill: parent
                         anchors.leftMargin: panel.compact ? 9 : 12
                         anchors.rightMargin: panel.compact ? 9 : 12
-                        spacing: panel.compact ? 7 : 10
+                        anchors.topMargin: panel.compact ? 6 : 8
+                        anchors.bottomMargin: panel.compact ? 6 : 8
+                        spacing: panel.compact ? 3 : 5
 
-                        Label {
-                            text: modelData.icon
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: panel.compact ? 4 : 6
+
+                            Rectangle {
+                                Layout.preferredWidth: panel.compact ? 28 : 34
+                                Layout.preferredHeight: width
+                                radius: width / 2
+                                color: panel.stateSurfaceColor(communicationStatus)
+                                border.color: panel.stateColor(communicationStatus)
+                                border.width: 1
+
+                                Label {
+                                    anchors.centerIn: parent
+                                    text: modelData.icon
+                                    color: panel.stateColor(communicationStatus)
+                                    font.pixelSize: panel.compact ? 15 : 18
+                                }
+                            }
+
+                            Label {
+                                text: modelData.label.toUpperCase()
+                                color: panel.textColor
+                                font.pixelSize: panel.compact ? 11 : 13
+                                font.bold: true
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                                Layout.minimumWidth: 0
+                                verticalAlignment: Text.AlignVCenter
+                            }
+
+                            Rectangle {
+                                Layout.preferredHeight: panel.compact ? 24 : 28
+                                Layout.preferredWidth: Math.min(panel.compact ? 96 : 112, stateLabel.implicitWidth + (panel.compact ? 18 : 22))
+                                radius: 7
+                                color: panel.stateSurfaceColor(communicationStatus)
+                                border.color: panel.stateColor(communicationStatus)
+                                border.width: 1
+
+                                Label {
+                                    id: stateLabel
+                                    anchors.centerIn: parent
+                                    text: panel.stateText(communicationStatus).toUpperCase()
+                                    color: panel.stateColor(communicationStatus)
+                                    font.pixelSize: panel.compact ? 9 : 10
+                                    font.bold: true
+                                    elide: Text.ElideRight
+                                    width: parent.width - 10
+                                    horizontalAlignment: Text.AlignHCenter
+                                }
+                            }
+                        }
+
+                        Item {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: panel.compact ? 4 : 6
+                        }
+
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 1
                             color: panel.stateColor(communicationStatus)
-                            font.pixelSize: panel.compact ? 16 : 19
-                            Layout.preferredWidth: panel.compact ? 20 : 24
-                            horizontalAlignment: Text.AlignHCenter
+                            opacity: panel.dark ? 0.72 : 0.58
                         }
-                        Label {
-                            text: modelData.label.toUpperCase()
-                            color: panel.mutedText
-                            font.pixelSize: panel.compact ? 9 : 10
-                            font.bold: true
-                            elide: Text.ElideRight
-                            Layout.preferredWidth: Math.max(panel.compact ? 112 : 130, Math.round(parent.width * 0.24))
-                        }
+
                         Label {
                             text: panel.detailFor(modelData.key)
                             color: panel.mutedText
-                            font.pixelSize: panel.compact ? 10 : 11
-                            elide: Text.ElideRight
-                            Layout.fillWidth: true
-                        }
-                        Label {
-                            text: panel.stateGlyph(communicationStatus)
-                            color: panel.stateColor(communicationStatus)
-                            font.pixelSize: panel.compact ? 15 : 17
-                            font.bold: true
-                        }
-                        Label {
-                            text: panel.stateText(communicationStatus)
-                            color: panel.textColor
                             font.pixelSize: panel.compact ? 11 : 12
                             font.bold: true
                             elide: Text.ElideRight
-                            Layout.preferredWidth: panel.compact ? 105 : 120
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            Layout.minimumWidth: 0
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
                         }
                     }
                 }
