@@ -155,50 +155,21 @@ Rectangle {
                     border.color: panel.stateColor(communicationStatus)
                     border.width: 1
 
-                    ColumnLayout {
+                    RowLayout {
                         anchors.fill: parent
                         anchors.leftMargin: panel.compact ? 9 : 12
                         anchors.rightMargin: panel.compact ? 9 : 12
-                        anchors.topMargin: panel.compact ? 7 : 9
-                        anchors.bottomMargin: panel.compact ? 7 : 9
-                        spacing: panel.compact ? 2 : 4
+                        spacing: panel.compact ? 7 : 10
 
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: panel.compact ? 4 : 7
-
-                            Label {
-                                text: modelData.icon
-                                color: panel.stateColor(communicationStatus)
-                                font.pixelSize: panel.compact ? 16 : 19
-                                Layout.preferredWidth: panel.compact ? 20 : 24
-                                horizontalAlignment: Text.AlignHCenter
-                            }
-                            Label {
-                                text: modelData.label.toUpperCase()
-                                color: panel.mutedText
-                                font.pixelSize: panel.compact ? 9 : 10
-                                font.bold: true
-                                elide: Text.ElideRight
-                                Layout.fillWidth: true
-                                Layout.minimumWidth: 0
-                            }
-                            Label {
-                                text: panel.stateGlyph(communicationStatus)
-                                color: panel.stateColor(communicationStatus)
-                                font.pixelSize: panel.compact ? 15 : 17
-                                font.bold: true
-                            }
-                            Label {
-                                text: panel.stateText(communicationStatus)
-                                color: panel.textColor
-                                font.pixelSize: panel.compact ? 10 : 11
-                                font.bold: true
-                                elide: Text.ElideRight
-                                Layout.preferredWidth: panel.compact ? 78 : 92
-                                Layout.maximumWidth: panel.compact ? 84 : 100
-                                horizontalAlignment: Text.AlignRight
-                            }
+                        Label {
+                            text: modelData.label.toUpperCase()
+                            color: panel.mutedText
+                            font.pixelSize: panel.compact ? 9 : 10
+                            font.bold: true
+                            elide: Text.ElideRight
+                            Layout.preferredWidth: panel.compact ? 86 : 108
+                            Layout.maximumWidth: panel.compact ? 98 : 124
+                            verticalAlignment: Text.AlignVCenter
                         }
 
                         Label {
@@ -208,6 +179,30 @@ Rectangle {
                             elide: Text.ElideRight
                             Layout.fillWidth: true
                             Layout.minimumWidth: 0
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
+                        Label {
+                            text: panel.stateGlyph(communicationStatus)
+                            color: panel.stateColor(communicationStatus)
+                            font.pixelSize: panel.compact ? 15 : 17
+                            font.bold: true
+                            Layout.preferredWidth: panel.compact ? 13 : 16
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
+                        Label {
+                            text: panel.stateText(communicationStatus)
+                            color: panel.stateColor(communicationStatus)
+                            font.pixelSize: panel.compact ? 10 : 11
+                            font.bold: true
+                            elide: Text.ElideRight
+                            Layout.preferredWidth: panel.compact ? 78 : 92
+                            Layout.maximumWidth: panel.compact ? 84 : 100
+                            horizontalAlignment: Text.AlignRight
+                            verticalAlignment: Text.AlignVCenter
                         }
                     }
                 }
