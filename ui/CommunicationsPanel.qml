@@ -144,8 +144,8 @@ Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
             columns: 2
-            columnSpacing: panel.contentSpacing
-            rowSpacing: panel.contentSpacing
+            columnSpacing: panel.compact ? 14 : 18
+            rowSpacing: panel.compact ? 12 : 16
 
             Repeater {
                 model: [
@@ -229,6 +229,11 @@ Rectangle {
                             }
                         }
 
+                        Item {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: panel.compact ? 4 : 6
+                        }
+
                         Rectangle {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 1
@@ -239,7 +244,8 @@ Rectangle {
                         Label {
                             text: panel.detailFor(modelData.key)
                             color: panel.mutedText
-                            font.pixelSize: panel.compact ? 10 : 11
+                            font.pixelSize: panel.compact ? 11 : 12
+                            font.bold: true
                             elide: Text.ElideRight
                             Layout.fillWidth: true
                             Layout.fillHeight: true
