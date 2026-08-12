@@ -328,6 +328,13 @@ class BlankyController(QObject):
     def commandCatalogText(self):
         return command_catalog_text(self._language)
 
+    @Property(QUrl, constant=True)
+    def defaultExportFolder(self):
+        """Expose the project's exports folder as the initial folder-dialog location."""
+        export_dir = os.path.abspath(os.path.join(os.getcwd(), "exports"))
+        os.makedirs(export_dir, exist_ok=True)
+        return QUrl.fromLocalFile(export_dir)
+
     @Property(bool, notify=soundEnabledChanged)
     def soundEnabled(self):
         return self._sound_enabled

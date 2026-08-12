@@ -2,7 +2,6 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Dialogs
-import QtCore
 import "Translations.js" as I18n
 
 ApplicationWindow {
@@ -396,7 +395,7 @@ ApplicationWindow {
                 }
 
                 MenuActionButton {
-                    text: "\u21BB"
+                    iconText: "\u21BB"
                     width: 50
                     height: 44
                     textPixelSize: 22
@@ -2469,19 +2468,6 @@ ApplicationWindow {
                                 font.bold: true
                                 Layout.fillWidth: true
                             }
-                            MenuActionButton {
-                                text: "\u2139"
-                                iconOnly: true
-                                textPixelSize: 16
-                                Layout.preferredWidth: 32
-                                Layout.preferredHeight: 30
-                                accentColor: "#63cbff"
-                                textColor: root.textColor
-                                mutedText: root.mutedText
-                                borderColor: root.borderColor
-                                panelColor: root.panelColor
-                                toolTip: t("audioInfoTooltip")
-                            }
                         }
 
                         RowLayout {
@@ -2496,6 +2482,7 @@ ApplicationWindow {
                                 mutedText: root.mutedText
                                 borderColor: root.borderColor
                                 panelColor: root.panelColor
+                                toolTip: t("automaticModeHelp")
                                 onClicked: root.selectAudioMode("auto")
                             }
                             MenuActionButton {
@@ -2507,6 +2494,7 @@ ApplicationWindow {
                                 mutedText: root.mutedText
                                 borderColor: root.borderColor
                                 panelColor: root.panelColor
+                                toolTip: t("manualModeHelp")
                                 onClicked: root.selectAudioMode("manual")
                             }
                         }
@@ -2532,6 +2520,7 @@ ApplicationWindow {
                                 mutedText: root.mutedText
                                 borderColor: root.borderColor
                                 panelColor: root.panelColor
+                                toolTip: t("simpleProfileHelp")
                                 onClicked: root.selectAudioProfile("simple")
                             }
                             MenuActionButton {
@@ -2543,6 +2532,7 @@ ApplicationWindow {
                                 mutedText: root.mutedText
                                 borderColor: root.borderColor
                                 panelColor: root.panelColor
+                                toolTip: t("balancedProfileHelp")
                                 onClicked: root.selectAudioProfile("balanced")
                             }
                             MenuActionButton {
@@ -2554,6 +2544,7 @@ ApplicationWindow {
                                 mutedText: root.mutedText
                                 borderColor: root.borderColor
                                 panelColor: root.panelColor
+                                toolTip: t("noisyProfileHelp")
                                 onClicked: root.selectAudioProfile("noisy")
                             }
                         }
@@ -2597,12 +2588,13 @@ ApplicationWindow {
                             width: parent.width; height: 72; radius: 10
                             color: root.panelColor; border.color: root.borderColor; border.width: 1
                             opacity: root.audioSettingIsEditable("sensitivity") ? 1 : 0.56
+                            HoverHandler { id: sensitivityHintHover }
+                            BlankyToolTip { visible: sensitivityHintHover.hovered; text: t("sensitivityHelp"); lightSurface: !root.dark }
                             Column {
                                 anchors.fill: parent; anchors.margins: 9; spacing: 4
                                 RowLayout {
                                     width: parent.width
                                     Label { text: t("startSensitivity"); color: root.textColor; font.bold: true; Layout.fillWidth: true }
-                                    MenuActionButton { text: "\u2139"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#63cbff"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("sensitivityHelp") }
                                     MenuActionButton { visible: !root.audioSettingIsEditable("sensitivity"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("sensitivity") }
                                     Label { text: Math.round(blanky.micSensitivity); color: root.mutedText; font.bold: true }
                                 }
@@ -2614,12 +2606,13 @@ ApplicationWindow {
                             width: parent.width; height: 72; radius: 10
                             color: root.panelColor; border.color: root.borderColor; border.width: 1
                             opacity: root.audioSettingIsEditable("wait") ? 1 : 0.56
+                            HoverHandler { id: waitHintHover }
+                            BlankyToolTip { visible: waitHintHover.hovered; text: t("maxWaitHelp"); lightSurface: !root.dark }
                             Column {
                                 anchors.fill: parent; anchors.margins: 9; spacing: 4
                                 RowLayout {
                                     width: parent.width
                                     Label { text: t("maxWait"); color: root.textColor; font.bold: true; Layout.fillWidth: true }
-                                    MenuActionButton { text: "\u2139"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#63cbff"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("maxWaitHelp") }
                                     MenuActionButton { visible: !root.audioSettingIsEditable("wait"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("wait") }
                                     Label { text: formatFixed(blanky.micWaitForSpeech, 2) + " s"; color: root.mutedText; font.bold: true }
                                 }
@@ -2631,12 +2624,13 @@ ApplicationWindow {
                             width: parent.width; height: 72; radius: 10
                             color: root.panelColor; border.color: root.borderColor; border.width: 1
                             opacity: root.audioSettingIsEditable("minimum") ? 1 : 0.56
+                            HoverHandler { id: minimumHintHover }
+                            BlankyToolTip { visible: minimumHintHover.hovered; text: t("minimumCommandHelp"); lightSurface: !root.dark }
                             Column {
                                 anchors.fill: parent; anchors.margins: 9; spacing: 4
                                 RowLayout {
                                     width: parent.width
                                     Label { text: t("minimumCommand"); color: root.textColor; font.bold: true; Layout.fillWidth: true }
-                                    MenuActionButton { text: "\u2139"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#63cbff"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("minimumCommandHelp") }
                                     MenuActionButton { visible: !root.audioSettingIsEditable("minimum"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("minimum") }
                                     Label { text: formatFixed(blanky.micMinCommand, 2) + " s"; color: root.mutedText; font.bold: true }
                                 }
@@ -2648,12 +2642,13 @@ ApplicationWindow {
                             width: parent.width; height: 72; radius: 10
                             color: root.panelColor; border.color: root.borderColor; border.width: 1
                             opacity: root.audioSettingIsEditable("silence") ? 1 : 0.56
+                            HoverHandler { id: silenceHintHover }
+                            BlankyToolTip { visible: silenceHintHover.hovered; text: t("silenceHelp"); lightSurface: !root.dark }
                             Column {
                                 anchors.fill: parent; anchors.margins: 9; spacing: 4
                                 RowLayout {
                                     width: parent.width
                                     Label { text: t("silenceHold"); color: root.textColor; font.bold: true; Layout.fillWidth: true }
-                                    MenuActionButton { text: "\u2139"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#63cbff"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("silenceHelp") }
                                     MenuActionButton { visible: !root.audioSettingIsEditable("silence"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("silence") }
                                     Label { text: formatFixed(blanky.micSilenceHold, 2) + " s"; color: root.mutedText; font.bold: true }
                                 }
@@ -2665,12 +2660,13 @@ ApplicationWindow {
                             width: parent.width; height: 72; radius: 10
                             color: root.panelColor; border.color: root.borderColor; border.width: 1
                             opacity: root.audioSettingIsEditable("gain") ? 1 : 0.56
+                            HoverHandler { id: gainHintHover }
+                            BlankyToolTip { visible: gainHintHover.hovered; text: t("gainHelp"); lightSurface: !root.dark }
                             Column {
                                 anchors.fill: parent; anchors.margins: 9; spacing: 4
                                 RowLayout {
                                     width: parent.width
                                     Label { text: t("microphoneGain"); color: root.textColor; font.bold: true; Layout.fillWidth: true }
-                                    MenuActionButton { text: "\u2139"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#63cbff"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("gainHelp") }
                                     MenuActionButton { visible: !root.audioSettingIsEditable("gain"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("gain") }
                                     Label { text: formatFixed(blanky.micMaxGain, 2) + "x"; color: root.mutedText; font.bold: true }
                                 }
@@ -2683,25 +2679,28 @@ ApplicationWindow {
                         RowLayout {
                             width: parent.width
                             opacity: root.audioSettingIsEditable("highpass") ? 1 : 0.56
+                            HoverHandler { id: highPassHintHover }
+                            BlankyToolTip { visible: highPassHintHover.hovered; text: t("highPassHelp"); lightSurface: !root.dark }
                             Switch { checked: blanky.micHighpassEnabled; enabled: root.audioSettingIsEditable("highpass"); onClicked: blanky.setMicHighpassEnabled(checked) }
                             Label { text: t("highPass"); color: root.textColor; Layout.fillWidth: true }
-                            MenuActionButton { text: "\u2139"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#63cbff"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("highPassHelp") }
                             MenuActionButton { visible: !root.audioSettingIsEditable("highpass"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("highpass") }
                         }
                         RowLayout {
                             width: parent.width
                             opacity: root.audioSettingIsEditable("gate") ? 1 : 0.56
+                            HoverHandler { id: noiseGateHintHover }
+                            BlankyToolTip { visible: noiseGateHintHover.hovered; text: t("noiseGateHelp"); lightSurface: !root.dark }
                             Switch { checked: blanky.micNoiseGateEnabled; enabled: root.audioSettingIsEditable("gate"); onClicked: blanky.setMicNoiseGateEnabled(checked) }
                             Label { text: t("noiseGate"); color: root.textColor; Layout.fillWidth: true }
-                            MenuActionButton { text: "\u2139"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#63cbff"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("noiseGateHelp") }
                             MenuActionButton { visible: !root.audioSettingIsEditable("gate"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("gate") }
                         }
                         RowLayout {
                             width: parent.width
                             opacity: root.audioSettingIsEditable("reduction") ? 1 : 0.56
+                            HoverHandler { id: noiseReductionHintHover }
+                            BlankyToolTip { visible: noiseReductionHintHover.hovered; text: t("noiseReductionHelp"); lightSurface: !root.dark }
                             Switch { checked: blanky.micNoiseReductionEnabled; enabled: root.audioSettingIsEditable("reduction"); onClicked: blanky.setMicNoiseReductionEnabled(checked) }
                             Label { text: t("noiseReduction"); color: root.textColor; Layout.fillWidth: true }
-                            MenuActionButton { text: "\u2139"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#63cbff"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("noiseReductionHelp") }
                             MenuActionButton { visible: !root.audioSettingIsEditable("reduction"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("reduction") }
                         }
                     }
@@ -2745,7 +2744,7 @@ ApplicationWindow {
         property string exportKind: "events"
         property string exportFormat: "csv"
         title: t("chooseExportFolder")
-        currentFolder: StandardPaths.writableLocation(StandardPaths.DocumentsLocation)
+        currentFolder: blanky.defaultExportFolder
         onAccepted: {
             var folder = selectedFolder.toString()
             if (exportKind === "audio")

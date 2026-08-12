@@ -42,7 +42,7 @@ Rectangle {
         anchors.rightMargin: 10
 
         Text {
-            visible: !control.iconOnly && !control.subText
+            visible: !control.iconOnly && !control.subText && !control.hasStructuredContent
             anchors.centerIn: parent
             width: Math.min(implicitWidth, parent.width)
             height: Math.min(implicitHeight, parent.height)
@@ -56,6 +56,35 @@ Rectangle {
             elide: Text.ElideRight
             wrapMode: Text.NoWrap
             transform: Translate { x: control.textHorizontalOffset; y: control.textVerticalOffset }
+        }
+
+        Row {
+            visible: !control.iconOnly && !control.subText && control.hasStructuredContent
+            anchors.centerIn: parent
+            spacing: control.labelText.length > 0 ? 4 : 0
+
+            Text {
+                visible: control.iconText.length > 0
+                text: control.iconText
+                color: control.textColor
+                font.pixelSize: control.textPixelSize
+                font.bold: true
+                verticalAlignment: Text.AlignVCenter
+                transform: Translate { x: control.textHorizontalOffset; y: control.textVerticalOffset }
+            }
+
+            Text {
+                visible: control.labelText.length > 0
+                text: control.labelText
+                textFormat: Text.RichText
+                color: control.textColor
+                font.pixelSize: control.textPixelSize
+                font.bold: true
+                verticalAlignment: Text.AlignVCenter
+                elide: Text.ElideRight
+                wrapMode: Text.NoWrap
+                transform: Translate { x: control.textHorizontalOffset; y: control.textVerticalOffset }
+            }
         }
 
         Column {
@@ -111,27 +140,10 @@ Rectangle {
         onClicked: control.clicked()
     }
 
-    ToolTip {
+    BlankyToolTip {
         parent: control
         visible: mouseArea.containsMouse && control.toolTip.length > 0
-        delay: 450
-        timeout: 5000
         text: control.toolTip
-        background: Rectangle {
-            color: control.lightSurface ? "#e6eef2" : "#061521"
-            border.color: control.lightSurface ? "#277cab" : "#3ba8e5"
-            border.width: 1
-            radius: 7
-        }
-        contentItem: Label {
-            text: control.toolTip
-            color: control.lightSurface ? "#123d58" : "#dff5ff"
-            font.pixelSize: 12
-            font.bold: true
-            leftPadding: 10
-            rightPadding: 10
-            topPadding: 6
-            bottomPadding: 6
-        }
+        lightSurface: control.lightSurface
     }
 }
