@@ -73,6 +73,18 @@ Rectangle {
         return "#ff6b6b"
     }
 
+    function stateSurfaceColor(state) {
+        if (state === "connected")
+            return panel.dark ? "#0c3423" : "#d7f4df"
+        if (state === "communicating")
+            return panel.dark ? "#0b3040" : "#d9effa"
+        if (state === "standby" || state === "checking")
+            return panel.dark ? "#1e2b34" : "#e1e9ed"
+        if (state === "silent")
+            return panel.dark ? "#382c0d" : "#fff0c5"
+        return panel.dark ? "#38161d" : "#ffe0e3"
+    }
+
     function stateGlyph(state) {
         if (state === "communicating")
             return "⇄"
@@ -164,20 +176,69 @@ Rectangle {
                         anchors.bottomMargin: panel.compact ? 6 : 8
                         spacing: panel.compact ? 3 : 5
 
-                        Label {
-                            text: modelData.icon + "  " + modelData.label.toUpperCase()
-                            color: panel.mutedText
-                            font.pixelSize: panel.compact ? 11 : 13
-                            font.bold: true
-                            elide: Text.ElideRight
+                        RowLayout {
                             Layout.fillWidth: true
-                            Layout.minimumWidth: 0
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
+                            spacing: panel.compact ? 4 : 6
+
+                            Rectangle {
+                                Layout.preferredWidth: panel.compact ? 28 : 34
+                                Layout.preferredHeight: width
+                                radius: width / 2
+                                color: panel.stateSurfaceColor(communicationStatus)
+                                border.color: panel.stateColor(communicationStatus)
+                                border.width: 1
+
+                                Label {
+                                    anchors.centerIn: parent
+                                    text: modelData.icon
+                                    color: panel.stateColor(communicationStatus)
+                                    font.pixelSize: panel.compact ? 15 : 18
+                                }
+                            }
+
+                            Label {
+                                text: modelData.label.toUpperCase()
+                                color: panel.textColor
+                                font.pixelSize: panel.compact ? 11 : 13
+                                font.bold: true
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                                Layout.minimumWidth: 0
+                                verticalAlignment: Text.AlignVCenter
+                            }
+
+                            Rectangle {
+                                Layout.preferredHeight: panel.compact ? 24 : 28
+                                Layout.preferredWidth: Math.min(panel.compact ? 96 : 112, stateLabel.implicitWidth + (panel.compact ? 18 : 22))
+                                radius: 7
+                                color: panel.stateSurfaceColor(communicationStatus)
+                                border.color: panel.stateColor(communicationStatus)
+                                border.width: 1
+
+                                Label {
+                                    id: stateLabel
+                                    anchors.centerIn: parent
+                                    text: panel.stateText(communicationStatus).toUpperCase()
+                                    color: panel.stateColor(communicationStatus)
+                                    font.pixelSize: panel.compact ? 9 : 10
+                                    font.bold: true
+                                    elide: Text.ElideRight
+                                    width: parent.width - 10
+                                    horizontalAlignment: Text.AlignHCenter
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 1
+                            color: panel.stateColor(communicationStatus)
+                            opacity: panel.dark ? 0.72 : 0.58
                         }
 
                         RowLayout {
                             Layout.fillWidth: true
+                            Layout.fillHeight: true
                             spacing: panel.compact ? 4 : 6
 
                             Label {
