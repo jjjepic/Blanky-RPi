@@ -63,25 +63,30 @@ Rectangle {
         Row {
             visible: !control.glyphButton && !control.subText && control.hasStructuredContent
             anchors.centerIn: parent
+            height: parent.height
             spacing: control.labelText.length > 0 ? 4 : 0
 
             Text {
                 visible: control.iconText.length > 0
+                height: parent.height
                 text: control.iconText
                 color: control.textColor
                 font.pixelSize: control.textPixelSize
                 font.bold: true
+                horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
                 transform: Translate { x: control.textHorizontalOffset; y: control.textVerticalOffset }
             }
 
             Text {
                 visible: control.labelText.length > 0
+                height: parent.height
                 text: control.labelText
                 textFormat: Text.RichText
                 color: control.textColor
                 font.pixelSize: control.textPixelSize
                 font.bold: true
+                horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
                 elide: Text.ElideRight
                 wrapMode: Text.NoWrap
@@ -122,15 +127,14 @@ Rectangle {
 
     Text {
         visible: control.glyphButton
-        anchors.centerIn: parent
-        anchors.horizontalCenterOffset: control.textHorizontalOffset
-        anchors.verticalCenterOffset: control.textVerticalOffset
+        anchors.fill: parent
         text: control.iconText.length > 0 ? control.iconText : control.text
         color: control.textColor
         font.pixelSize: control.textPixelSize
         font.bold: true
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
+        transform: Translate { x: control.textHorizontalOffset; y: control.textVerticalOffset }
     }
 
     MouseArea {
