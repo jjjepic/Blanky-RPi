@@ -130,7 +130,7 @@ Rectangle {
 
         GridLayout {
             Layout.fillWidth: true
-            Layout.fillHeight: true
+            Layout.alignment: Qt.AlignTop
             columns: 2
             columnSpacing: panel.contentSpacing
             rowSpacing: panel.contentSpacing
@@ -148,8 +148,8 @@ Rectangle {
                     Layout.column: (modelData.key === "mqtt_base" || modelData.key === "mqtt_phone") ? 1 : 0
                     Layout.row: (modelData.key === "mqtt_phone" || modelData.key === "opcua") ? 1 : 0
                     Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    Layout.minimumHeight: panel.compact ? 62 : 72
+                    Layout.preferredHeight: panel.compact ? 42 : 48
+                    Layout.minimumHeight: panel.compact ? 42 : 48
                     radius: 9
                     color: panel.dark ? "#06121d" : "#e4edf2"
                     border.color: panel.stateColor(communicationStatus)
@@ -160,6 +160,15 @@ Rectangle {
                         anchors.leftMargin: panel.compact ? 9 : 12
                         anchors.rightMargin: panel.compact ? 9 : 12
                         spacing: panel.compact ? 7 : 10
+
+                        Label {
+                            text: modelData.icon
+                            color: panel.stateColor(communicationStatus)
+                            font.pixelSize: panel.compact ? 14 : 16
+                            Layout.preferredWidth: panel.compact ? 17 : 20
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
 
                         Label {
                             text: modelData.label.toUpperCase()
@@ -183,26 +192,31 @@ Rectangle {
                             verticalAlignment: Text.AlignVCenter
                         }
 
-                        Label {
-                            text: panel.stateGlyph(communicationStatus)
-                            color: panel.stateColor(communicationStatus)
-                            font.pixelSize: panel.compact ? 15 : 17
-                            font.bold: true
-                            Layout.preferredWidth: panel.compact ? 13 : 16
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                        }
+                        RowLayout {
+                            Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+                            spacing: 2
 
-                        Label {
-                            text: panel.stateText(communicationStatus)
-                            color: panel.stateColor(communicationStatus)
-                            font.pixelSize: panel.compact ? 10 : 11
-                            font.bold: true
-                            elide: Text.ElideRight
-                            Layout.preferredWidth: panel.compact ? 78 : 92
-                            Layout.maximumWidth: panel.compact ? 84 : 100
-                            horizontalAlignment: Text.AlignRight
-                            verticalAlignment: Text.AlignVCenter
+                            Label {
+                                text: panel.stateGlyph(communicationStatus)
+                                color: panel.stateColor(communicationStatus)
+                                font.pixelSize: panel.compact ? 15 : 17
+                                font.bold: true
+                                Layout.preferredWidth: panel.compact ? 13 : 16
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+
+                            Label {
+                                text: panel.stateText(communicationStatus)
+                                color: panel.stateColor(communicationStatus)
+                                font.pixelSize: panel.compact ? 10 : 11
+                                font.bold: true
+                                elide: Text.ElideRight
+                                Layout.preferredWidth: panel.compact ? 78 : 92
+                                Layout.maximumWidth: panel.compact ? 84 : 100
+                                horizontalAlignment: Text.AlignRight
+                                verticalAlignment: Text.AlignVCenter
+                            }
                         }
                     }
                 }
