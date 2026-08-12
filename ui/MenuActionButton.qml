@@ -21,10 +21,12 @@ Rectangle {
     property real textVerticalOffset: 0
     property bool iconOnly: false
     readonly property bool hasStructuredContent: iconText.length > 0 || labelText.length > 0
+    readonly property bool glyphButton: iconOnly || (hasStructuredContent && labelText.length === 0)
     readonly property string displayText: hasStructuredContent
         ? iconText + (labelText.length > 0 ? " " + labelText : "")
         : text
     readonly property bool lightSurface: (panelColor.r + panelColor.g + panelColor.b) > 1.8
+    readonly property bool hovered: mouseArea.containsMouse
 
     signal clicked()
 
@@ -42,7 +44,7 @@ Rectangle {
         anchors.rightMargin: 10
 
         Text {
-            visible: !control.iconOnly && !control.subText && !control.hasStructuredContent
+            visible: !control.glyphButton && !control.subText && !control.hasStructuredContent
             anchors.centerIn: parent
             width: Math.min(implicitWidth, parent.width)
             height: Math.min(implicitHeight, parent.height)
@@ -59,7 +61,7 @@ Rectangle {
         }
 
         Row {
-            visible: !control.iconOnly && !control.subText && control.hasStructuredContent
+            visible: !control.glyphButton && !control.subText && control.hasStructuredContent
             anchors.centerIn: parent
             spacing: control.labelText.length > 0 ? 4 : 0
 
@@ -119,11 +121,11 @@ Rectangle {
     }
 
     Text {
-        visible: control.iconOnly
+        visible: control.glyphButton
         anchors.centerIn: parent
         anchors.horizontalCenterOffset: control.textHorizontalOffset
         anchors.verticalCenterOffset: control.textVerticalOffset
-        text: control.text
+        text: control.iconText.length > 0 ? control.iconText : control.text
         color: control.textColor
         font.pixelSize: control.textPixelSize
         font.bold: true

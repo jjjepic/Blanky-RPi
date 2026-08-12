@@ -381,7 +381,7 @@ ApplicationWindow {
                 }
 
                 MenuActionButton {
-                    text: "\u2699"
+                    iconText: "\u2699"
                     width: 50
                     height: 44
                     textPixelSize: 21
@@ -2588,14 +2588,14 @@ ApplicationWindow {
                             width: parent.width; height: 72; radius: 10
                             color: root.panelColor; border.color: root.borderColor; border.width: 1
                             opacity: root.audioSettingIsEditable("sensitivity") ? 1 : 0.56
-                            HoverHandler { id: sensitivityHintHover }
-                            BlankyToolTip { visible: sensitivityHintHover.hovered; text: t("sensitivityHelp"); lightSurface: !root.dark }
+                            HoverHandler { id: sensitivityHintHover; enabled: !sensitivityUnlock.hovered }
+                            BlankyToolTip { visible: sensitivityHintHover.hovered && !sensitivityUnlock.hovered; text: t("sensitivityHelp"); lightSurface: !root.dark }
                             Column {
                                 anchors.fill: parent; anchors.margins: 9; spacing: 4
                                 RowLayout {
                                     width: parent.width
                                     Label { text: t("startSensitivity"); color: root.textColor; font.bold: true; Layout.fillWidth: true }
-                                    MenuActionButton { visible: !root.audioSettingIsEditable("sensitivity"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("sensitivity") }
+                                    MenuActionButton { id: sensitivityUnlock; visible: !root.audioSettingIsEditable("sensitivity"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("sensitivity") }
                                     Label { text: Math.round(blanky.micSensitivity); color: root.mutedText; font.bold: true }
                                 }
                                 Slider { width: parent.width; from: 0; to: 100; stepSize: 1; value: blanky.micSensitivity; enabled: root.audioSettingIsEditable("sensitivity"); onMoved: blanky.setMicSensitivity(value) }
@@ -2606,14 +2606,14 @@ ApplicationWindow {
                             width: parent.width; height: 72; radius: 10
                             color: root.panelColor; border.color: root.borderColor; border.width: 1
                             opacity: root.audioSettingIsEditable("wait") ? 1 : 0.56
-                            HoverHandler { id: waitHintHover }
-                            BlankyToolTip { visible: waitHintHover.hovered; text: t("maxWaitHelp"); lightSurface: !root.dark }
+                            HoverHandler { id: waitHintHover; enabled: !waitUnlock.hovered }
+                            BlankyToolTip { visible: waitHintHover.hovered && !waitUnlock.hovered; text: t("maxWaitHelp"); lightSurface: !root.dark }
                             Column {
                                 anchors.fill: parent; anchors.margins: 9; spacing: 4
                                 RowLayout {
                                     width: parent.width
                                     Label { text: t("maxWait"); color: root.textColor; font.bold: true; Layout.fillWidth: true }
-                                    MenuActionButton { visible: !root.audioSettingIsEditable("wait"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("wait") }
+                                    MenuActionButton { id: waitUnlock; visible: !root.audioSettingIsEditable("wait"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("wait") }
                                     Label { text: formatFixed(blanky.micWaitForSpeech, 2) + " s"; color: root.mutedText; font.bold: true }
                                 }
                                 Slider { width: parent.width; from: 0.35; to: 2.50; stepSize: 0.05; value: blanky.micWaitForSpeech; enabled: root.audioSettingIsEditable("wait"); onMoved: blanky.setMicWaitForSpeech(value) }
@@ -2624,14 +2624,14 @@ ApplicationWindow {
                             width: parent.width; height: 72; radius: 10
                             color: root.panelColor; border.color: root.borderColor; border.width: 1
                             opacity: root.audioSettingIsEditable("minimum") ? 1 : 0.56
-                            HoverHandler { id: minimumHintHover }
-                            BlankyToolTip { visible: minimumHintHover.hovered; text: t("minimumCommandHelp"); lightSurface: !root.dark }
+                            HoverHandler { id: minimumHintHover; enabled: !minimumUnlock.hovered }
+                            BlankyToolTip { visible: minimumHintHover.hovered && !minimumUnlock.hovered; text: t("minimumCommandHelp"); lightSurface: !root.dark }
                             Column {
                                 anchors.fill: parent; anchors.margins: 9; spacing: 4
                                 RowLayout {
                                     width: parent.width
                                     Label { text: t("minimumCommand"); color: root.textColor; font.bold: true; Layout.fillWidth: true }
-                                    MenuActionButton { visible: !root.audioSettingIsEditable("minimum"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("minimum") }
+                                    MenuActionButton { id: minimumUnlock; visible: !root.audioSettingIsEditable("minimum"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("minimum") }
                                     Label { text: formatFixed(blanky.micMinCommand, 2) + " s"; color: root.mutedText; font.bold: true }
                                 }
                                 Slider { width: parent.width; from: 0.25; to: 1.80; stepSize: 0.05; value: blanky.micMinCommand; enabled: root.audioSettingIsEditable("minimum"); onMoved: blanky.setMicMinCommand(value) }
@@ -2642,14 +2642,14 @@ ApplicationWindow {
                             width: parent.width; height: 72; radius: 10
                             color: root.panelColor; border.color: root.borderColor; border.width: 1
                             opacity: root.audioSettingIsEditable("silence") ? 1 : 0.56
-                            HoverHandler { id: silenceHintHover }
-                            BlankyToolTip { visible: silenceHintHover.hovered; text: t("silenceHelp"); lightSurface: !root.dark }
+                            HoverHandler { id: silenceHintHover; enabled: !silenceUnlock.hovered }
+                            BlankyToolTip { visible: silenceHintHover.hovered && !silenceUnlock.hovered; text: t("silenceHelp"); lightSurface: !root.dark }
                             Column {
                                 anchors.fill: parent; anchors.margins: 9; spacing: 4
                                 RowLayout {
                                     width: parent.width
                                     Label { text: t("silenceHold"); color: root.textColor; font.bold: true; Layout.fillWidth: true }
-                                    MenuActionButton { visible: !root.audioSettingIsEditable("silence"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("silence") }
+                                    MenuActionButton { id: silenceUnlock; visible: !root.audioSettingIsEditable("silence"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("silence") }
                                     Label { text: formatFixed(blanky.micSilenceHold, 2) + " s"; color: root.mutedText; font.bold: true }
                                 }
                                 Slider { width: parent.width; from: 0.18; to: 1.00; stepSize: 0.05; value: blanky.micSilenceHold; enabled: root.audioSettingIsEditable("silence"); onMoved: blanky.setMicSilenceHold(value) }
@@ -2660,14 +2660,14 @@ ApplicationWindow {
                             width: parent.width; height: 72; radius: 10
                             color: root.panelColor; border.color: root.borderColor; border.width: 1
                             opacity: root.audioSettingIsEditable("gain") ? 1 : 0.56
-                            HoverHandler { id: gainHintHover }
-                            BlankyToolTip { visible: gainHintHover.hovered; text: t("gainHelp"); lightSurface: !root.dark }
+                            HoverHandler { id: gainHintHover; enabled: !gainUnlock.hovered }
+                            BlankyToolTip { visible: gainHintHover.hovered && !gainUnlock.hovered; text: t("gainHelp"); lightSurface: !root.dark }
                             Column {
                                 anchors.fill: parent; anchors.margins: 9; spacing: 4
                                 RowLayout {
                                     width: parent.width
                                     Label { text: t("microphoneGain"); color: root.textColor; font.bold: true; Layout.fillWidth: true }
-                                    MenuActionButton { visible: !root.audioSettingIsEditable("gain"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("gain") }
+                                    MenuActionButton { id: gainUnlock; visible: !root.audioSettingIsEditable("gain"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("gain") }
                                     Label { text: formatFixed(blanky.micMaxGain, 2) + "x"; color: root.mutedText; font.bold: true }
                                 }
                                 Slider { width: parent.width; from: 1.0; to: 6.0; stepSize: 0.1; value: blanky.micMaxGain; enabled: root.audioSettingIsEditable("gain"); onMoved: blanky.setMicMaxGain(value) }
@@ -2679,29 +2679,29 @@ ApplicationWindow {
                         RowLayout {
                             width: parent.width
                             opacity: root.audioSettingIsEditable("highpass") ? 1 : 0.56
-                            HoverHandler { id: highPassHintHover }
-                            BlankyToolTip { visible: highPassHintHover.hovered; text: t("highPassHelp"); lightSurface: !root.dark }
+                            HoverHandler { id: highPassHintHover; enabled: !highPassUnlock.hovered }
+                            BlankyToolTip { visible: highPassHintHover.hovered && !highPassUnlock.hovered; text: t("highPassHelp"); lightSurface: !root.dark }
                             Switch { checked: blanky.micHighpassEnabled; enabled: root.audioSettingIsEditable("highpass"); onClicked: blanky.setMicHighpassEnabled(checked) }
                             Label { text: t("highPass"); color: root.textColor; Layout.fillWidth: true }
-                            MenuActionButton { visible: !root.audioSettingIsEditable("highpass"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("highpass") }
+                            MenuActionButton { id: highPassUnlock; visible: !root.audioSettingIsEditable("highpass"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("highpass") }
                         }
                         RowLayout {
                             width: parent.width
                             opacity: root.audioSettingIsEditable("gate") ? 1 : 0.56
-                            HoverHandler { id: noiseGateHintHover }
-                            BlankyToolTip { visible: noiseGateHintHover.hovered; text: t("noiseGateHelp"); lightSurface: !root.dark }
+                            HoverHandler { id: noiseGateHintHover; enabled: !noiseGateUnlock.hovered }
+                            BlankyToolTip { visible: noiseGateHintHover.hovered && !noiseGateUnlock.hovered; text: t("noiseGateHelp"); lightSurface: !root.dark }
                             Switch { checked: blanky.micNoiseGateEnabled; enabled: root.audioSettingIsEditable("gate"); onClicked: blanky.setMicNoiseGateEnabled(checked) }
                             Label { text: t("noiseGate"); color: root.textColor; Layout.fillWidth: true }
-                            MenuActionButton { visible: !root.audioSettingIsEditable("gate"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("gate") }
+                            MenuActionButton { id: noiseGateUnlock; visible: !root.audioSettingIsEditable("gate"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("gate") }
                         }
                         RowLayout {
                             width: parent.width
                             opacity: root.audioSettingIsEditable("reduction") ? 1 : 0.56
-                            HoverHandler { id: noiseReductionHintHover }
-                            BlankyToolTip { visible: noiseReductionHintHover.hovered; text: t("noiseReductionHelp"); lightSurface: !root.dark }
+                            HoverHandler { id: noiseReductionHintHover; enabled: !noiseReductionUnlock.hovered }
+                            BlankyToolTip { visible: noiseReductionHintHover.hovered && !noiseReductionUnlock.hovered; text: t("noiseReductionHelp"); lightSurface: !root.dark }
                             Switch { checked: blanky.micNoiseReductionEnabled; enabled: root.audioSettingIsEditable("reduction"); onClicked: blanky.setMicNoiseReductionEnabled(checked) }
                             Label { text: t("noiseReduction"); color: root.textColor; Layout.fillWidth: true }
-                            MenuActionButton { visible: !root.audioSettingIsEditable("reduction"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("reduction") }
+                            MenuActionButton { id: noiseReductionUnlock; visible: !root.audioSettingIsEditable("reduction"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("reduction") }
                         }
                     }
                 }
