@@ -130,7 +130,7 @@ Rectangle {
 
         GridLayout {
             Layout.fillWidth: true
-            Layout.alignment: Qt.AlignTop
+            Layout.fillHeight: true
             columns: 2
             columnSpacing: panel.contentSpacing
             rowSpacing: panel.contentSpacing
@@ -148,8 +148,9 @@ Rectangle {
                     Layout.column: (modelData.key === "mqtt_base" || modelData.key === "mqtt_phone") ? 1 : 0
                     Layout.row: (modelData.key === "mqtt_phone" || modelData.key === "opcua") ? 1 : 0
                     Layout.fillWidth: true
-                    Layout.preferredHeight: panel.compact ? 50 : 56
-                    Layout.minimumHeight: panel.compact ? 50 : 56
+                    Layout.fillHeight: true
+                    Layout.preferredHeight: panel.compact ? 62 : 70
+                    Layout.minimumHeight: panel.compact ? 58 : 66
                     radius: 9
                     color: panel.dark ? "#06121d" : "#e4edf2"
                     border.color: panel.stateColor(communicationStatus)
@@ -159,56 +160,61 @@ Rectangle {
                         anchors.fill: parent
                         anchors.leftMargin: panel.compact ? 9 : 12
                         anchors.rightMargin: panel.compact ? 9 : 12
-                        anchors.topMargin: panel.compact ? 4 : 6
-                        anchors.bottomMargin: panel.compact ? 4 : 6
-                        spacing: 1
+                        anchors.topMargin: panel.compact ? 6 : 8
+                        anchors.bottomMargin: panel.compact ? 6 : 8
+                        spacing: panel.compact ? 3 : 5
+
+                        Label {
+                            text: modelData.icon + "  " + modelData.label.toUpperCase()
+                            color: panel.mutedText
+                            font.pixelSize: panel.compact ? 11 : 13
+                            font.bold: true
+                            elide: Text.ElideRight
+                            Layout.fillWidth: true
+                            Layout.minimumWidth: 0
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
 
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: panel.compact ? 4 : 6
 
                             Label {
-                                text: modelData.icon
-                                color: panel.stateColor(communicationStatus)
-                                font.pixelSize: panel.compact ? 14 : 16
-                                Layout.preferredWidth: panel.compact ? 17 : 20
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                            }
-
-                            Label {
-                                text: modelData.label.toUpperCase()
+                                text: panel.detailFor(modelData.key)
                                 color: panel.mutedText
                                 font.pixelSize: panel.compact ? 9 : 10
-                                font.bold: true
                                 elide: Text.ElideRight
                                 Layout.fillWidth: true
                                 Layout.minimumWidth: 0
+                                horizontalAlignment: Text.AlignLeft
                                 verticalAlignment: Text.AlignVCenter
                             }
 
-                            Label {
-                                text: panel.stateText(communicationStatus)
-                                color: panel.stateColor(communicationStatus)
-                                font.pixelSize: panel.compact ? 10 : 11
-                                font.bold: true
-                                elide: Text.ElideRight
-                                Layout.preferredWidth: panel.compact ? 78 : 92
-                                Layout.maximumWidth: panel.compact ? 84 : 100
-                                horizontalAlignment: Text.AlignRight
-                                verticalAlignment: Text.AlignVCenter
-                            }
-                        }
+                            RowLayout {
+                                Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+                                spacing: 2
 
-                        Label {
-                            text: panel.detailFor(modelData.key)
-                            color: panel.mutedText
-                            font.pixelSize: panel.compact ? 9 : 10
-                            elide: Text.ElideRight
-                            Layout.fillWidth: true
-                            Layout.minimumWidth: 0
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
+                                Label {
+                                    text: panel.stateGlyph(communicationStatus)
+                                    color: panel.stateColor(communicationStatus)
+                                    font.pixelSize: panel.compact ? 13 : 15
+                                    font.bold: true
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+
+                                Label {
+                                    text: panel.stateText(communicationStatus)
+                                    color: panel.stateColor(communicationStatus)
+                                    font.pixelSize: panel.compact ? 10 : 11
+                                    font.bold: true
+                                    elide: Text.ElideRight
+                                    Layout.preferredWidth: panel.compact ? 78 : 92
+                                    Layout.maximumWidth: panel.compact ? 84 : 100
+                                    horizontalAlignment: Text.AlignRight
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+                            }
                         }
                     }
                 }

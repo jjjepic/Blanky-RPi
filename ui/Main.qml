@@ -1445,7 +1445,7 @@ ApplicationWindow {
         x: root.width - width - 18
         y: mainColumn.y + statusPanel.y
         width: root.rightPanelWidth
-        height: mainColumn.y + workspacePanel.y + workspaceContent.y + directControlPanel.y - y - 12
+        height: mainColumn.y + primaryControlsPanel.y + primaryControlsPanel.height - y
         z: 3
         controller: blanky
         language: blanky.language
