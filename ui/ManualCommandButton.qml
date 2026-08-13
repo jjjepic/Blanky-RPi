@@ -23,7 +23,7 @@ Rectangle {
     radius: 8
     height: parent && parent.controlButtonHeight !== undefined ? parent.controlButtonHeight : 42
     color: active ? Qt.lighter(panelColor, 1.45) : panelColor
-    opacity: commandEnabled ? 1.0 : 0.42
+    opacity: commandEnabled || active ? 1.0 : 0.42
     border.color: active ? iconColor : borderColor
     border.width: active ? 2 : 1
 
