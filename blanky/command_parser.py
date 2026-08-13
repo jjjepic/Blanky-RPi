@@ -2,6 +2,7 @@ import json
 import os
 import re
 import unicodedata
+from difflib import SequenceMatcher
 from typing import Tuple
 
 from openai import OpenAI
@@ -118,6 +119,62 @@ def cylinder_letter(text: str):
     return m.group(1).upper() if m else None
 
 
+def resolve_mode_command(text: str, data: dict) -> str:
+    """Recognise an explicit mode request, including small STT spelling changes."""
+    tokens = text.split()
+    direct_mode_request = len(tokens) <= 3 or "modo" in text or "mode" in text
+    if not direct_mode_request:
+        return ""
+
+    mode_sets = (
+        ("MODE_FAST", data.get("mode_fast_ph", []) + data.get("mode_fast_words", [])),
+        ("MODE_IDEAL", data.get("mode_ideal_ph", []) + data.get("mode_ideal_words", [])),
+        ("MODE_MANUAL", data.get("mode_manual_ph", []) + data.get("mode_manual_words", [])),
+    )
+    for command, variants in mode_sets:
+        if contains_any_substring(text, variants):
+            return command
+
+    # Restrict fuzzy matching to very short requests so ordinary speech is not a command.
+    if not 1 <= len(tokens) <= 3:
+        return ""
+    for token in tokens:
+        if len(token) < 5:
+            continue
+        for command, variants in mode_sets:
+            for variant in variants:
+                candidate = normalize(variant)
+                if " " in candidate or len(candidate) < 5:
+                    continue
+                if SequenceMatcher(None, token, candidate).ratio() >= 0.84:
+                    return command
+    return ""
+
+
+def resolve_change_mode_request(text: str, data: dict) -> bool:
+    """Recognise short spoken variants of the safe mode-change request."""
+    variants = data.get("change_mode_ph", []) + data.get("change_mode_words", [])
+    if contains_any_substring(text, variants):
+        return True
+
+    tokens = text.split()
+    if not 1 <= len(tokens) <= 3:
+        return False
+    candidates = list(tokens)
+    if len(tokens) > 1:
+        candidates.append("".join(tokens))
+    for token in candidates:
+        if len(token) < 5:
+            continue
+        for variant in variants:
+            candidate = normalize(variant)
+            if " " in candidate or len(candidate) < 5:
+                continue
+            if SequenceMatcher(None, token, candidate).ratio() >= 0.80:
+                return True
+    return False
+
+
 def parse_command(raw_text: str, lang: str) -> Tuple[str, str]:
     text = normalize(raw_text)
     if not text:
@@ -133,11 +190,15 @@ def parse_command(raw_text: str, lang: str) -> Tuple[str, str]:
     # ============ MODOS ============
     # PT: pode vir "mudar modo", ou apenas conter "modo ..."
     # EN: idem com "mode"
-    change_mode = (
-        contains_any_substring(text, d.get("change_mode_ph", []))
-        or contains_any_substring(text, d.get("change_mode_words", []))
-        or ("modo" in text if lang == "pt" else "mode" in text)
-    )
+    change_mode = resolve_change_mode_request(text, d) or ("modo" in text if lang == "pt" else "mode" in text)
+    mode_command = resolve_mode_command(text, d)
+    if mode_command:
+        if mode_command == "MODE_FAST":
+            return mode_command, "Modo rapido ativado." if lang == "pt" else "Fast mode enabled."
+        if mode_command == "MODE_IDEAL":
+            return mode_command, "Modo ideal ativado." if lang == "pt" else "Ideal mode enabled."
+        return mode_command, "Modo manual ativado." if lang == "pt" else "Manual mode enabled."
+
     if change_mode:
         fast = d.get("mode_fast_ph", []) + d.get("mode_fast_words", [])
         ideal = d.get("mode_ideal_ph", []) + d.get("mode_ideal_words", [])

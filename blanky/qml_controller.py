@@ -397,34 +397,55 @@ class BlankyController(QObject):
         if not self._audio_diagnostic_entries:
             return ""
 
+        id_w = 5
+        time_w = 8
+        capture_w = 8
+        transcript_w = 28
+        command_w = 14
+        result_w = 9
+        duration_w = 7
         lines = []
         for index, entry in enumerate(self._audio_diagnostic_entries, start=1):
-            transcript = str(entry["text"])
-            transcript_preview = transcript if len(transcript) <= 32 else transcript[:31] + "…"
-            lines.append(
-                "[{id:03d}] | {time:<8} | {capture:>7.2f}s | {text:<32} | {command:<16} | {result:<6} | {duration:>7.2f}s".format(
-                    id=index,
-                    time=entry["time"],
-                    capture=float(entry["capture"]),
-                    text=transcript_preview,
-                    command=entry["command"],
-                    result=entry.get("result", "--"),
-                    duration=float(entry.get("duration", 0.0)),
-                )
+            transcript_lines = textwrap.wrap(
+                str(entry["text"]), width=transcript_w,
+                break_long_words=True, break_on_hyphens=False,
+            ) or [""]
+            prefix = (
+                f"[{index:03d}]".ljust(id_w) + " | "
+                + str(entry["time"]).ljust(time_w) + " | "
+                + f"{float(entry['capture']):.2f}s".rjust(capture_w) + " | "
+                + transcript_lines[0].ljust(transcript_w) + " | "
+                + str(entry["command"]).ljust(command_w) + " | "
+                + str(entry.get("result", "--")).ljust(result_w) + " | "
+                + f"{float(entry.get('duration', 0.0)):.2f}s".rjust(duration_w)
             )
-            if len(transcript) > 32:
-                lines.append("       |          |          | " + transcript)
+            lines.append(prefix)
+
+            continuation_prefix = (
+                " ".ljust(id_w) + " | " + " ".ljust(time_w) + " | "
+                + " ".ljust(capture_w) + " | "
+            )
+            continuation_suffix = (
+                " | " + " ".ljust(command_w) + " | "
+                + " ".ljust(result_w) + " | " + " ".ljust(duration_w)
+            )
+            for transcript_line in transcript_lines[1:]:
+                lines.append(continuation_prefix + transcript_line.ljust(transcript_w) + continuation_suffix)
         return "\n".join(lines)
 
     @Property(str, notify=audioDiagnosticLogTextChanged)
     def audioDiagnosticHeaderText(self):
-        if self._language == "pt":
-            return "ID    | Hora     | Capta\u00e7\u00e3o | Transcri\u00e7\u00e3o                      | Comando          | Resultado | Dura\u00e7\u00e3o"
-        return "ID    | Time     | Capture  | Transcript                       | Command          | Result    | Duration"
+        headers = (
+            ("ID", "Hora", "Capta\u00e7\u00e3o", "Transcri\u00e7\u00e3o", "Comando", "Resultado", "Dura\u00e7\u00e3o")
+            if self._language == "pt"
+            else ("ID", "Time", "Capture", "Transcript", "Command", "Result", "Duration")
+        )
+        widths = (5, 8, 8, 28, 14, 9, 7)
+        return " | ".join(value.ljust(width) for value, width in zip(headers, widths))
 
     @Property(str, notify=audioDiagnosticLogTextChanged)
     def audioDiagnosticDividerText(self):
-        return "----- | -------- | -------- | -------------------------------- | ---------------- | --------- | --------"
+        return " | ".join("-" * width for width in (5, 8, 8, 28, 14, 9, 7))
 
     @Property(str, notify=stateCompactChanged)
     def stateCompact(self):
@@ -910,7 +931,18 @@ class BlankyController(QObject):
 
     def _on_recognized(self, text: str):
         if text:
-            self._set_recognized(text)
+            self._set_recognized(self._repair_display_text(text))
+
+    @staticmethod
+    def _repair_display_text(value: str) -> str:
+        """Repair UTF-8 text that was incorrectly decoded as Latin-1 upstream."""
+        text = str(value or "")
+        if not any(marker in text for marker in ("Ã", "Â", "â")):
+            return text
+        try:
+            return text.encode("latin-1").decode("utf-8")
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            return text
 
     def _append_audio_diagnostic(self, entry: dict):
         item = dict(entry or {})
@@ -923,6 +955,7 @@ class BlankyController(QObject):
         item.setdefault("text", self._tr("no_audio"))
         item.setdefault("result", "--")
         item.setdefault("duration", 0.0)
+        item["text"] = self._repair_display_text(item["text"])
         self._audio_diagnostic_entries.append(item)
         self.audioDiagnosticLogTextChanged.emit()
 
