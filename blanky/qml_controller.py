@@ -754,11 +754,11 @@ class BlankyController(QObject):
     @Slot()
     def shutdownApplication(self):
         self._stop_and_flush_audio()
-        _, response = self._bridge.shutdown_system(self._language, source="button")
+        self._bridge.shutdown_system(self._language, source="button")
         self._set_recognized(self._tr("system_shutdown"))
         self._set_status(self._tr("shutting_down_status"))
-        self._enqueue_tts(response)
-        QTimer.singleShot(2000, QCoreApplication.quit)
+        # The QML transition already gives the operator a three-second shutdown notice.
+        QTimer.singleShot(80, QCoreApplication.quit)
 
     @Slot(str)
     def exportEvents(self, fmt: str):
@@ -1249,6 +1249,7 @@ class BlankyController(QObject):
         source_w = 10
         command_w = 18
         status_w = 6
+        current_generation = int(snapshot.get("event_generation", 0) or 0)
         rich_rows = []
         for ev in snapshot.get("events", []):
             event_id = int(ev.get("id", 0) or 0)
@@ -1257,7 +1258,8 @@ class BlankyController(QObject):
             source = self._source_label(str(ev.get("source") or ""))
             status = "OK" if ev.get("accepted") else "REJECT"
             command = str(ev.get("command") or "")
-            color = self._event_visual_color(command, bool(ev.get("accepted")))
+            is_previous_session = int(ev.get("generation", 0) or 0) < current_generation
+            color = "#6d8290" if is_previous_session else self._event_visual_color(command, bool(ev.get("accepted")))
             detail_lines = textwrap.wrap(
                 self._localized_event_detail(ev), width=44,
                 break_long_words=False, break_on_hyphens=False,
