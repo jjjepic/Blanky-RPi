@@ -77,10 +77,12 @@ Popup {
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 52
+            Layout.leftMargin: 1
+            Layout.rightMargin: 1
+            Layout.topMargin: 1
             color: Qt.darker(panel.panelColor, 1.18)
-            radius: 16
-            border.color: panel.borderColor
-            border.width: 1
+            // Keep the outer frame visible across the title bar.
+            radius: 15
 
             Rectangle {
                 anchors.left: parent.left

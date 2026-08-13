@@ -21,10 +21,12 @@ Rectangle {
     property real textVerticalOffset: 0
     property bool iconOnly: false
     readonly property bool hasStructuredContent: iconText.length > 0 || labelText.length > 0
+    readonly property bool glyphButton: iconOnly || (hasStructuredContent && labelText.length === 0)
     readonly property string displayText: hasStructuredContent
         ? iconText + (labelText.length > 0 ? " " + labelText : "")
         : text
     readonly property bool lightSurface: (panelColor.r + panelColor.g + panelColor.b) > 1.8
+    readonly property bool hovered: mouseArea.containsMouse
 
     signal clicked()
 
@@ -42,7 +44,7 @@ Rectangle {
         anchors.rightMargin: 10
 
         Text {
-            visible: !control.iconOnly && !control.subText
+            visible: !control.glyphButton && !control.subText && !control.hasStructuredContent
             anchors.centerIn: parent
             width: Math.min(implicitWidth, parent.width)
             height: Math.min(implicitHeight, parent.height)
@@ -56,6 +58,40 @@ Rectangle {
             elide: Text.ElideRight
             wrapMode: Text.NoWrap
             transform: Translate { x: control.textHorizontalOffset; y: control.textVerticalOffset }
+        }
+
+        Row {
+            visible: !control.glyphButton && !control.subText && control.hasStructuredContent
+            anchors.centerIn: parent
+            height: parent.height
+            spacing: control.labelText.length > 0 ? 4 : 0
+
+            Text {
+                visible: control.iconText.length > 0
+                height: parent.height
+                text: control.iconText
+                color: control.textColor
+                font.pixelSize: control.textPixelSize
+                font.bold: true
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                transform: Translate { x: control.textHorizontalOffset; y: control.textVerticalOffset }
+            }
+
+            Text {
+                visible: control.labelText.length > 0
+                height: parent.height
+                text: control.labelText
+                textFormat: Text.RichText
+                color: control.textColor
+                font.pixelSize: control.textPixelSize
+                font.bold: true
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                elide: Text.ElideRight
+                wrapMode: Text.NoWrap
+                transform: Translate { x: control.textHorizontalOffset; y: control.textVerticalOffset }
+            }
         }
 
         Column {
@@ -90,16 +126,15 @@ Rectangle {
     }
 
     Text {
-        visible: control.iconOnly
-        anchors.centerIn: parent
-        anchors.horizontalCenterOffset: control.textHorizontalOffset
-        anchors.verticalCenterOffset: control.textVerticalOffset
-        text: control.text
+        visible: control.glyphButton
+        anchors.fill: parent
+        text: control.iconText.length > 0 ? control.iconText : control.text
         color: control.textColor
         font.pixelSize: control.textPixelSize
         font.bold: true
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
+        transform: Translate { x: control.textHorizontalOffset; y: control.textVerticalOffset }
     }
 
     MouseArea {
@@ -111,27 +146,10 @@ Rectangle {
         onClicked: control.clicked()
     }
 
-    ToolTip {
+    BlankyToolTip {
         parent: control
         visible: mouseArea.containsMouse && control.toolTip.length > 0
-        delay: 450
-        timeout: 5000
         text: control.toolTip
-        background: Rectangle {
-            color: control.lightSurface ? "#e6eef2" : "#061521"
-            border.color: control.lightSurface ? "#277cab" : "#3ba8e5"
-            border.width: 1
-            radius: 7
-        }
-        contentItem: Label {
-            text: control.toolTip
-            color: control.lightSurface ? "#123d58" : "#dff5ff"
-            font.pixelSize: 12
-            font.bold: true
-            leftPadding: 10
-            rightPadding: 10
-            topPadding: 6
-            bottomPadding: 6
-        }
+        lightSurface: control.lightSurface
     }
 }
