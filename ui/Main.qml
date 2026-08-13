@@ -2793,7 +2793,7 @@ ApplicationWindow {
 
     FloatingPanel {
         id: audioLogsPanel
-        width: 880
+        width: 980
         height: 520
         panelTitle: t("audioLogs")
         panelColor: root.panelColor
@@ -2837,7 +2837,7 @@ ApplicationWindow {
                     text: blanky.audioDiagnosticLogText || t("noAudioLogs")
                     readOnly: true
                     selectByMouse: true
-                    wrapMode: TextEdit.Wrap
+                    wrapMode: TextEdit.NoWrap
                     color: root.textColor
                     font.family: "Noto Sans Mono"
                     font.pixelSize: 11
