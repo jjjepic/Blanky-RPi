@@ -931,7 +931,18 @@ class BlankyController(QObject):
 
     def _on_recognized(self, text: str):
         if text:
-            self._set_recognized(text)
+            self._set_recognized(self._repair_display_text(text))
+
+    @staticmethod
+    def _repair_display_text(value: str) -> str:
+        """Repair UTF-8 text that was incorrectly decoded as Latin-1 upstream."""
+        text = str(value or "")
+        if not any(marker in text for marker in ("Ã", "Â", "â")):
+            return text
+        try:
+            return text.encode("latin-1").decode("utf-8")
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            return text
 
     def _append_audio_diagnostic(self, entry: dict):
         item = dict(entry or {})
@@ -944,6 +955,7 @@ class BlankyController(QObject):
         item.setdefault("text", self._tr("no_audio"))
         item.setdefault("result", "--")
         item.setdefault("duration", 0.0)
+        item["text"] = self._repair_display_text(item["text"])
         self._audio_diagnostic_entries.append(item)
         self.audioDiagnosticLogTextChanged.emit()
 

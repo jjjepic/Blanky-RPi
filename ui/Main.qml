@@ -2934,37 +2934,42 @@ ApplicationWindow {
                 }
             }
 
-            ScrollView {
-                id: audioLogsScroll
+            Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                clip: true
-                ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
-                ScrollBar.vertical.policy: ScrollBar.AlwaysOn
 
-                TextEdit {
-                    width: audioLogsScroll.availableWidth
-                    height: Math.max(audioLogsScroll.availableHeight, contentHeight + 6)
-                    visible: blanky.audioDiagnosticLogText.length > 0
-                    text: blanky.audioDiagnosticLogText
-                    readOnly: true
-                    selectByMouse: true
-                    wrapMode: TextEdit.NoWrap
-                    color: root.textColor
-                    font.family: "Noto Sans Mono"
-                    font.pixelSize: 11
-                    textFormat: TextEdit.PlainText
+                ScrollView {
+                    id: audioLogsScroll
+                    anchors.fill: parent
+                    clip: true
+                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                    ScrollBar.vertical.policy: ScrollBar.AlwaysOn
+
+                    TextEdit {
+                        width: audioLogsScroll.availableWidth
+                        height: Math.max(audioLogsScroll.availableHeight, contentHeight + 6)
+                        text: blanky.audioDiagnosticLogText
+                        readOnly: true
+                        selectByMouse: true
+                        wrapMode: TextEdit.NoWrap
+                        color: root.textColor
+                        font.family: "Noto Sans Mono"
+                        font.pixelSize: 11
+                        textFormat: TextEdit.PlainText
+                    }
+                    background: Rectangle { color: root.panelAltColor; radius: 10; border.color: root.borderColor; border.width: 1 }
                 }
+
                 Label {
                     anchors.centerIn: parent
                     visible: blanky.audioDiagnosticLogText.length === 0
                     text: blanky.language === "pt" ? "Ainda n\u00e3o existem registos de voz." : t("noAudioLogs")
-                    color: root.mutedText
-                    font.pixelSize: 13
+                    color: root.textColor
+                    font.pixelSize: 14
                     font.bold: true
                     horizontalAlignment: Text.AlignHCenter
+                    z: 1
                 }
-                background: Rectangle { color: root.panelAltColor; radius: 10; border.color: root.borderColor; border.width: 1 }
             }
 
             RowLayout {

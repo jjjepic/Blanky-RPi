@@ -30,7 +30,7 @@
     "mode_ideal_words": ["ideal", "idial", "ideial", "ideais", "automatico", "auto", "normal", "otimo", "otimizado", "optimal", "optimo"],
     "mode_manual_words": ["manual", "manuais", "manualmente", "manuale", "operator", "hand"],
 
-    "change_mode_ph": ["mudar modo", "mudar de modo", "trocar modo", "trocar de modo", "tu cara", "alterar modo", "alterar de modo", "muda modo", "troca modo", "altera modo", "alterna modo", "quero mudar de modo", "quero trocar de modo"],
+    "change_mode_ph": ["mudar modo", "mudar de modo", "trocar modo", "trocar de modo", "tu cara", "tu cala", "alterar modo", "alterar de modo", "muda modo", "troca modo", "altera modo", "alterna modo", "quero mudar de modo", "quero trocar de modo"],
     "change_mode_words": ["mudar", "muda", "mude", "mudanca", "trocar", "troca", "troque", "alterar", "altera", "altere", "alternar", "alterna"]
   },
 
