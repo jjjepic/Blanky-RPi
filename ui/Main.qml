@@ -2904,7 +2904,7 @@ ApplicationWindow {
 
     FloatingPanel {
         id: audioLogsPanel
-        width: 980
+        width: 760
         height: 520
         panelTitle: t("audioLogs")
         panelColor: root.panelColor
@@ -2945,7 +2945,8 @@ ApplicationWindow {
                 TextEdit {
                     width: audioLogsScroll.availableWidth
                     height: Math.max(audioLogsScroll.availableHeight, contentHeight + 6)
-                    text: blanky.audioDiagnosticLogText || t("noAudioLogs")
+                    visible: blanky.audioDiagnosticLogText.length > 0
+                    text: blanky.audioDiagnosticLogText
                     readOnly: true
                     selectByMouse: true
                     wrapMode: TextEdit.NoWrap
@@ -2953,6 +2954,15 @@ ApplicationWindow {
                     font.family: "Noto Sans Mono"
                     font.pixelSize: 11
                     textFormat: TextEdit.PlainText
+                }
+                Label {
+                    anchors.centerIn: parent
+                    visible: blanky.audioDiagnosticLogText.length === 0
+                    text: blanky.language === "pt" ? "Ainda n\u00e3o existem registos de voz." : t("noAudioLogs")
+                    color: root.mutedText
+                    font.pixelSize: 13
+                    font.bold: true
+                    horizontalAlignment: Text.AlignHCenter
                 }
                 background: Rectangle { color: root.panelAltColor; radius: 10; border.color: root.borderColor; border.width: 1 }
             }

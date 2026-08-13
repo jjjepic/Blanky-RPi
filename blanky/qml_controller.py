@@ -402,7 +402,7 @@ class BlankyController(QObject):
         capture_w = 8
         transcript_w = 28
         command_w = 14
-        result_w = 8
+        result_w = 9
         duration_w = 7
         lines = []
         for index, entry in enumerate(self._audio_diagnostic_entries, start=1):
@@ -435,13 +435,17 @@ class BlankyController(QObject):
 
     @Property(str, notify=audioDiagnosticLogTextChanged)
     def audioDiagnosticHeaderText(self):
-        if self._language == "pt":
-            return "ID    | Hora     | Capta\u00e7\u00e3o | Transcri\u00e7\u00e3o                  | Comando        | Resultado | Dura\u00e7\u00e3o"
-        return "ID    | Time     | Capture  | Transcript                   | Command        | Result    | Duration"
+        headers = (
+            ("ID", "Hora", "Capta\u00e7\u00e3o", "Transcri\u00e7\u00e3o", "Comando", "Resultado", "Dura\u00e7\u00e3o")
+            if self._language == "pt"
+            else ("ID", "Time", "Capture", "Transcript", "Command", "Result", "Duration")
+        )
+        widths = (5, 8, 8, 28, 14, 9, 7)
+        return " | ".join(value.ljust(width) for value, width in zip(headers, widths))
 
     @Property(str, notify=audioDiagnosticLogTextChanged)
     def audioDiagnosticDividerText(self):
-        return "----- | -------- | -------- | ---------------------------- | -------------- | --------- | --------"
+        return " | ".join("-" * width for width in (5, 8, 8, 28, 14, 9, 7))
 
     @Property(str, notify=stateCompactChanged)
     def stateCompact(self):

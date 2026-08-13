@@ -151,6 +151,30 @@ def resolve_mode_command(text: str, data: dict) -> str:
     return ""
 
 
+def resolve_change_mode_request(text: str, data: dict) -> bool:
+    """Recognise short spoken variants of the safe mode-change request."""
+    variants = data.get("change_mode_ph", []) + data.get("change_mode_words", [])
+    if contains_any_substring(text, variants):
+        return True
+
+    tokens = text.split()
+    if not 1 <= len(tokens) <= 3:
+        return False
+    candidates = list(tokens)
+    if len(tokens) > 1:
+        candidates.append("".join(tokens))
+    for token in candidates:
+        if len(token) < 5:
+            continue
+        for variant in variants:
+            candidate = normalize(variant)
+            if " " in candidate or len(candidate) < 5:
+                continue
+            if SequenceMatcher(None, token, candidate).ratio() >= 0.80:
+                return True
+    return False
+
+
 def parse_command(raw_text: str, lang: str) -> Tuple[str, str]:
     text = normalize(raw_text)
     if not text:
@@ -166,11 +190,7 @@ def parse_command(raw_text: str, lang: str) -> Tuple[str, str]:
     # ============ MODOS ============
     # PT: pode vir "mudar modo", ou apenas conter "modo ..."
     # EN: idem com "mode"
-    change_mode = (
-        contains_any_substring(text, d.get("change_mode_ph", []))
-        or contains_any_substring(text, d.get("change_mode_words", []))
-        or ("modo" in text if lang == "pt" else "mode" in text)
-    )
+    change_mode = resolve_change_mode_request(text, d) or ("modo" in text if lang == "pt" else "mode" in text)
     mode_command = resolve_mode_command(text, d)
     if mode_command:
         if mode_command == "MODE_FAST":

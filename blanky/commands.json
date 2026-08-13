@@ -30,8 +30,8 @@
     "mode_ideal_words": ["ideal", "idial", "ideial", "ideais", "automatico", "auto", "normal", "otimo", "otimizado", "optimal", "optimo"],
     "mode_manual_words": ["manual", "manuais", "manualmente", "manuale", "operator", "hand"],
 
-    "change_mode_ph": ["mudar modo", "trocar modo", "alterar modo", "muda modo", "troca modo", "altera modo", "alterna modo", "quero mudar de modo"],
-    "change_mode_words": ["mudar", "muda", "trocar", "troca", "alterar", "altera"]
+    "change_mode_ph": ["mudar modo", "mudar de modo", "trocar modo", "trocar de modo", "tu cara", "alterar modo", "alterar de modo", "muda modo", "troca modo", "altera modo", "alterna modo", "quero mudar de modo", "quero trocar de modo"],
+    "change_mode_words": ["mudar", "muda", "mude", "mudanca", "trocar", "troca", "troque", "alterar", "altera", "altere", "alternar", "alterna"]
   },
 
   "en": {
@@ -69,7 +69,7 @@
     "mode_ideal_words": ["ideal", "ideally", "idealized", "optimal", "normal", "automatic", "auto"],
     "mode_manual_words": ["manual", "manually", "operator"],
 
-    "change_mode_ph": ["change mode", "switch mode", "set mode", "change the mode", "switch operating mode"],
-    "change_mode_words": ["change", "switch", "set"]
+    "change_mode_ph": ["change mode", "switch mode", "set mode", "change the mode", "switch operating mode", "change modes", "switch modes"],
+    "change_mode_words": ["change", "switch", "swap", "set"]
   }
 }
