@@ -1234,6 +1234,11 @@ class BlankyController(QObject):
         status_w = 6
         rich_rows = []
         for ev in snapshot.get("events", []):
+            event_id = int(ev.get("id", 0) or 0)
+            event_label = f"[{event_id:03d}]"
+            event_time = str(ev.get("time") or "")
+            source = self._source_label(str(ev.get("source") or ""))
+            status = "OK" if ev.get("accepted") else "REJECT"
             command = str(ev.get("command") or "")
             color = self._event_visual_color(command, bool(ev.get("accepted")))
             detail_lines = textwrap.wrap(
@@ -1241,9 +1246,8 @@ class BlankyController(QObject):
                 break_long_words=False, break_on_hyphens=False,
             ) or [""]
             prefix = (
-                f"{f'[{int(ev.get('id', 0) or 0):03d}]':<{id_w}} | {str(ev.get('time') or ''):<{time_w}} | "
-                f"{self._source_label(str(ev.get('source') or '')):<{source_w}} | {command:<{command_w}} | "
-                f"{'OK' if ev.get('accepted') else 'REJECT':<{status_w}} | "
+                f"{event_label:<{id_w}} | {event_time:<{time_w}} | "
+                f"{source:<{source_w}} | {command:<{command_w}} | {status:<{status_w}} | "
             )
             continuation = f"{'':<{id_w}} | {'':<{time_w}} | {'':<{source_w}} | {'':<{command_w}} | {'':<{status_w}} | "
             event_rows = [prefix + detail_lines[0]]
