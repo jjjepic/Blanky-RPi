@@ -24,6 +24,10 @@ ApplicationWindow {
     property var stateMap: ({})
     property var commStateMap: ({})
     property bool popupBackdropVisible: false
+    property bool systemTransitionActive: false
+    property string systemTransitionAction: ""
+    property int systemTransitionProgress: 0
+    property double systemTransitionStartedAt: 0
     property string textBotMode: "offline"
     property var audioManualOverrides: ({})
     readonly property int rightPanelWidth: 660
@@ -77,6 +81,32 @@ ApplicationWindow {
             volumePopover.close()
         else
             volumePopover.open()
+    }
+
+    function beginSystemTransition(action) {
+        if (systemTransitionActive)
+            return
+
+        volumePopover.close()
+        ttsSpeedPopover.close()
+        systemTransitionAction = action
+        systemTransitionProgress = 0
+        systemTransitionStartedAt = Date.now()
+        systemTransitionActive = true
+        systemTransitionTimer.start()
+    }
+
+    function finishSystemTransition() {
+        systemTransitionProgress = 100
+        systemTransitionTimer.stop()
+        if (systemTransitionAction === "shutdown") {
+            blanky.shutdownApplication()
+            return
+        }
+
+        blanky.resetSystem()
+        systemTransitionActive = false
+        systemTransitionAction = ""
     }
 
     function volumeGlyph() {
@@ -289,6 +319,18 @@ ApplicationWindow {
         onTriggered: root.scrollEventsToBottom()
     }
 
+    Timer {
+        id: systemTransitionTimer
+        interval: 30
+        repeat: true
+        onTriggered: {
+            var elapsed = Date.now() - root.systemTransitionStartedAt
+            root.systemTransitionProgress = Math.min(100, Math.round((elapsed / 3000) * 100))
+            if (root.systemTransitionProgress >= 100)
+                root.finishSystemTransition()
+        }
+    }
+
     Component.onCompleted: {
         root.stateMap = root.parseStateCompact(blanky.stateCompact)
         root.commStateMap = root.parseCommCompact(blanky.commStatusCompact)
@@ -429,7 +471,7 @@ ApplicationWindow {
                     borderColor: root.borderColor
                     panelColor: root.panelAltColor
                     toolTip: t("tooltipReset")
-                    onClicked: blanky.resetSystem()
+                    onClicked: root.beginSystemTransition("reset")
                 }
 
                 MenuActionButton {
@@ -443,7 +485,7 @@ ApplicationWindow {
                     borderColor: root.borderColor
                     panelColor: root.panelAltColor
                     toolTip: t("tooltipShutdown")
-                    onClicked: blanky.shutdownApplication()
+                    onClicked: root.beginSystemTransition("shutdown")
                 }
             }
         }
@@ -1236,6 +1278,7 @@ ApplicationWindow {
 
                         ScrollView {
                             id: eventsScroll
+                            visible: !root.systemTransitionActive
                             Layout.fillWidth: true
                             Layout.fillHeight: true
                             clip: true
@@ -1258,6 +1301,7 @@ ApplicationWindow {
                         }
 
                         Rectangle {
+                            visible: !root.systemTransitionActive
                             Layout.fillWidth: true
                             Layout.preferredHeight: 88
                             color: root.panelAltColor
@@ -1481,6 +1525,73 @@ ApplicationWindow {
         stateMap: root.commStateMap
     }
 
+    }
+
+    Rectangle {
+        id: systemTransitionOverlay
+        anchors.fill: parent
+        z: 200
+        visible: root.systemTransitionActive || opacity > 0.01
+        opacity: root.systemTransitionActive ? 1 : 0
+        color: root.dark ? "#02060d" : "#d7e3ea"
+
+        Behavior on opacity {
+            NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+        }
+
+        Column {
+            anchors.centerIn: parent
+            width: Math.min(parent.width - 48, 440)
+            spacing: 16
+
+            Label {
+                width: parent.width
+                text: root.systemTransitionAction === "shutdown" ? t("shuttingDownSystem") : t("restartingSystem")
+                color: root.textColor
+                font.pixelSize: 24
+                font.bold: true
+                horizontalAlignment: Text.AlignHCenter
+            }
+
+            Label {
+                width: parent.width
+                text: t("transitionWait")
+                color: root.mutedText
+                font.pixelSize: 14
+                horizontalAlignment: Text.AlignHCenter
+            }
+
+            Rectangle {
+                width: parent.width
+                height: 12
+                radius: 6
+                color: root.dark ? "#0a1a26" : "#b4cad8"
+                border.color: root.borderColor
+                border.width: 1
+
+                Rectangle {
+                    width: parent.width * root.systemTransitionProgress / 100
+                    height: parent.height
+                    radius: parent.radius
+                    color: root.systemTransitionAction === "shutdown" ? "#ff6b6b" : "#48d66b"
+                    Behavior on width { NumberAnimation { duration: 60 } }
+                }
+            }
+
+            Label {
+                width: parent.width
+                text: root.systemTransitionProgress + "%"
+                color: root.textColor
+                font.pixelSize: 18
+                font.bold: true
+                horizontalAlignment: Text.AlignHCenter
+            }
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.AllButtons
+        }
     }
 
     Item {
