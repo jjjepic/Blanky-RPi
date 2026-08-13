@@ -33,6 +33,8 @@ class MQTTBridge:
         self._echo_suppression: dict[tuple[str, str], float] = {}
         self._events: list[dict[str, Any]] = []
         self._next_event_id = 1
+        # Each reset starts a new visual event session without discarding history.
+        self._event_generation = 0
         self._ui_lang = "pt"
         self._opcua = get_opcua_bridge()
         self._last_mqtt_panel_rx = 0.0
@@ -556,6 +558,7 @@ class MQTTBridge:
             "command": command,
             "accepted": accepted,
             "detail": detail or "",
+            "generation": self._event_generation,
         }
         self._next_event_id += 1
         self._events.append(event)
@@ -567,6 +570,8 @@ class MQTTBridge:
         with self._lock:
             self._reset_all_state()
             self.publish_all_state()
+            # Preserve all existing events, but make subsequent events part of a new session.
+            self._event_generation += 1
             msg = (
                 "Sistema reinicializado. Todas as variaveis foram repostas a zero."
                 if lang == "pt"
@@ -591,6 +596,7 @@ class MQTTBridge:
             return {
                 "state": dict(self.state),
                 "events": list(self._events),
+                "event_generation": self._event_generation,
             }
 
     def health(self) -> dict[str, Any]:
