@@ -97,6 +97,14 @@ ApplicationWindow {
         return t("normal")
     }
 
+    function ttsSpeedGlyph() {
+        if (blanky.ttsSpeed < 0.9)
+            return "\uD83D\uDC22"
+        if (blanky.ttsSpeed > 1.1)
+            return "\u26A1"
+        return "\u25B6"
+    }
+
     function voiceLabel() {
         var voice = blanky.ttsVoice || ""
         if (!voice)
@@ -725,7 +733,7 @@ ApplicationWindow {
 
                 MenuActionButton {
                     id: voiceSpeedButton
-                    iconText: "\uD83D\uDC22"
+                    iconText: root.ttsSpeedGlyph()
                     labelText: t("voiceSpeed") + ": <b>" + root.ttsSpeedLabel() + "</b>"
                     Layout.fillWidth: true
                     Layout.preferredWidth: 205

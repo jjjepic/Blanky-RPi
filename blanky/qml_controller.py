@@ -1161,33 +1161,46 @@ class BlankyController(QObject):
         lines.append("</div>")
         return "".join(lines)
 
-    @staticmethod
-    def _event_visual_color(command: str, accepted: bool) -> str:
+    def _event_visual_color(self, command: str, accepted: bool) -> str:
+        colors = (
+            {
+                "normal": "#def2ff", "inactive": "#8fa8b8", "error": "#ff6b6b",
+                "start": "#48d66b", "fast": "#f8c25d", "ideal": "#d66ad9",
+                "manual": "#b7f7d4", "change": "#9dd9ff", "motor": "#63cbff",
+                "green": "#48d66b", "red": "#ff5c5c", "robot": "#b7f7d4",
+            }
+            if self._dark_mode else {
+                "normal": "#16384c", "inactive": "#526e7d", "error": "#b32635",
+                "start": "#147a3d", "fast": "#8a5b00", "ideal": "#8f3f9e",
+                "manual": "#13735e", "change": "#146f9e", "motor": "#126c9f",
+                "green": "#147a3d", "red": "#b32635", "robot": "#13735e",
+            }
+        )
         if not accepted:
-            return "#ff6b6b"
+            return colors["error"]
         if command == "START":
-            return "#48d66b"
+            return colors["start"]
         if command == "STOP":
-            return "#8fa8b8"
+            return colors["inactive"]
         if command == "MODE_FAST":
-            return "#f8c25d"
+            return colors["fast"]
         if command == "MODE_IDEAL":
-            return "#63cbff"
+            return colors["ideal"]
         if command == "MODE_MANUAL":
-            return "#b7f7d4"
+            return colors["manual"]
         if command in {"MODE_UNSPEC", "MODE_CHANGE"}:
-            return "#9dd9ff"
+            return colors["change"]
         if command == "GREEN_ON":
-            return "#48d66b"
+            return colors["green"]
         if command == "RED_ON":
-            return "#ff5c5c"
+            return colors["red"]
         if command.endswith("_OFF") or command.endswith("_RETRACT"):
-            return "#8fa8b8"
+            return colors["inactive"]
         if command.startswith("MOTOR_") or command.startswith("CYL_") or command == "ROBOT_TO_METAL":
-            return "#63cbff"
+            return colors["motor"]
         if command == "ROBOT_TO_NONMETAL":
-            return "#b7f7d4"
-        return "#def2ff"
+            return colors["robot"]
+        return colors["normal"]
 
     def _build_monitor_event_lines(self, snapshot: dict) -> list[tuple[str, str]]:
         events = snapshot.get("events", [])
@@ -1214,27 +1227,32 @@ class BlankyController(QObject):
         return "\n".join(line for line, _ in self._build_monitor_event_lines(snapshot))
 
     def _build_monitor_events_rich_text(self, snapshot: dict) -> str:
-        rows = []
+        id_w = 5
+        time_w = 8
+        source_w = 10
+        command_w = 18
+        status_w = 6
+        rich_rows = []
         for ev in snapshot.get("events", []):
             command = str(ev.get("command") or "")
             color = self._event_visual_color(command, bool(ev.get("accepted")))
-            cells = [
-                f"[{int(ev.get('id', 0) or 0):03d}]",
-                str(ev.get("time") or ""),
-                self._source_label(str(ev.get("source") or "")),
-                command,
-                "OK" if ev.get("accepted") else "REJECT",
-                self._localized_event_detail(ev),
-            ]
-            widths = [36, 57, 72, 130, 43]
-            cell_markup = []
-            for index, value in enumerate(cells):
-                width = f" width='{widths[index]}'" if index < len(widths) else ""
-                cell_markup.append(
-                    f"<td{width} valign='top'><font color='{color}'>{html.escape(value)}</font></td>"
-                )
-            rows.append("<tr>" + "".join(cell_markup) + "</tr>")
-        return "<table width='100%' cellspacing='0' cellpadding='0' style='font-family:Consolas; font-size:12px;'>" + "".join(rows) + "</table>"
+            detail_lines = textwrap.wrap(
+                self._localized_event_detail(ev), width=44,
+                break_long_words=False, break_on_hyphens=False,
+            ) or [""]
+            prefix = (
+                f"{f'[{int(ev.get('id', 0) or 0):03d}]':<{id_w}} | {str(ev.get('time') or ''):<{time_w}} | "
+                f"{self._source_label(str(ev.get('source') or '')):<{source_w}} | {command:<{command_w}} | "
+                f"{'OK' if ev.get('accepted') else 'REJECT':<{status_w}} | "
+            )
+            continuation = f"{'':<{id_w}} | {'':<{time_w}} | {'':<{source_w}} | {'':<{command_w}} | {'':<{status_w}} | "
+            event_rows = [prefix + detail_lines[0]]
+            event_rows.extend(continuation + line for line in detail_lines[1:])
+            rich_rows.extend(
+                f"<span style='color:{color};'>{html.escape(row)}</span>"
+                for row in event_rows
+            )
+        return "<pre style='font-family:Consolas; font-size:12px;'>" + "\n".join(rich_rows) + "</pre>"
 
     def _localized_event_detail(self, event: dict) -> str:
         command = str(event.get("command") or "")
