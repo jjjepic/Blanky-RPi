@@ -150,9 +150,18 @@ ApplicationWindow {
     }
 
     function chooseExportDestination(kind, format) {
-        exportFolderDialog.exportKind = kind
-        exportFolderDialog.exportFormat = format
-        exportFolderDialog.open()
+        exportFileDialog.exportKind = kind
+        exportFileDialog.exportFormat = format
+        var now = new Date()
+        var stamp = now.getFullYear().toString()
+            + ("0" + (now.getMonth() + 1)).slice(-2)
+            + ("0" + now.getDate()).slice(-2)
+            + "_" + ("0" + now.getHours()).slice(-2)
+            + ("0" + now.getMinutes()).slice(-2)
+            + ("0" + now.getSeconds()).slice(-2)
+        var prefix = kind === "audio" ? "blanky_diagnostico_audio_" : "blanky_eventos_"
+        exportFileDialog.currentFile = blanky.defaultExportFolder.toString() + "/" + prefix + stamp + "." + format
+        exportFileDialog.open()
     }
 
     function parseStateCompact(raw) {
@@ -2753,18 +2762,20 @@ ApplicationWindow {
         }
     }
 
-    FolderDialog {
-        id: exportFolderDialog
+    FileDialog {
+        id: exportFileDialog
         property string exportKind: "events"
         property string exportFormat: "csv"
-        title: t("chooseExportFolder")
+        title: t("saveExportFile")
+        fileMode: FileDialog.SaveFile
         currentFolder: blanky.defaultExportFolder
+        nameFilters: exportFormat === "pdf" ? ["PDF (*.pdf)"] : ["CSV (*.csv)"]
         onAccepted: {
-            var folder = selectedFolder.toString()
+            var file = selectedFile.toString()
             if (exportKind === "audio")
-                blanky.exportAudioDiagnosticsTo(exportFormat, folder)
+                blanky.exportAudioDiagnosticsTo(exportFormat, file)
             else
-                blanky.exportEventsTo(exportFormat, folder)
+                blanky.exportEventsTo(exportFormat, file)
         }
     }
 
@@ -2814,7 +2825,7 @@ ApplicationWindow {
                     text: blanky.audioDiagnosticLogText || t("noAudioLogs")
                     readOnly: true
                     selectByMouse: true
-                    wrapMode: TextEdit.NoWrap
+                    wrapMode: TextEdit.Wrap
                     color: root.textColor
                     font.family: "Noto Sans Mono"
                     font.pixelSize: 11

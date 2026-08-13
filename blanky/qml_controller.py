@@ -395,19 +395,20 @@ class BlankyController(QObject):
         lines = []
         for index, entry in enumerate(self._audio_diagnostic_entries, start=1):
             transcript = str(entry["text"])
-            if len(transcript) > 32:
-                transcript = transcript[:31] + "…"
+            transcript_preview = transcript if len(transcript) <= 32 else transcript[:31] + "…"
             lines.append(
                 "[{id:03d}] | {time:<8} | {capture:>7.2f}s | {text:<32} | {command:<16} | {result:<6} | {duration:>7.2f}s".format(
                     id=index,
                     time=entry["time"],
                     capture=float(entry["capture"]),
-                    text=transcript,
+                    text=transcript_preview,
                     command=entry["command"],
                     result=entry.get("result", "--"),
                     duration=float(entry.get("duration", 0.0)),
                 )
             )
+            if len(transcript) > 32:
+                lines.append("       |          |          | " + transcript)
         return "\n".join(lines)
 
     @Property(str, notify=audioDiagnosticLogTextChanged)
@@ -746,7 +747,7 @@ class BlankyController(QObject):
         fmt = (fmt or "csv").strip().lower()
         events = self._bridge.get_snapshot().get("events", [])
         try:
-            path = self._write_events_export(events, fmt, self._export_directory(folder))
+            path = self._write_events_export(events, fmt, folder)
         except Exception as exc:
             self._set_status(self._tr("export_error", error=exc))
             return
@@ -758,7 +759,7 @@ class BlankyController(QObject):
     def exportAudioDiagnosticsTo(self, fmt: str, folder: str):
         fmt = (fmt or "csv").strip().lower()
         try:
-            path = self._write_audio_diagnostics_export(fmt, self._export_directory(folder))
+            path = self._write_audio_diagnostics_export(fmt, folder)
         except Exception as exc:
             self._set_status(self._tr("export_error", error=exc))
             return
@@ -1238,14 +1239,20 @@ class BlankyController(QObject):
             })
         return rows
 
-    def _export_directory(self, folder: str) -> str:
-        selected = QUrl(folder).toLocalFile() if folder else ""
-        export_dir = selected or os.path.join(os.getcwd(), "exports")
-        os.makedirs(export_dir, exist_ok=True)
-        return export_dir
+    def _export_path(self, destination: str, prefix: str, fmt: str) -> str:
+        selected = QUrl(destination).toLocalFile() if destination else ""
+        extension = f".{fmt}"
+        if selected and not os.path.splitext(selected)[1]:
+            selected = os.path.join(selected, f"{prefix}_{datetime.now():%Y%m%d_%H%M%S}{extension}")
+        elif not selected:
+            selected = os.path.join(os.getcwd(), "exports", f"{prefix}_{datetime.now():%Y%m%d_%H%M%S}{extension}")
+        elif not selected.lower().endswith(extension):
+            selected += extension
 
-    def _write_events_export(self, events: list[dict], fmt: str, export_dir: str) -> str:
-        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        os.makedirs(os.path.dirname(os.path.abspath(selected)), exist_ok=True)
+        return selected
+
+    def _write_events_export(self, events: list[dict], fmt: str, destination: str) -> str:
         rows = self._event_export_rows(events)
         headers = list(rows[0].keys()) if rows else (
             ["ID", "Hora", "Origem", "Comando", "Estado", "Descri\u00e7\u00e3o"]
@@ -1254,11 +1261,11 @@ class BlankyController(QObject):
         )
 
         if fmt == "pdf":
-            path = os.path.join(export_dir, f"blanky_eventos_{stamp}.pdf")
+            path = self._export_path(destination, "blanky_eventos", "pdf")
             self._write_events_pdf(path, rows, headers)
             return path
 
-        path = os.path.join(export_dir, f"blanky_eventos_{stamp}.csv")
+        path = self._export_path(destination, "blanky_eventos", "csv")
         with open(path, "w", encoding="utf-8-sig", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=headers, delimiter=";")
             writer.writeheader()
@@ -1284,8 +1291,7 @@ class BlankyController(QObject):
             })
         return rows
 
-    def _write_audio_diagnostics_export(self, fmt: str, export_dir: str) -> str:
-        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    def _write_audio_diagnostics_export(self, fmt: str, destination: str) -> str:
         rows = self._audio_diagnostic_rows()
         headers = list(rows[0].keys()) if rows else (
             ["ID", "Hora", "Captação", "Transcrição", "Comando", "Resultado", "Duração"]
@@ -1294,12 +1300,12 @@ class BlankyController(QObject):
         )
 
         if fmt == "pdf":
-            path = os.path.join(export_dir, f"blanky_diagnostico_audio_{stamp}.pdf")
+            path = self._export_path(destination, "blanky_diagnostico_audio", "pdf")
             title = "Relatório de diagnóstico de áudio" if self._language == "pt" else "Audio diagnostic report"
             self._write_events_pdf(path, rows, headers, title)
             return path
 
-        path = os.path.join(export_dir, f"blanky_diagnostico_audio_{stamp}.csv")
+        path = self._export_path(destination, "blanky_diagnostico_audio", "csv")
         with open(path, "w", encoding="utf-8-sig", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=headers, delimiter=";")
             writer.writeheader()
@@ -1333,7 +1339,7 @@ class BlankyController(QObject):
         margin = 32
         audio_report = len(headers) == 7
         columns = [32, 68, 128, 190, 420, 538, 600] if audio_report else [32, 80, 148, 236, 390, 448]
-        short_limits = [5, 8, 8, 30, 16, 8, 8] if audio_report else [5, 8, 13, 20, 8]
+        short_limits = [5, 8, 13, 20, 8]
         pages: list[bytes] = []
 
         def add_text(commands: list[bytes], x: float, y: float, value, *, size=9, bold=False, color=(0.1, 0.18, 0.25)):
@@ -1346,9 +1352,11 @@ class BlankyController(QObject):
                 + b") Tj ET\n"
             )
 
-        def add_rule(commands: list[bytes], y: float):
+        def add_rule(commands: list[bytes], y: float, *, subtle: bool = False):
+            color = "0.66 0.78 0.86" if subtle else "0.20 0.48 0.68"
+            width = 0.25 if subtle else 0.45
             commands.append(
-                f"0.20 0.48 0.68 RG 0.45 w {margin} {y:.1f} m "
+                f"{color} RG {width:.2f} w {margin} {y:.1f} m "
                 f"{page_width - margin} {y:.1f} l S\n".encode("ascii")
             )
 
@@ -1383,21 +1391,28 @@ class BlankyController(QObject):
         for row in rows:
             values = [str(row.get(header, "")) for header in headers]
             if audio_report:
-                row_height = 18
-                if y - row_height < margin + 18:
+                wrapped_values = [
+                    textwrap.wrap(value, width=limit, break_long_words=False, break_on_hyphens=False) or [""]
+                    for value, limit in zip(values, [5, 8, 8, 28, 16, 8, 8])
+                ]
+                line_count = max(len(lines) for lines in wrapped_values)
+                row_height = max(22, (line_count - 1) * 11 + 22)
+                if y - row_height - 10 < margin + 18:
                     pages.append(b"".join(commands))
                     page_number += 1
                     commands, y = new_page(page_number)
 
-                for index, value in enumerate(values):
-                    add_text(commands, columns[index], y, self._pdf_shorten(value, short_limits[index]), size=8)
+                for index, lines in enumerate(wrapped_values):
+                    for line_index, line in enumerate(lines):
+                        add_text(commands, columns[index], y - line_index * 11, line, size=8)
                 y -= row_height
-                add_rule(commands, y + 4)
+                add_rule(commands, y + 3, subtle=True)
+                y -= 10
                 continue
 
-            detail_lines = textwrap.wrap(values[-1], width=56, break_long_words=False, break_on_hyphens=False) or [""]
-            row_height = max(16, len(detail_lines) * 11 + 5)
-            if y - row_height < margin + 18:
+            detail_lines = textwrap.wrap(values[-1], width=70, break_long_words=False, break_on_hyphens=False) or [""]
+            row_height = max(22, (len(detail_lines) - 1) * 11 + 22)
+            if y - row_height - 10 < margin + 18:
                 pages.append(b"".join(commands))
                 page_number += 1
                 commands, y = new_page(page_number)
@@ -1407,7 +1422,8 @@ class BlankyController(QObject):
             for line_index, line in enumerate(detail_lines):
                 add_text(commands, columns[5], y - line_index * 11, line, size=8)
             y -= row_height
-            add_rule(commands, y + 4)
+            add_rule(commands, y + 3, subtle=True)
+            y -= 10
 
         pages.append(b"".join(commands))
 
