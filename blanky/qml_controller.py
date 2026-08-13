@@ -216,6 +216,7 @@ class BlankyController(QObject):
         self._dark_mode = True
         self._monitor_left_text = ""
         self._monitor_events_text = ""
+        self._monitor_events_rich_text = ""
         self._language = "pt"
         self._tts_voice = set_tts_voice("", self._language)
         self._tts_speed = 1.0
@@ -299,6 +300,10 @@ class BlankyController(QObject):
     @Property(str, notify=monitorEventsTextChanged)
     def monitorEventsText(self):
         return self._monitor_events_text
+
+    @Property(str, notify=monitorEventsTextChanged)
+    def monitorEventsRichText(self):
+        return self._monitor_events_rich_text
 
     @Property(bool, notify=listeningChanged)
     def listening(self):
@@ -830,9 +835,10 @@ class BlankyController(QObject):
             self._monitor_left_text = text
             self.monitorLeftTextChanged.emit()
 
-    def _set_monitor_events_text(self, text: str):
-        if self._monitor_events_text != text:
+    def _set_monitor_events_text(self, text: str, rich_text: str):
+        if self._monitor_events_text != text or self._monitor_events_rich_text != rich_text:
             self._monitor_events_text = text
+            self._monitor_events_rich_text = rich_text
             self.monitorEventsTextChanged.emit()
 
     def _set_listening(self, value: bool):
@@ -1155,25 +1161,102 @@ class BlankyController(QObject):
         lines.append("</div>")
         return "".join(lines)
 
-    def _build_monitor_events_text(self, snapshot: dict) -> str:
+    def _event_visual_color(self, command: str, accepted: bool) -> str:
+        colors = (
+            {
+                "normal": "#def2ff", "inactive": "#8fa8b8", "error": "#ff6b6b",
+                "start": "#48d66b", "fast": "#f8c25d", "ideal": "#d66ad9",
+                "manual": "#b7f7d4", "change": "#9dd9ff", "motor": "#63cbff",
+                "green": "#48d66b", "red": "#ff5c5c", "robot": "#b7f7d4",
+            }
+            if self._dark_mode else {
+                "normal": "#16384c", "inactive": "#526e7d", "error": "#b32635",
+                "start": "#147a3d", "fast": "#8a5b00", "ideal": "#8f3f9e",
+                "manual": "#13735e", "change": "#146f9e", "motor": "#126c9f",
+                "green": "#147a3d", "red": "#b32635", "robot": "#13735e",
+            }
+        )
+        if not accepted:
+            return colors["error"]
+        if command == "START":
+            return colors["start"]
+        if command == "STOP":
+            return colors["inactive"]
+        if command == "MODE_FAST":
+            return colors["fast"]
+        if command == "MODE_IDEAL":
+            return colors["ideal"]
+        if command == "MODE_MANUAL":
+            return colors["manual"]
+        if command in {"MODE_UNSPEC", "MODE_CHANGE"}:
+            return colors["change"]
+        if command == "GREEN_ON":
+            return colors["green"]
+        if command == "RED_ON":
+            return colors["red"]
+        if command.endswith("_OFF") or command.endswith("_RETRACT"):
+            return colors["inactive"]
+        if command.startswith("MOTOR_") or command.startswith("CYL_") or command == "ROBOT_TO_METAL":
+            return colors["motor"]
+        if command == "ROBOT_TO_NONMETAL":
+            return colors["robot"]
+        return colors["normal"]
+
+    def _build_monitor_event_lines(self, snapshot: dict) -> list[tuple[str, str]]:
         events = snapshot.get("events", [])
         id_w = 5
         time_w = 8
         source_w = 10
         command_w = 18
         status_w = 6
-        lines = []
+        lines: list[tuple[str, str]] = []
         for ev in events:
             status = "OK" if ev.get("accepted") else "REJECT"
             source = self._source_label(str(ev.get("source") or ""))
             event_id = int(ev.get("id", 0) or 0)
             command = str(ev.get("command") or "")
             detail = self._localized_event_detail(ev)
-            lines.append(
+            line = (
                 f"{f'[{event_id:03d}]':<{id_w}} | {str(ev.get('time') or ''):<{time_w}} | "
                 f"{source:<{source_w}} | {command:<{command_w}} | {status:<{status_w}} | {detail}"
             )
-        return "\n".join(lines)
+            lines.append((line, self._event_visual_color(command, bool(ev.get("accepted")))))
+        return lines
+
+    def _build_monitor_events_text(self, snapshot: dict) -> str:
+        return "\n".join(line for line, _ in self._build_monitor_event_lines(snapshot))
+
+    def _build_monitor_events_rich_text(self, snapshot: dict) -> str:
+        id_w = 5
+        time_w = 8
+        source_w = 10
+        command_w = 18
+        status_w = 6
+        rich_rows = []
+        for ev in snapshot.get("events", []):
+            event_id = int(ev.get("id", 0) or 0)
+            event_label = f"[{event_id:03d}]"
+            event_time = str(ev.get("time") or "")
+            source = self._source_label(str(ev.get("source") or ""))
+            status = "OK" if ev.get("accepted") else "REJECT"
+            command = str(ev.get("command") or "")
+            color = self._event_visual_color(command, bool(ev.get("accepted")))
+            detail_lines = textwrap.wrap(
+                self._localized_event_detail(ev), width=44,
+                break_long_words=False, break_on_hyphens=False,
+            ) or [""]
+            prefix = (
+                f"{event_label:<{id_w}} | {event_time:<{time_w}} | "
+                f"{source:<{source_w}} | {command:<{command_w}} | {status:<{status_w}} | "
+            )
+            continuation = f"{'':<{id_w}} | {'':<{time_w}} | {'':<{source_w}} | {'':<{command_w}} | {'':<{status_w}} | "
+            event_rows = [prefix + detail_lines[0]]
+            event_rows.extend(continuation + line for line in detail_lines[1:])
+            rich_rows.extend(
+                f"<span style='color:{color};'>{html.escape(row)}</span>"
+                for row in event_rows
+            )
+        return "<pre style='font-family:Consolas; font-size:12px;'>" + "\n".join(rich_rows) + "</pre>"
 
     def _localized_event_detail(self, event: dict) -> str:
         command = str(event.get("command") or "")
@@ -1487,7 +1570,10 @@ class BlankyController(QObject):
         self._set_comm_status_compact(self._build_comm_status_compact(health))
         self._set_comm_details_compact(self._build_comm_details_compact(health))
         self._set_monitor_left_text(self._build_monitor_left_text(snapshot, health))
-        self._set_monitor_events_text(self._build_monitor_events_text(snapshot))
+        self._set_monitor_events_text(
+            self._build_monitor_events_text(snapshot),
+            self._build_monitor_events_rich_text(snapshot),
+        )
 
         if not self._listening:
             for ev in self._wakeword.get_events():
