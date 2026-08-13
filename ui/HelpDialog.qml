@@ -171,6 +171,16 @@ FloatingPanel {
         helpScroll.contentItem.contentY = 0
     }
 
+    function activeColor() {
+        var section = currentSection()
+        return section ? section.color : "#63cbff"
+    }
+
+    function blockIcon(index) {
+        var icons = ["●", "→", "✓", "!"]
+        return icons[index % icons.length]
+    }
+
     ColumnLayout {
         anchors.fill: parent
         spacing: 12
@@ -188,6 +198,7 @@ FloatingPanel {
                 color: dialog.mutedText
                 font.pixelSize: 14
                 wrapMode: Text.WordWrap
+                horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
             }
 
@@ -215,78 +226,143 @@ FloatingPanel {
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
             ScrollBar.vertical.policy: ScrollBar.AlwaysOn
 
-            GridLayout {
-                visible: dialog.sectionId === ""
-                width: Math.max(parent.width - 12, 700)
-                columns: 2
-                columnSpacing: 12
-                rowSpacing: 12
+            Item {
+                id: helpContent
+                width: Math.max(helpScroll.availableWidth - 12, 700)
+                height: dialog.sectionId === "" ? homeGrid.implicitHeight : detailColumn.implicitHeight
 
-                Repeater {
-                    model: dialog.sectionList()
+                GridLayout {
+                    id: homeGrid
+                    visible: dialog.sectionId === ""
+                    width: parent.width
+                    height: implicitHeight
+                    columns: 2
+                    columnSpacing: 12
+                    rowSpacing: 12
 
-                    Rectangle {
-                        required property var modelData
-                        Layout.preferredWidth: (parent.width - parent.columnSpacing) / 2
-                        Layout.preferredHeight: 86
-                        radius: 12
-                        color: hoverArea.containsMouse ? Qt.lighter(dialog.panelAltColor, 1.18) : dialog.panelAltColor
-                        border.color: modelData.color
-                        border.width: 1
+                    Repeater {
+                        model: dialog.sectionList()
 
-                        RowLayout {
-                            anchors.fill: parent
-                            anchors.margins: 12
-                            spacing: 10
-                            Label { text: modelData.icon; color: modelData.color; font.pixelSize: 24; font.bold: true }
+                        Rectangle {
+                            required property var modelData
+                            Layout.preferredWidth: (parent.width - parent.columnSpacing) / 2
+                            Layout.preferredHeight: 104
+                            radius: 12
+                            color: hoverArea.containsMouse ? Qt.lighter(dialog.panelAltColor, 1.18) : dialog.panelAltColor
+                            border.color: modelData.color
+                            border.width: 1
+
                             ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 3
-                                Label { text: modelData.title; color: dialog.titleColor; font.pixelSize: 15; font.bold: true; Layout.fillWidth: true; elide: Text.ElideRight }
-                                Label { text: modelData.summary; color: dialog.mutedText; font.pixelSize: 11; Layout.fillWidth: true; wrapMode: Text.WordWrap; maximumLineCount: 2; elide: Text.ElideRight }
-                            }
-                        }
+                                anchors.fill: parent
+                                anchors.margins: 10
+                                spacing: 4
 
-                        MouseArea {
-                            id: hoverArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: dialog.showSection(modelData.id)
+                                Label {
+                                    text: modelData.icon
+                                    color: modelData.color
+                                    font.pixelSize: 25
+                                    font.bold: true
+                                    Layout.alignment: Qt.AlignHCenter
+                                }
+                                Label {
+                                    text: modelData.title
+                                    color: dialog.titleColor
+                                    font.pixelSize: 15
+                                    font.bold: true
+                                    Layout.fillWidth: true
+                                    horizontalAlignment: Text.AlignHCenter
+                                    elide: Text.ElideRight
+                                }
+                                Label {
+                                    text: modelData.summary
+                                    color: dialog.mutedText
+                                    font.pixelSize: 11
+                                    Layout.fillWidth: true
+                                    wrapMode: Text.WordWrap
+                                    horizontalAlignment: Text.AlignHCenter
+                                    maximumLineCount: 2
+                                    elide: Text.ElideRight
+                                }
+                            }
+
+                            MouseArea {
+                                id: hoverArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: dialog.showSection(modelData.id)
+                            }
                         }
                     }
                 }
-            }
 
-            Column {
-                visible: dialog.sectionId !== ""
-                width: Math.max(parent.width - 12, 700)
-                spacing: 12
-
-                Repeater {
-                    model: dialog.currentSection() ? dialog.currentSection().blocks : []
+                Column {
+                    id: detailColumn
+                    visible: dialog.sectionId !== ""
+                    width: parent.width
+                    height: implicitHeight
+                    spacing: 12
 
                     Rectangle {
-                        required property var modelData
                         width: parent.width
-                        implicitHeight: blockText.implicitHeight + 42
-                        radius: 12
+                        height: 92
+                        radius: 14
                         color: dialog.panelAltColor
-                        border.color: dialog.borderColor
+                        border.color: dialog.activeColor()
                         border.width: 1
 
                         Column {
-                            anchors.fill: parent
-                            anchors.margins: 14
-                            spacing: 7
-                            Label { text: modelData.title; color: dialog.titleColor; font.pixelSize: 15; font.bold: true }
+                            anchors.centerIn: parent
+                            spacing: 3
                             Label {
-                                id: blockText
-                                width: parent.width
-                                text: modelData.text
-                                color: dialog.textColor
-                                font.pixelSize: 13
-                                wrapMode: Text.WordWrap
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: dialog.currentSection() ? dialog.currentSection().icon : "?"
+                                color: dialog.activeColor()
+                                font.pixelSize: 27
+                                font.bold: true
+                            }
+                            Label {
+                                text: dialog.currentSection() ? dialog.currentSection().title : ""
+                                color: dialog.titleColor
+                                font.pixelSize: 18
+                                font.bold: true
+                            }
+                        }
+                    }
+
+                    Repeater {
+                        model: dialog.currentSection() ? dialog.currentSection().blocks : []
+
+                        Rectangle {
+                            required property var modelData
+                            width: parent.width
+                            implicitHeight: blockText.implicitHeight + 54
+                            radius: 12
+                            color: dialog.panelAltColor
+                            border.color: dialog.borderColor
+                            border.width: 1
+
+                            Column {
+                                anchors.fill: parent
+                                anchors.margins: 14
+                                spacing: 7
+                                Label {
+                                    width: parent.width
+                                    text: dialog.blockIcon(index) + "  " + modelData.title
+                                    color: dialog.activeColor()
+                                    font.pixelSize: 15
+                                    font.bold: true
+                                    horizontalAlignment: Text.AlignHCenter
+                                }
+                                Label {
+                                    id: blockText
+                                    width: parent.width
+                                    text: modelData.text
+                                    color: dialog.textColor
+                                    font.pixelSize: 13
+                                    wrapMode: Text.WordWrap
+                                    horizontalAlignment: Text.AlignHCenter
+                                }
                             }
                         }
                     }
