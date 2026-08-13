@@ -406,6 +406,23 @@ ApplicationWindow {
                     toolTip: "English"
                     onClicked: blanky.setLanguage("en")
                 }
+
+                MenuActionButton {
+                    text: "?"
+                    width: 54
+                    height: 44
+                    textPixelSize: 22
+                    accentColor: "#63cbff"
+                    textColor: root.textColor
+                    mutedText: root.mutedText
+                    borderColor: root.borderColor
+                    panelColor: root.panelAltColor
+                    toolTip: blanky.language === "pt" ? "Ajuda / Tutorial" : "Help / Tutorial"
+                    onClicked: {
+                        helpPanel.showHome()
+                        helpPanel.open()
+                    }
+                }
             }
 
             Rectangle {
@@ -1959,6 +1976,20 @@ ApplicationWindow {
                 }
             }
         }
+    }
+
+    HelpDialog {
+        id: helpPanel
+        language: blanky.language
+        panelColor: root.panelColor
+        panelAltColor: root.panelAltColor
+        borderColor: root.borderColor
+        titleColor: root.textColor
+        textColor: root.textColor
+        mutedText: root.mutedText
+        onOpening: { root.popupBackdropVisible = true; modalBackdrop.scheduleSnapshot() }
+        onOpenedForBackdrop: modalBackdrop.scheduleSnapshot()
+        onClosedForBackdrop: root.popupBackdropVisible = false
     }
 
     FloatingPanel {
