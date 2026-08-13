@@ -389,7 +389,7 @@ ApplicationWindow {
                     mutedText: root.mutedText
                     borderColor: root.borderColor
                     panelColor: root.panelAltColor
-                    toolTip: "Portugu\u00eas"
+                    toolTip: blanky.language === "pt" ? "Portugu\u00eas" : "Portuguese"
                     onClicked: blanky.setLanguage("pt")
                 }
 
@@ -403,7 +403,7 @@ ApplicationWindow {
                     mutedText: root.mutedText
                     borderColor: root.borderColor
                     panelColor: root.panelAltColor
-                    toolTip: "English"
+                    toolTip: blanky.language === "pt" ? "Ingl\u00eas" : "English"
                     onClicked: blanky.setLanguage("en")
                 }
 

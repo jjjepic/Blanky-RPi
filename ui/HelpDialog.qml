@@ -181,6 +181,49 @@ FloatingPanel {
         return icons[index % icons.length]
     }
 
+    function safeHelpText(value) {
+        return String(value)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+    }
+
+    function decorateHelpText(value) {
+        var text = safeHelpText(value)
+        var references = language === "pt" ? [
+            { word: "Microfone", icon: "\uD83C\uDF99", color: "#48d66b" },
+            { word: "MQTT Base", icon: "\uD83D\uDCE1", color: "#63cbff" },
+            { word: "Telem\u00f3vel", icon: "\uD83D\uDCF1", color: "#f8c25d" },
+            { word: "OPC UA", icon: "\uD83D\uDD17", color: "#ff6b6b" },
+            { word: "Painel de Opera\u00e7\u00e3o", icon: "\u2699", color: "#b7f7d4" },
+            { word: "Controlo Geral", icon: "\u25c9", color: "#f8c25d" },
+            { word: "Controlo Manual", icon: "\u261d", color: "#b7f7d4" },
+            { word: "Eventos", icon: "\u2261", color: "#63cbff" },
+            { word: "Text-Bot", icon: "\u2328", color: "#63cbff" },
+            { word: "Falar", icon: "\uD83C\uDF99", color: "#48d66b" },
+            { word: "Volume", icon: "\uD83D\uDD0a", color: "#63cbff" }
+        ] : [
+            { word: "Microphone", icon: "\uD83C\uDF99", color: "#48d66b" },
+            { word: "MQTT Base", icon: "\uD83D\uDCE1", color: "#63cbff" },
+            { word: "Phone", icon: "\uD83D\uDCF1", color: "#f8c25d" },
+            { word: "OPC UA", icon: "\uD83D\uDD17", color: "#ff6b6b" },
+            { word: "Operation Panel", icon: "\u2699", color: "#b7f7d4" },
+            { word: "General Control", icon: "\u25c9", color: "#f8c25d" },
+            { word: "Manual Control", icon: "\u261d", color: "#b7f7d4" },
+            { word: "Events", icon: "\u2261", color: "#63cbff" },
+            { word: "Text-Bot", icon: "\u2328", color: "#63cbff" },
+            { word: "Speak", icon: "\uD83C\uDF99", color: "#48d66b" },
+            { word: "Volume", icon: "\uD83D\uDD0a", color: "#63cbff" }
+        ]
+
+        for (var i = 0; i < references.length; ++i) {
+            var reference = references[i]
+            var replacement = "<font color='" + reference.color + "'><b>" + reference.icon + " " + reference.word + "</b></font>"
+            text = text.split(reference.word).join(replacement)
+        }
+        return text
+    }
+
     ColumnLayout {
         anchors.fill: parent
         spacing: 12
@@ -223,12 +266,14 @@ FloatingPanel {
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
+            contentWidth: availableWidth
+            contentHeight: helpContent.height
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
             ScrollBar.vertical.policy: ScrollBar.AlwaysOn
 
             Item {
                 id: helpContent
-                width: Math.max(helpScroll.availableWidth - 12, 700)
+                width: helpScroll.availableWidth
                 height: dialog.sectionId === "" ? homeGrid.implicitHeight : detailColumn.implicitHeight
 
                 GridLayout {
@@ -252,36 +297,43 @@ FloatingPanel {
                             border.color: modelData.color
                             border.width: 1
 
-                            ColumnLayout {
+                            RowLayout {
                                 anchors.fill: parent
                                 anchors.margins: 10
-                                spacing: 4
+                                spacing: 12
 
                                 Label {
                                     text: modelData.icon
                                     color: modelData.color
                                     font.pixelSize: 25
                                     font.bold: true
-                                    Layout.alignment: Qt.AlignHCenter
+                                    Layout.alignment: Qt.AlignVCenter
                                 }
-                                Label {
-                                    text: modelData.title
-                                    color: dialog.titleColor
-                                    font.pixelSize: 15
-                                    font.bold: true
+
+                                ColumnLayout {
                                     Layout.fillWidth: true
-                                    horizontalAlignment: Text.AlignHCenter
-                                    elide: Text.ElideRight
-                                }
-                                Label {
-                                    text: modelData.summary
-                                    color: dialog.mutedText
-                                    font.pixelSize: 11
-                                    Layout.fillWidth: true
-                                    wrapMode: Text.WordWrap
-                                    horizontalAlignment: Text.AlignHCenter
-                                    maximumLineCount: 2
-                                    elide: Text.ElideRight
+                                    Layout.alignment: Qt.AlignVCenter
+                                    spacing: 3
+
+                                    Label {
+                                        text: modelData.title
+                                        color: dialog.titleColor
+                                        font.pixelSize: 15
+                                        font.bold: true
+                                        Layout.fillWidth: true
+                                        horizontalAlignment: Text.AlignLeft
+                                        elide: Text.ElideRight
+                                    }
+                                    Label {
+                                        text: modelData.summary
+                                        color: dialog.mutedText
+                                        font.pixelSize: 11
+                                        Layout.fillWidth: true
+                                        wrapMode: Text.WordWrap
+                                        horizontalAlignment: Text.AlignLeft
+                                        maximumLineCount: 2
+                                        elide: Text.ElideRight
+                                    }
                                 }
                             }
 
@@ -336,15 +388,16 @@ FloatingPanel {
                         Rectangle {
                             required property var modelData
                             width: parent.width
-                            implicitHeight: blockText.implicitHeight + 54
+                            implicitHeight: Math.max(82, blockContent.implicitHeight + 28)
                             radius: 12
                             color: dialog.panelAltColor
                             border.color: dialog.borderColor
                             border.width: 1
 
                             Column {
-                                anchors.fill: parent
-                                anchors.margins: 14
+                                id: blockContent
+                                width: parent.width - 28
+                                anchors.centerIn: parent
                                 spacing: 7
                                 Label {
                                     width: parent.width
@@ -352,16 +405,17 @@ FloatingPanel {
                                     color: dialog.activeColor()
                                     font.pixelSize: 15
                                     font.bold: true
-                                    horizontalAlignment: Text.AlignHCenter
+                                    horizontalAlignment: Text.AlignLeft
                                 }
                                 Label {
                                     id: blockText
                                     width: parent.width
-                                    text: modelData.text
+                                    text: dialog.decorateHelpText(modelData.text)
                                     color: dialog.textColor
                                     font.pixelSize: 13
                                     wrapMode: Text.WordWrap
-                                    horizontalAlignment: Text.AlignHCenter
+                                    horizontalAlignment: Text.AlignLeft
+                                    textFormat: Text.RichText
                                 }
                             }
                         }
