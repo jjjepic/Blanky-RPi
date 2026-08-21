@@ -23,7 +23,7 @@ from blanky.audio_service import (
     stop_playback,
     update_audio_input_settings,
 )
-from blanky.config import AUDIO_DIR
+from blanky.config import AUDIO_DIR, WAKEWORD_ENABLED
 from blanky.mqtt_service import get_mqtt_bridge
 from blanky.speech_service import get_tts_voice_options, set_tts_voice, tts_speak_to_wav
 from blanky.voice_worker import VoiceWorker
@@ -980,7 +980,13 @@ class BlankyController(QObject):
             if not text:
                 continue
             try:
-                tts_speak_to_wav(text, self._panel_tts_path, voice=voice, speed=speed)
+                tts_speak_to_wav(
+                    text,
+                    self._panel_tts_path,
+                    voice=voice,
+                    speed=speed,
+                    lang=self._language,
+                )
                 play_wav(self._panel_tts_path)
             except Exception:
                 pass
@@ -1032,7 +1038,7 @@ class BlankyController(QObject):
             alerts.append(
                 f"OPC UA · {self._communication_error_text(str(health.get('opcua_last_error')))}"
             )
-        if wake.get("last_error"):
+        if WAKEWORD_ENABLED and wake.get("last_error"):
             alerts.append(
                 f"Wake Word · {self._communication_error_text(str(wake.get('last_error')))}"
             )
@@ -1055,8 +1061,9 @@ class BlankyController(QObject):
             "mqtt_base": "connected" if health.get("mqtt_base_connected") else "offline",
             "mqtt_phone": "communicating" if health.get("mqtt_panel_active") else "silent",
             "opcua": "connected" if health.get("opcua_connected") else "offline",
-            "wakeword": "connected" if wake.get("enabled") and wake.get("running") else "offline",
         }
+        if WAKEWORD_ENABLED:
+            states["wakeword"] = "connected" if wake.get("enabled") and wake.get("running") else "offline"
         return "|".join(f"{key}={value}" for key, value in states.items())
 
     def _build_comm_details_compact(self, health: dict) -> str:
