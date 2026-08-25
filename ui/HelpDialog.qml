@@ -155,14 +155,15 @@ FloatingPanel {
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
-            contentWidth: availableWidth
+            // Reserve a gutter so the overlay scrollbar never covers tutorial text.
+            contentWidth: availableWidth - Math.round(14 * dialog.textScale)
             contentHeight: helpContent.height
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
             ScrollBar.vertical.policy: ScrollBar.AlwaysOn
 
             Item {
                 id: helpContent
-                width: helpScroll.availableWidth
+                width: helpScroll.availableWidth - Math.round(14 * dialog.textScale)
                 height: dialog.sectionId === "" ? homeGrid.implicitHeight : sectionColumn.implicitHeight
 
                 GridLayout {

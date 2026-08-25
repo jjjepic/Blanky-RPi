@@ -153,12 +153,13 @@ Column {
         Column {
             id: stepBlock
             required property var modelData
+            required property int index
             width: tutorial.width
             spacing: Math.round(8 * tutorial.textScale)
 
             HelpStepCard {
                 width: parent.width
-                number: String(index + 1)
+                number: String(stepBlock.index + 1)
                 title: parent.modelData.title
                 description: parent.modelData.text
                 accentColor: tutorial.tone(parent.modelData.tone)

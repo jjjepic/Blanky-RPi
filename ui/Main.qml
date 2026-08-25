@@ -1068,7 +1068,7 @@ ApplicationWindow {
                                         text: t("textBotOffline")
                                         Layout.preferredWidth: 82
                                         Layout.preferredHeight: 28
-                                        accentColor: root.textBotMode === "offline" ? "#48d66b" : root.borderColor
+                                        accentColor: root.textBotMode === "offline" ? root.successColor : root.inactiveColor
                                         textColor: root.textColor
                                         mutedText: root.mutedText
                                         borderColor: root.borderColor
@@ -1080,7 +1080,7 @@ ApplicationWindow {
                                         text: t("textBotOnline")
                                         Layout.preferredWidth: 82
                                         Layout.preferredHeight: 28
-                                        accentColor: root.textBotMode === "online" ? "#63cbff" : root.borderColor
+                                        accentColor: root.textBotMode === "online" ? root.accentColor : root.inactiveColor
                                         textColor: root.textColor
                                         mutedText: root.mutedText
                                         borderColor: root.borderColor
@@ -1124,7 +1124,7 @@ ApplicationWindow {
                                         textPixelSize: 17
                                         Layout.preferredWidth: 40
                                         Layout.fillHeight: true
-                                        accentColor: "#63cbff"
+                                        accentColor: root.accentColor
                                         textColor: root.textColor
                                         mutedText: root.mutedText
                                         borderColor: root.borderColor
@@ -1137,7 +1137,7 @@ ApplicationWindow {
                                         text: "\u27A4 " + t("send")
                                         Layout.preferredWidth: 92
                                         Layout.fillHeight: true
-                                        accentColor: "#48d66b"
+                                        accentColor: root.successColor
                                         textColor: root.textColor
                                         mutedText: root.mutedText
                                         borderColor: root.borderColor
@@ -1178,7 +1178,7 @@ ApplicationWindow {
                                         text: t("textBotOffline")
                                         Layout.preferredWidth: 82
                                         Layout.preferredHeight: 28
-                                        accentColor: root.textBotMode === "offline" ? "#48d66b" : root.borderColor
+                                        accentColor: root.textBotMode === "offline" ? root.successColor : root.inactiveColor
                                         textColor: root.textColor
                                         mutedText: root.mutedText
                                         borderColor: root.borderColor
@@ -1190,7 +1190,7 @@ ApplicationWindow {
                                         text: t("textBotOnline")
                                         Layout.preferredWidth: 82
                                         Layout.preferredHeight: 28
-                                        accentColor: root.textBotMode === "online" ? "#63cbff" : root.borderColor
+                                        accentColor: root.textBotMode === "online" ? root.accentColor : root.inactiveColor
                                         textColor: root.textColor
                                         mutedText: root.mutedText
                                         borderColor: root.borderColor
@@ -1234,7 +1234,7 @@ ApplicationWindow {
                                         textPixelSize: 17
                                         Layout.preferredWidth: 40
                                         Layout.fillHeight: true
-                                        accentColor: "#63cbff"
+                                        accentColor: root.accentColor
                                         textColor: root.textColor
                                         mutedText: root.mutedText
                                         borderColor: root.borderColor
@@ -1247,7 +1247,7 @@ ApplicationWindow {
                                         text: "\u27A4 " + t("send")
                                         Layout.preferredWidth: 92
                                         Layout.fillHeight: true
-                                        accentColor: "#48d66b"
+                                        accentColor: root.successColor
                                         textColor: root.textColor
                                         mutedText: root.mutedText
                                         borderColor: root.borderColor
@@ -1447,7 +1447,7 @@ ApplicationWindow {
                                     MenuActionButton {
                                         text: "\u2139"; iconOnly: true; textPixelSize: 17
                                         Layout.preferredWidth: 40; Layout.fillHeight: true
-                                        accentColor: "#63cbff"; textColor: root.textColor; mutedText: root.mutedText
+                                        accentColor: root.accentColor; textColor: root.textColor; mutedText: root.mutedText
                                         borderColor: root.borderColor; panelColor: root.panelColor
                                         toolTip: t("tooltipTextBotInfo")
                                         onClicked: commandsPanel.open()
@@ -1455,7 +1455,7 @@ ApplicationWindow {
                                     MenuActionButton {
                                         text: "\u27A4 " + t("send")
                                         Layout.preferredWidth: 92; Layout.fillHeight: true
-                                        accentColor: "#48d66b"; textColor: root.textColor; mutedText: root.mutedText
+                                        accentColor: root.successColor; textColor: root.textColor; mutedText: root.mutedText
                                         borderColor: root.borderColor; panelColor: root.panelColor
                                         toolTip: t("tooltipTextBotSend")
                                         onClicked: root.sendTextBot()
