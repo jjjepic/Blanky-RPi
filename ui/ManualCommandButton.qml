@@ -51,7 +51,7 @@ Rectangle {
         anchors.bottom: parent.bottom
         anchors.rightMargin: 9
         anchors.bottomMargin: 6
-        text: control.stateText
+        text: (control.active ? "✓ " : "○ ") + control.stateText
         color: control.active ? control.iconColor : control.mutedText
         font.pixelSize: 10
         font.bold: true

@@ -14,6 +14,11 @@ Rectangle {
     property color borderColor: "#1f6fa8"
     property color textColor: "#def2ff"
     property color mutedText: "#9dd9ff"
+    property color accentColor: "#63cbff"
+    property color successColor: "#48d66b"
+    property color warningColor: "#f8c25d"
+    property color errorColor: "#ff6b6b"
+    property color inactiveColor: "#8fa8b8"
     property var stateMap: ({})
     property var detailsMap: ({})
     readonly property bool compact: panel.height < 300
@@ -61,16 +66,16 @@ Rectangle {
 
     function stateColor(state) {
         if (state === "connected")
-            return "#48d66b"
+            return panel.successColor
         if (state === "communicating")
-            return "#47c8ff"
+            return panel.accentColor
         if (state === "standby")
-            return "#aab7c2"
+            return panel.inactiveColor
         if (state === "silent")
-            return "#f8c25d"
+            return panel.warningColor
         if (state === "checking")
-            return "#8fa8b8"
-        return "#ff6b6b"
+            return panel.inactiveColor
+        return panel.errorColor
     }
 
     function stateSurfaceColor(state) {
@@ -86,17 +91,19 @@ Rectangle {
     }
 
     function stateGlyph(state) {
+        if (state === "connected")
+            return "✓"
         if (state === "communicating")
             return "⇄"
         if (state === "standby")
             return "◷"
         if (state === "silent")
-            return "◌"
+            return "!"
         if (state === "error")
-            return "⚠"
+            return "✕"
         if (state === "offline")
-            return "×"
-        return "●"
+            return "✕"
+        return "○"
     }
 
     Connections {
@@ -133,7 +140,7 @@ Rectangle {
             Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: panel.borderColor }
             Label {
                 text: panel.t("communications").toUpperCase()
-                color: panel.dark ? "#82d6ff" : "#0d5d8b"
+                color: panel.accentColor
                 font.pixelSize: 14
                 font.bold: true
             }
@@ -164,7 +171,7 @@ Rectangle {
                     Layout.preferredHeight: panel.compact ? 62 : 70
                     Layout.minimumHeight: panel.compact ? 58 : 66
                     radius: 9
-                    color: panel.dark ? "#06121d" : "#e4edf2"
+                    color: panel.panelAltColor
                     border.color: panel.stateColor(communicationStatus)
                     border.width: 1
 
@@ -218,7 +225,7 @@ Rectangle {
                                 Label {
                                     id: stateLabel
                                     anchors.centerIn: parent
-                                    text: panel.stateText(communicationStatus).toUpperCase()
+                                    text: panel.stateGlyph(communicationStatus) + " " + panel.stateText(communicationStatus).toUpperCase()
                                     color: panel.stateColor(communicationStatus)
                                     font.pixelSize: panel.compact ? 9 : 10
                                     font.bold: true

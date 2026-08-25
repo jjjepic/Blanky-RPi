@@ -7,7 +7,7 @@ import textwrap
 import re
 from datetime import datetime
 
-from PySide6.QtCore import QCoreApplication, QObject, Property, QTimer, QUrl, Signal, Slot
+from PySide6.QtCore import QCoreApplication, QObject, Property, QSettings, QTimer, QUrl, Signal, Slot
 
 from blanky.audio_service import (
     apply_audio_input_preset,
@@ -39,6 +39,7 @@ class BlankyController(QObject):
     commDetailsCompactChanged = Signal()
     dateTimeTextChanged = Signal()
     darkModeChanged = Signal()
+    appearanceModeChanged = Signal()
     monitorLeftTextChanged = Signal()
     monitorEventsTextChanged = Signal()
     listeningChanged = Signal()
@@ -213,7 +214,12 @@ class BlankyController(QObject):
         self._comm_status_compact = ""
         self._comm_details_compact = ""
         self._datetime_text = ""
-        self._dark_mode = True
+        self._settings = QSettings("Blanky", "Blanky")
+        saved_appearance = str(self._settings.value("appearanceMode", "dark") or "dark").lower()
+        self._appearance_mode = saved_appearance if saved_appearance in {
+            "light", "dark", "high_contrast", "colorblind", "monochrome"
+        } else "dark"
+        self._dark_mode = self._appearance_mode != "light"
         self._monitor_left_text = ""
         self._monitor_events_text = ""
         self._monitor_events_rich_text = ""
@@ -292,6 +298,10 @@ class BlankyController(QObject):
     @Property(bool, notify=darkModeChanged)
     def darkMode(self):
         return self._dark_mode
+
+    @Property(str, notify=appearanceModeChanged)
+    def appearanceMode(self):
+        return self._appearance_mode
 
     @Property(str, notify=monitorLeftTextChanged)
     def monitorLeftText(self):
@@ -454,8 +464,23 @@ class BlankyController(QObject):
     # ---------- QML Slots ----------
     @Slot()
     def toggleTheme(self):
-        self._dark_mode = not self._dark_mode
-        self.darkModeChanged.emit()
+        self.setAppearanceMode("light" if self._dark_mode else "dark")
+
+    @Slot(str)
+    def setAppearanceMode(self, mode: str):
+        mode = (mode or "").strip().lower()
+        if mode not in {"light", "dark", "high_contrast", "colorblind", "monochrome"}:
+            return
+        if self._appearance_mode == mode:
+            return
+        previous_dark = self._dark_mode
+        self._appearance_mode = mode
+        self._dark_mode = mode != "light"
+        self._settings.setValue("appearanceMode", mode)
+        self._settings.sync()
+        self.appearanceModeChanged.emit()
+        if previous_dark != self._dark_mode:
+            self.darkModeChanged.emit()
 
     @Slot(str)
     def setLanguage(self, lang: str):
@@ -1202,7 +1227,29 @@ class BlankyController(QObject):
         return "".join(lines)
 
     def _event_visual_color(self, command: str, accepted: bool) -> str:
-        colors = (
+        if self._appearance_mode == "high_contrast":
+            colors = {
+                "normal": "#ffffff", "inactive": "#c0c0c0", "error": "#ff8a65",
+                "start": "#00e5ff", "fast": "#ffd740", "ideal": "#00e5ff",
+                "manual": "#00e5ff", "change": "#00e5ff", "motor": "#00e5ff",
+                "green": "#00e5ff", "red": "#ff8a65", "robot": "#00e5ff",
+            }
+        elif self._appearance_mode == "colorblind":
+            colors = {
+                "normal": "#eef6fb", "inactive": "#b6c4cf", "error": "#ff9f43",
+                "start": "#4fc3f7", "fast": "#ffd166", "ideal": "#4fc3f7",
+                "manual": "#4fc3f7", "change": "#4fc3f7", "motor": "#4fc3f7",
+                "green": "#4fc3f7", "red": "#ff9f43", "robot": "#4fc3f7",
+            }
+        elif self._appearance_mode == "monochrome":
+            colors = {
+                "normal": "#f2f2f2", "inactive": "#a8a8a8", "error": "#ffffff",
+                "start": "#f2f2f2", "fast": "#d8d8d8", "ideal": "#f2f2f2",
+                "manual": "#f2f2f2", "change": "#ffffff", "motor": "#f2f2f2",
+                "green": "#f2f2f2", "red": "#ffffff", "robot": "#f2f2f2",
+            }
+        else:
+            colors = (
             {
                 "normal": "#def2ff", "inactive": "#8fa8b8", "error": "#ff6b6b",
                 "start": "#48d66b", "fast": "#f8c25d", "ideal": "#d66ad9",
@@ -1248,10 +1295,10 @@ class BlankyController(QObject):
         time_w = 8
         source_w = 10
         command_w = 18
-        status_w = 6
+        status_w = 9
         lines: list[tuple[str, str]] = []
         for ev in events:
-            status = "OK" if ev.get("accepted") else "REJECT"
+            status = "✓ OK" if ev.get("accepted") else "✕ REJECT"
             source = self._source_label(str(ev.get("source") or ""))
             event_id = int(ev.get("id", 0) or 0)
             command = str(ev.get("command") or "")
@@ -1271,7 +1318,7 @@ class BlankyController(QObject):
         time_w = 8
         source_w = 10
         command_w = 18
-        status_w = 6
+        status_w = 9
         current_generation = int(snapshot.get("event_generation", 0) or 0)
         rich_rows = []
         for ev in snapshot.get("events", []):
@@ -1279,7 +1326,7 @@ class BlankyController(QObject):
             event_label = f"[{event_id:03d}]"
             event_time = str(ev.get("time") or "")
             source = self._source_label(str(ev.get("source") or ""))
-            status = "OK" if ev.get("accepted") else "REJECT"
+            status = "✓ OK" if ev.get("accepted") else "✕ REJECT"
             command = str(ev.get("command") or "")
             is_previous_session = int(ev.get("generation", 0) or 0) < current_generation
             color = "#6d8290" if is_previous_session else self._event_visual_color(command, bool(ev.get("accepted")))

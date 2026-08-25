@@ -13,13 +13,19 @@ ApplicationWindow {
     minimumHeight: 850
     title: "Blanky"
 
-    readonly property bool dark: blanky.darkMode
-    readonly property color bgColor: dark ? "#02060d" : "#d7e3ea"
-    readonly property color panelColor: dark ? "#091722" : "#c5d8e4"
-    readonly property color panelAltColor: dark ? "#07111a" : "#e3edf2"
-    readonly property color borderColor: dark ? "#1f6fa8" : "#5f98b8"
-    readonly property color textColor: dark ? "#def2ff" : "#16384c"
-    readonly property color mutedText: dark ? "#9dd9ff" : "#386b85"
+    ThemePalette { id: theme; mode: blanky.appearanceMode }
+    readonly property bool dark: theme.dark
+    readonly property color bgColor: theme.background
+    readonly property color panelColor: theme.surface
+    readonly property color panelAltColor: theme.surfaceSecondary
+    readonly property color borderColor: theme.border
+    readonly property color textColor: theme.textPrimary
+    readonly property color mutedText: theme.textSecondary
+    readonly property color accentColor: theme.accent
+    readonly property color successColor: theme.success
+    readonly property color warningColor: theme.warning
+    readonly property color errorColor: theme.error
+    readonly property color inactiveColor: theme.inactive
     property var ttsVoiceModel: blanky.ttsVoiceOptions ? blanky.ttsVoiceOptions.split("|") : []
     property var stateMap: ({})
     property var commStateMap: ({})
@@ -42,16 +48,26 @@ ApplicationWindow {
 
     function eventsHeaderText() {
         if (blanky.language === "en")
-            return "ID    | Time     | Source     | Command            | State  | Description"
-        return "ID    | Hora     | Origem     | Comando            | Estado | Descri\u00e7\u00e3o"
+            return "ID    | Time     | Source     | Command            | State     | Description"
+        return "ID    | Hora     | Origem     | Comando            | Estado    | Descri\u00e7\u00e3o"
     }
 
     function eventsHeaderDivider() {
-        return "----- | -------- | ---------- | ------------------ | ------ | --------------------------------------------------------"
+        return "----- | -------- | ---------- | ------------------ | --------- | --------------------------------------------------------"
     }
 
     function t(key, values) {
         return I18n.text(blanky.language, key, values)
+    }
+
+    function appearanceOptions() {
+        return [
+            { id: "light", icon: "☀", title: t("lightAppearance"), description: blanky.language === "pt" ? "Interface clara e equilibrada." : "Balanced light interface." },
+            { id: "dark", icon: "☾", title: t("darkAppearance"), description: blanky.language === "pt" ? "Interface escura atual." : "Current dark interface." },
+            { id: "high_contrast", icon: "◐", title: t("highContrast"), description: blanky.language === "pt" ? "Máxima legibilidade e contornos fortes." : "Maximum legibility and strong borders." },
+            { id: "colorblind", icon: "◉", title: t("colorblindUniversal"), description: blanky.language === "pt" ? "Estados com símbolos, texto e cores acessíveis." : "States with symbols, text and accessible colours." },
+            { id: "monochrome", icon: "◻", title: t("monochrome"), description: blanky.language === "pt" ? "Estados compreensíveis sem depender da cor." : "States that do not depend on colour." }
+        ]
     }
 
     function audioSettingIsEditable(key) {
@@ -345,7 +361,7 @@ ApplicationWindow {
         Rectangle {
             anchors.fill: parent
             gradient: Gradient {
-            GradientStop { position: 0.0; color: dark ? "#03101b" : "#e3edf2" }
+            GradientStop { position: 0.0; color: theme.backgroundTop }
             GradientStop { position: 1.0; color: root.bgColor }
         }
     }
@@ -366,17 +382,17 @@ ApplicationWindow {
                 spacing: 7
 
                 MenuActionButton {
-                    text: dark ? "\u263D" : "\u2600"
+                    iconText: "\u25D0"
                     width: 50
                     height: 44
                     textPixelSize: 22
-                    accentColor: dark ? "#63cbff" : "#f8c25d"
+                    accentColor: root.accentColor
                     textColor: root.textColor
                     mutedText: root.mutedText
                     borderColor: root.borderColor
                     panelColor: root.panelAltColor
-                    toolTip: dark ? t("tooltipThemeLight") : t("tooltipThemeDark")
-                    onClicked: blanky.toggleTheme()
+                    toolTip: t("tooltipAppearance")
+                    onClicked: appearancePanel.open()
                 }
 
                 MenuActionButton {
@@ -1518,6 +1534,11 @@ ApplicationWindow {
                     borderColor: root.borderColor
                     textColor: root.textColor
                     mutedText: root.mutedText
+                    accentColor: root.accentColor
+                    successColor: root.successColor
+                    warningColor: root.warningColor
+                    errorColor: root.errorColor
+                    inactiveColor: root.inactiveColor
                     stateMap: root.stateMap
                 }
             }
@@ -1540,6 +1561,11 @@ ApplicationWindow {
         borderColor: root.borderColor
         textColor: root.textColor
         mutedText: root.mutedText
+        accentColor: root.accentColor
+        successColor: root.successColor
+        warningColor: root.warningColor
+        errorColor: root.errorColor
+        inactiveColor: root.inactiveColor
         stateMap: root.commStateMap
     }
 
@@ -1991,6 +2017,101 @@ ApplicationWindow {
         onOpening: { root.popupBackdropVisible = true; modalBackdrop.scheduleSnapshot() }
         onOpenedForBackdrop: modalBackdrop.scheduleSnapshot()
         onClosedForBackdrop: root.popupBackdropVisible = false
+    }
+
+    FloatingPanel {
+        id: appearancePanel
+        width: 680
+        height: 470
+        panelTitle: t("appearanceAccessibility")
+        panelColor: root.panelColor
+        borderColor: root.borderColor
+        titleColor: root.textColor
+        textColor: root.textColor
+        rememberPosition: false
+        onOpening: { root.popupBackdropVisible = true; modalBackdrop.scheduleSnapshot() }
+        onOpenedForBackdrop: modalBackdrop.scheduleSnapshot()
+        onClosedForBackdrop: root.popupBackdropVisible = false
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 12
+
+            Label {
+                Layout.fillWidth: true
+                text: blanky.language === "pt"
+                    ? "Escolha um modo visual. A alteração é aplicada imediatamente e fica guardada para o próximo arranque."
+                    : "Choose a visual mode. It applies immediately and is saved for the next start."
+                color: root.mutedText
+                font.pixelSize: 12
+                wrapMode: Text.WordWrap
+            }
+
+            GridLayout {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                columns: 2
+                columnSpacing: 10
+                rowSpacing: 10
+
+                Repeater {
+                    model: root.appearanceOptions()
+
+                    Rectangle {
+                        required property var modelData
+                        readonly property bool selected: blanky.appearanceMode === modelData.id
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 74
+                        radius: 10
+                        color: selected ? Qt.lighter(root.panelAltColor, root.dark ? 1.16 : 1.03) : root.panelAltColor
+                        border.color: selected ? root.accentColor : root.borderColor
+                        border.width: selected ? 2 : 1
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.margins: 10
+                            spacing: 10
+
+                            Label { text: modelData.icon; color: selected ? root.accentColor : root.mutedText; font.pixelSize: 23 }
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 3
+                                Label { text: modelData.title; color: root.textColor; font.bold: true; font.pixelSize: 14; Layout.fillWidth: true }
+                                Label { text: modelData.description; color: root.mutedText; font.pixelSize: 10; Layout.fillWidth: true; elide: Text.ElideRight }
+                            }
+                            Label { text: selected ? "✓" : "○"; color: selected ? root.successColor : root.inactiveColor; font.pixelSize: 18; font.bold: true }
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: blanky.setAppearanceMode(modelData.id)
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 48
+                radius: 9
+                color: root.panelAltColor
+                border.color: root.borderColor
+                border.width: 1
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 12
+                    anchors.rightMargin: 12
+                    spacing: 16
+                    Label { text: t("appearancePreview"); color: root.textColor; font.bold: true; font.pixelSize: 12; Layout.fillWidth: true }
+                    Label { text: "✓ " + t("connected"); color: root.successColor; font.bold: true }
+                    Label { text: "! " + t("warning"); color: root.warningColor; font.bold: true }
+                    Label { text: "✕ " + t("error"); color: root.errorColor; font.bold: true }
+                    Label { text: "○ " + t("inactive"); color: root.inactiveColor; font.bold: true }
+                }
+            }
+        }
     }
 
     FloatingPanel {
