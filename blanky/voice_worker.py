@@ -29,7 +29,15 @@ class VoiceWorker(QThread):
             tts_speak_to_wav(response, TTS_WAV, speed=self.tts_speed, lang=self.lang)
             play_wav(TTS_WAV)
         except Exception:
-            self.status.emit("Ocorreu um erro" if self.lang == "pt" else "An error occurred")
+            # A execução já foi confirmada; uma falha de TTS não deve substituir esse estado.
+            return
+
+    def _response_for_result(self, bridge, command: str, accepted: bool, message: str | None) -> str:
+        if message:
+            return message
+        if accepted:
+            return bridge.response_for_command(command, self.lang)
+        return ""
 
     def _emit_diagnostic(
         self,
@@ -71,7 +79,8 @@ class VoiceWorker(QThread):
             if not text:
                 command = "NO_AUDIO"
                 self.commandRecognized.emit(command)
-                accepted, response = mqtt_bridge.process_command(command, self.lang, source="voice")
+                accepted, message = mqtt_bridge.process_command(command, self.lang, source="voice")
+                response = self._response_for_result(mqtt_bridge, command, accepted, message)
                 self._emit_diagnostic(
                     diag,
                     text,
@@ -90,7 +99,8 @@ class VoiceWorker(QThread):
                 if not commands:
                     command = "UNKNOWN"
                     self.commandRecognized.emit(command)
-                    accepted, response = mqtt_bridge.process_command(command, self.lang, source="voice")
+                    accepted, message = mqtt_bridge.process_command(command, self.lang, source="voice")
+                    response = self._response_for_result(mqtt_bridge, command, accepted, message)
                     self._emit_diagnostic(
                         diag,
                         text,
@@ -108,8 +118,12 @@ class VoiceWorker(QThread):
                             self.lang,
                             source="voice",
                         )
-                        if mqtt_message:
-                            response = mqtt_message
+                        response = self._response_for_result(
+                            mqtt_bridge,
+                            command,
+                            accepted,
+                            mqtt_message,
+                        )
                         self._emit_diagnostic(
                             diag,
                             text,
@@ -122,9 +136,8 @@ class VoiceWorker(QThread):
                             time.sleep(0.3)
             if response:
                 self.spoken.emit(response)
-
-            t = threading.Thread(target=self._speak_async, args=(response,), daemon=True)
-            t.start()
+                t = threading.Thread(target=self._speak_async, args=(response,), daemon=True)
+                t.start()
 
         except Exception:
             self.status.emit("Ocorreu um erro" if self.lang == "pt" else "An error occurred")
