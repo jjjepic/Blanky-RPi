@@ -72,6 +72,15 @@ Comandos e intenções:
 - GREEN_ON/OFF e RED_ON/OFF: acender/ligar ou apagar/desligar a luz verde ou vermelha.
 - ROBOT_TO_METAL e ROBOT_TO_NONMETAL: enviar, mover ou mandar o robô para metal ou não metal.
 
+Pedidos de grupo claros devem ser expandidos para os comandos individuais, pela ordem indicada:
+- "todos os motores" liga/desliga MOTOR_1, MOTOR_2 e MOTOR_3.
+- "todos os cilindros" avança/recolhe CYL_A, CYL_B, CYL_C e CYL_D.
+- "todas as luzes" liga/desliga GREEN e RED.
+- "tudo" ou "todos os componentes", exceto o robô, inclui os três motores, quatro cilindros e
+  duas luzes. Para ligar, cilindros usam EXTEND; para desligar, usam RETRACT.
+- Pedidos de subconjuntos como "motor 1 e 3" ou "cilindro B e D" devolvem uma ação por cada
+  componente mencionado. Nunca incluas o robô num pedido de "tudo" sem destino explícito.
+
 Preserva a ordem de várias ações. Não devolvas nada para pedidos ambíguos, conversa, perguntas,
 ou quando faltar o componente, destino ou direção necessários para uma ação segura.
 """,
@@ -93,6 +102,15 @@ Commands and intents:
   named cylinder or actuator. The letter and direction must be clear.
 - GREEN_ON/OFF and RED_ON/OFF: turn on or turn off the green or red light.
 - ROBOT_TO_METAL and ROBOT_TO_NONMETAL: send, move or direct the robot to metal or non-metal.
+
+Clear group requests must expand into individual commands in the stated order:
+- "all motors" turns MOTOR_1, MOTOR_2 and MOTOR_3 on or off.
+- "all cylinders" extends or retracts CYL_A, CYL_B, CYL_C and CYL_D.
+- "all lights" turns GREEN and RED on or off.
+- "everything" or "all components", except the robot, includes the three motors, four cylinders
+  and two lights. Turning on cylinders uses EXTEND; turning them off uses RETRACT.
+- Subsets such as "motors 1 and 3" or "cylinders B and D" return one action for each named
+  component. Never include the robot in an "everything" request without an explicit destination.
 
 Preserve the order of multiple actions. Return nothing for ambiguous requests, conversation,
 questions, or when a safe action is missing its required component, destination or direction.
