@@ -238,6 +238,8 @@ class MQTTBridge:
                     self._publish_rejected(command, "no_state_change")
                     self._add_event(command=command, source=source, accepted=False, detail=msg)
                     return False, msg
+                if self.state["mode_manual"] == 1:
+                    self._deactivate_manual_components(lang)
                 self._emit_for_command(command, emit_pulse)
                 self._set_modes(fast=0, ideal=0, manual=0, change=1)
                 self._add_event(command=command, source=source, accepted=True, detail=self._response_for_command(command, lang))
@@ -394,6 +396,33 @@ class MQTTBridge:
         self._publish("state/mode_ideal", ideal, retain=True)
         self._publish("state/mode_manual", manual, retain=True)
         self._publish("state/mode_change", change, retain=True)
+
+    def _deactivate_manual_components(self, lang: str):
+        """Safely release manual actuators before allowing another operating mode."""
+        commands = (
+            ("motor_1", "MOTOR_1_OFF"),
+            ("motor_2", "MOTOR_2_OFF"),
+            ("motor_3", "MOTOR_3_OFF"),
+            ("cyl_a", "CYL_A_RETRACT"),
+            ("cyl_b", "CYL_B_RETRACT"),
+            ("cyl_c", "CYL_C_RETRACT"),
+            ("cyl_d", "CYL_D_RETRACT"),
+            ("light_green", "GREEN_OFF"),
+            ("light_red", "RED_OFF"),
+        )
+        pending = [(key, command) for key, command in commands if self.state[key] == 1]
+        for index, (key, command) in enumerate(pending):
+            self._emit_for_command(command, emit_pulse=None)
+            self.state[key] = 0
+            self._publish(f"state/{key}", 0, retain=True)
+            self._add_event(
+                command=command,
+                source="system",
+                accepted=True,
+                detail=self._response_for_command(command, lang),
+            )
+            if index < len(pending) - 1:
+                time.sleep(0.05)
 
     def _reset_all_state(self):
         for key in self.state.keys():

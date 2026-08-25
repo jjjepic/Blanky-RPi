@@ -59,9 +59,9 @@ FloatingPanel {
                     { title: "Online", text: "Online uses AI to interpret a natural request and extracts only valid commands. Safety rules still apply." },
                     { title: "How to use", text: "Type one or more commands. Press Enter to send, or Shift+Enter for a new line. The information button opens the command list." }
                 ] },
-                { id: "voice", icon: "🎙", color: "#48d66b", title: "Voice commands", summary: "Give short, direct spoken requests.", blocks: [
-                    { title: "How to use", text: "Select Speak, wait for Blanky to listen, then say a command clearly. You can say modes directly, such as Fast, Ideal or Manual." },
-                    { title: "Recognition", text: "Blanky accepts common wording and some close pronunciations. If it does not understand, speak again with a short and direct request." },
+                { id: "voice", icon: "🎙", color: "#48d66b", title: "Voice commands", summary: "Give natural spoken requests in your own words.", blocks: [
+                    { title: "How to use", text: "Select Speak, wait for Blanky to listen, then say what you want naturally. For example, ask it to start the system or switch to manual mode." },
+                    { title: "Recognition", text: "Blanky interprets your request online and only uses valid, safe commands. You can include more than one action in the same request." },
                     { title: "Audio log", text: "Audio settings can show the time, transcript, interpreted command and result of each spoken request." }
                 ] },
                 { id: "audio", icon: "⚙", color: "#b7f7d4", title: "Settings and audio", summary: "Adjust sound and microphone behaviour.", blocks: [
@@ -127,9 +127,9 @@ FloatingPanel {
                 { title: "Online", text: "Online usa IA para interpretar uma frase natural e extrai apenas comandos válidos. As regras de segurança mantêm-se." },
                 { title: "Como utilizar", text: "Escreve um ou mais comandos. Pressiona Enter para enviar, ou Shift+Enter para criar uma nova linha. O botão de informação abre a lista de comandos." }
             ] },
-            { id: "voice", icon: "🎙", color: "#48d66b", title: "Comandos de voz", summary: "Dá pedidos falados curtos e diretos.", blocks: [
-                { title: "Como utilizar", text: "Seleciona Falar, espera que o Blanky fique a ouvir e diz o comando com clareza. Podes dizer apenas Rápido, Ideal ou Manual para escolher o modo." },
-                { title: "Reconhecimento", text: "O Blanky aceita formas comuns de dizer um comando e algumas pronúncias próximas. Se não perceber, fala novamente com um pedido curto e direto." },
+            { id: "voice", icon: "🎙", color: "#48d66b", title: "Comandos de voz", summary: "Dá pedidos falados naturais, pelas tuas próprias palavras.", blocks: [
+                { title: "Como utilizar", text: "Seleciona Falar, espera que o Blanky fique a ouvir e diz naturalmente o que pretendes. Por exemplo, pede para iniciar o sistema ou mudar para o modo manual." },
+                { title: "Reconhecimento", text: "O Blanky interpreta o pedido online e usa apenas comandos válidos e seguros. Podes incluir mais do que uma ação no mesmo pedido." },
                 { title: "Registo de áudio", text: "Nas configurações de áudio podes ver a hora, transcrição, comando interpretado e resultado de cada pedido falado." }
             ] },
             { id: "audio", icon: "⚙", color: "#b7f7d4", title: "Definições e áudio", summary: "Ajusta o som e o comportamento do microfone.", blocks: [

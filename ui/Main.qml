@@ -764,7 +764,8 @@ ApplicationWindow {
                     Layout.minimumWidth: 135
                     Layout.preferredHeight: 44
                     prominent: true
-                    accentColor: "#20d6a4"
+                    textPixelSize: 16
+                    accentColor: "#28e6ad"
                     textColor: root.textColor
                     mutedText: root.mutedText
                     borderColor: root.borderColor

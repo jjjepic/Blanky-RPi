@@ -51,21 +51,92 @@ VALID_COMMANDS = frozenset({
 })
 
 
+_ONLINE_INTENT_GUIDES = {
+    "pt": """
+Mapeia o significado do pedido, não apenas palavras exatas. O utilizador pode usar frases naturais,
+formas coloquiais, tempos verbais diferentes e pequenas imperfeições de transcrição.
+
+Comandos e intenções:
+- START: iniciar, arrancar, começar ou pôr o sistema a trabalhar.
+- STOP: parar, interromper, terminar ou desligar o sistema.
+- MODE_FAST: escolher o modo rápido, acelerado ou de alta velocidade.
+- MODE_IDEAL: escolher o modo ideal, automático, normal ou otimizado.
+- MODE_MANUAL: escolher operação ou controlo manual.
+- MODE_UNSPEC: pedir para trocar, mudar, alterar, selecionar outro ou escolher o modo sem indicar
+  qual. Inclui "trocar modo", "mudar de modo", "alterar modo" e transcrições aproximadas como
+  "trocar molde" ou "mudar móvel" quando o contexto é a troca de modo.
+- MOTOR_1_ON/OFF, MOTOR_2_ON/OFF, MOTOR_3_ON/OFF: ligar, ativar, parar ou desligar o motor
+  indicado. O número do motor e a ação têm de estar claros.
+- CYL_A_EXTEND/RETRACT até CYL_D_EXTEND/RETRACT: avançar/estender ou recuar/recolher o cilindro
+  ou atuador indicado. A letra e a direção têm de estar claras.
+- GREEN_ON/OFF e RED_ON/OFF: acender/ligar ou apagar/desligar a luz verde ou vermelha.
+- ROBOT_TO_METAL e ROBOT_TO_NONMETAL: enviar, mover ou mandar o robô para metal ou não metal.
+
+Pedidos de grupo claros devem ser expandidos para os comandos individuais, pela ordem indicada:
+- "todos os motores" liga/desliga MOTOR_1, MOTOR_2 e MOTOR_3.
+- "todos os cilindros" avança/recolhe CYL_A, CYL_B, CYL_C e CYL_D.
+- "todas as luzes" liga/desliga GREEN e RED.
+- "tudo" ou "todos os componentes", exceto o robô, inclui os três motores, quatro cilindros e
+  duas luzes. Para ligar, cilindros usam EXTEND; para desligar, usam RETRACT.
+- Pedidos de subconjuntos como "motor 1 e 3" ou "cilindro B e D" devolvem uma ação por cada
+  componente mencionado. Nunca incluas o robô num pedido de "tudo" sem destino explícito.
+
+Preserva a ordem de várias ações. Não devolvas nada para pedidos ambíguos, conversa, perguntas,
+ou quando faltar o componente, destino ou direção necessários para uma ação segura.
+""",
+    "en": """
+Map the user's meaning, not exact keywords. The user may use natural phrasing, colloquial wording,
+different verb forms and minor transcription mistakes.
+
+Commands and intents:
+- START: start, begin, launch or put the system into operation.
+- STOP: stop, halt, interrupt, finish or shut down the system.
+- MODE_FAST: select fast, quick, accelerated or high-speed mode.
+- MODE_IDEAL: select ideal, automatic, normal or optimized mode.
+- MODE_MANUAL: select manual operation or manual control.
+- MODE_UNSPEC: request to change, switch, alter, select another or choose a mode without stating
+  which one. This includes "change mode", "switch mode" and close transcription variants.
+- MOTOR_1_ON/OFF, MOTOR_2_ON/OFF, MOTOR_3_ON/OFF: turn on, enable, stop or turn off the named
+  motor. The motor number and action must be clear.
+- CYL_A_EXTEND/RETRACT through CYL_D_EXTEND/RETRACT: extend/advance or retract/pull back the
+  named cylinder or actuator. The letter and direction must be clear.
+- GREEN_ON/OFF and RED_ON/OFF: turn on or turn off the green or red light.
+- ROBOT_TO_METAL and ROBOT_TO_NONMETAL: send, move or direct the robot to metal or non-metal.
+
+Clear group requests must expand into individual commands in the stated order:
+- "all motors" turns MOTOR_1, MOTOR_2 and MOTOR_3 on or off.
+- "all cylinders" extends or retracts CYL_A, CYL_B, CYL_C and CYL_D.
+- "all lights" turns GREEN and RED on or off.
+- "everything" or "all components", except the robot, includes the three motors, four cylinders
+  and two lights. Turning on cylinders uses EXTEND; turning them off uses RETRACT.
+- Subsets such as "motors 1 and 3" or "cylinders B and D" return one action for each named
+  component. Never include the robot in an "everything" request without an explicit destination.
+
+Preserve the order of multiple actions. Return nothing for ambiguous requests, conversation,
+questions, or when a safe action is missing its required component, destination or direction.
+""",
+}
+
+
 def interpret_online_commands(raw_text: str, lang: str) -> list[str]:
     """Use the AI only to map natural text to a validated canonical command list."""
     language = "Portuguese" if lang == "pt" else "English"
     allowed = ", ".join(sorted(VALID_COMMANDS))
-    prompt = (
+    guide = _ONLINE_INTENT_GUIDES.get(lang, _ONLINE_INTENT_GUIDES["en"])
+    instructions = (
         "You are a strict industrial command interpreter. Return JSON only, in the form "
-        '{"commands": ["COMMAND"]}. Extract one or more actions from the user text, preserve their order, '
-        "and return an empty array if no safe action is explicit. Never invent commands, explanations, "
-        f"or extra fields. The user language is {language}. Allowed commands are: {allowed}. "
-        f"User text: {raw_text}"
+        "{\"commands\": [\"COMMAND\"]}. Extract one or more explicit, safe actions from the user's text "
+        "and preserve their order. Never invent commands, explanations or extra fields. "
+        f"The user language is {language}. Allowed commands are: {allowed}.\n\n"
+        f"{guide}"
     )
     client = OpenAI()
     response = client.chat.completions.create(
         model=os.getenv("BLANKY_TEXTBOT_MODEL", "gpt-4o-mini"),
-        messages=[{"role": "user", "content": prompt}],
+        messages=[
+            {"role": "system", "content": instructions},
+            {"role": "user", "content": raw_text},
+        ],
         response_format={"type": "json_object"},
         temperature=0,
     )
