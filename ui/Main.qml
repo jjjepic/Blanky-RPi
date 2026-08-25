@@ -60,6 +60,18 @@ ApplicationWindow {
         return I18n.text(blanky.language, key, values)
     }
 
+    function appearanceIcon() {
+        if (blanky.appearanceMode === "light")
+            return "\u2600"
+        if (blanky.appearanceMode === "high_contrast")
+            return "\u25D0"
+        if (blanky.appearanceMode === "colorblind")
+            return "\u25C9"
+        if (blanky.appearanceMode === "monochrome")
+            return "\u25FB"
+        return "\u263E"
+    }
+
     function appearanceOptions() {
         return [
             { id: "light", icon: "☀", title: t("lightAppearance"), description: blanky.language === "pt" ? "Interface clara e equilibrada." : "Balanced light interface." },
@@ -152,7 +164,11 @@ ApplicationWindow {
     }
 
     function voiceLabel() {
-        var voice = blanky.ttsVoice || ""
+        return voiceName(blanky.ttsVoice)
+    }
+
+    function voiceName(voice) {
+        voice = voice || ""
         if (!voice)
             return ""
         return voice.charAt(0).toUpperCase() + voice.slice(1).toLowerCase()
@@ -382,7 +398,7 @@ ApplicationWindow {
                 spacing: 7
 
                 MenuActionButton {
-                    iconText: "\u25D0"
+                    iconText: root.appearanceIcon()
                     width: 50
                     height: 44
                     textPixelSize: 22
@@ -1326,7 +1342,7 @@ ApplicationWindow {
                                 text: blanky.monitorEventsRichText
                                 readOnly: true
                                 selectByMouse: true
-                                wrapMode: TextEdit.Wrap
+                                wrapMode: TextEdit.NoWrap
                                 color: root.textColor
                                 font.family: "Consolas"
                                 font.pixelSize: 12
@@ -2216,7 +2232,7 @@ ApplicationWindow {
                                 }
 
                                 Label {
-                                    text: modelData
+                                    text: root.voiceName(modelData)
                                     color: root.textColor
                                     font.pixelSize: 17
                                     font.bold: true
@@ -3106,14 +3122,14 @@ ApplicationWindow {
                     TextEdit {
                         width: audioLogsScroll.availableWidth
                         height: Math.max(audioLogsScroll.availableHeight, contentHeight + 6)
-                        text: blanky.audioDiagnosticLogText
+                        text: blanky.audioDiagnosticRichText
                         readOnly: true
                         selectByMouse: true
                         wrapMode: TextEdit.NoWrap
                         color: root.textColor
                         font.family: "Noto Sans Mono"
                         font.pixelSize: 11
-                        textFormat: TextEdit.PlainText
+                        textFormat: TextEdit.RichText
                     }
                     background: Rectangle { color: root.panelAltColor; radius: 10; border.color: root.borderColor; border.width: 1 }
                 }

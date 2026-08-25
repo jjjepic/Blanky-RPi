@@ -407,6 +407,22 @@ class BlankyController(QObject):
         if not self._audio_diagnostic_entries:
             return ""
 
+        return "\n".join(line for line, _ in self._build_audio_diagnostic_lines())
+
+    @Property(str, notify=audioDiagnosticLogTextChanged)
+    def audioDiagnosticRichText(self):
+        rows = self._build_audio_diagnostic_lines()
+        if not rows:
+            return ""
+        rich_rows = [
+            f"<span style='color:{color};'>{html.escape(line)}</span>"
+            for line, color in rows
+        ]
+        return "<pre style='font-family:Consolas; font-size:11px;'>" + "\n".join(rich_rows) + "</pre>"
+
+    def _build_audio_diagnostic_lines(self) -> list[tuple[str, str]]:
+        """Format voice diagnostics once for both plain and coloured views."""
+
         id_w = 5
         time_w = 8
         capture_w = 8
@@ -414,8 +430,16 @@ class BlankyController(QObject):
         command_w = 14
         result_w = 9
         duration_w = 7
-        lines = []
+        lines: list[tuple[str, str]] = []
         for index, entry in enumerate(self._audio_diagnostic_entries, start=1):
+            command = str(entry["command"])
+            result = str(entry.get("result", "--")).upper()
+            result_label = (
+                "✓ OK" if result == "OK" else
+                "✕ REJECT" if result == "REJECT" else
+                "○ " + result
+            )
+            line_color = self._event_visual_color(command, result == "OK")
             transcript_lines = textwrap.wrap(
                 str(entry["text"]), width=transcript_w,
                 break_long_words=True, break_on_hyphens=False,
@@ -425,11 +449,11 @@ class BlankyController(QObject):
                 + str(entry["time"]).ljust(time_w) + " | "
                 + f"{float(entry['capture']):.2f}s".rjust(capture_w) + " | "
                 + transcript_lines[0].ljust(transcript_w) + " | "
-                + str(entry["command"]).ljust(command_w) + " | "
-                + str(entry.get("result", "--")).ljust(result_w) + " | "
+                + command.ljust(command_w) + " | "
+                + result_label.ljust(result_w) + " | "
                 + f"{float(entry.get('duration', 0.0)):.2f}s".rjust(duration_w)
             )
-            lines.append(prefix)
+            lines.append((prefix, line_color))
 
             continuation_prefix = (
                 " ".ljust(id_w) + " | " + " ".ljust(time_w) + " | "
@@ -440,8 +464,8 @@ class BlankyController(QObject):
                 + " ".ljust(result_w) + " | " + " ".ljust(duration_w)
             )
             for transcript_line in transcript_lines[1:]:
-                lines.append(continuation_prefix + transcript_line.ljust(transcript_w) + continuation_suffix)
-        return "\n".join(lines)
+                lines.append((continuation_prefix + transcript_line.ljust(transcript_w) + continuation_suffix, line_color))
+        return lines
 
     @Property(str, notify=audioDiagnosticLogTextChanged)
     def audioDiagnosticHeaderText(self):
@@ -1349,7 +1373,7 @@ class BlankyController(QObject):
 
     def _localized_event_detail(self, event: dict) -> str:
         command = str(event.get("command") or "")
-        original = str(event.get("detail") or "")
+        original = self._repair_display_text(str(event.get("detail") or ""))
         if event.get("accepted"):
             if command == "SYSTEM_RESET":
                 return self._tr("system_reset")
