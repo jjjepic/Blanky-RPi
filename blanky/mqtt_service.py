@@ -35,6 +35,7 @@ class MQTTBridge:
         self._next_event_id = 1
         # Each reset starts a new visual event session without discarding history.
         self._event_generation = 0
+        self._robot_release_generation = 0
         self._ui_lang = "pt"
         self._opcua = get_opcua_bridge()
         self._last_mqtt_panel_rx = 0.0
@@ -332,6 +333,7 @@ class MQTTBridge:
                 self.state["robot_nonmetal"] = 0
                 self._publish("state/robot_metal", 1, retain=True)
                 self._publish("state/robot_nonmetal", 0, retain=True)
+                self._schedule_robot_release()
                 self._add_event(command=command, source=source, accepted=True, detail=self._response_for_command(command, lang))
                 return True, None
 
@@ -345,6 +347,7 @@ class MQTTBridge:
                 self.state["robot_nonmetal"] = 1
                 self._publish("state/robot_metal", 0, retain=True)
                 self._publish("state/robot_nonmetal", 1, retain=True)
+                self._schedule_robot_release()
                 self._add_event(command=command, source=source, accepted=True, detail=self._response_for_command(command, lang))
                 return True, None
 
@@ -399,6 +402,8 @@ class MQTTBridge:
 
     def _deactivate_manual_components(self, lang: str):
         """Safely release manual actuators before allowing another operating mode."""
+        self._cancel_robot_release()
+        self._clear_robot_state()
         commands = (
             ("motor_1", "MOTOR_1_OFF"),
             ("motor_2", "MOTOR_2_OFF"),
@@ -425,8 +430,35 @@ class MQTTBridge:
                 time.sleep(0.05)
 
     def _reset_all_state(self):
+        self._cancel_robot_release()
         for key in self.state.keys():
             self.state[key] = 0
+
+    def _cancel_robot_release(self):
+        """Invalidate any pending visual release for a robot command."""
+        self._robot_release_generation += 1
+
+    def _clear_robot_state(self):
+        """Clear robot indicators and MQTT state without adding an Event entry."""
+        for key in ("robot_metal", "robot_nonmetal"):
+            if self.state[key] != 0:
+                self.state[key] = 0
+                self._publish(f"state/{key}", 0, retain=True)
+
+    def _schedule_robot_release(self):
+        """Keep robot selections visible briefly, then release them silently."""
+        self._cancel_robot_release()
+        generation = self._robot_release_generation
+
+        def release():
+            with self._lock:
+                if generation != self._robot_release_generation:
+                    return
+                self._clear_robot_state()
+
+        timer = threading.Timer(2.0, release)
+        timer.daemon = True
+        timer.start()
 
     def _is_everything_reset(self) -> bool:
         return all(value == 0 for value in self.state.values())
