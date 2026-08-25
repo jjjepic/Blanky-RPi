@@ -17,13 +17,14 @@ Rectangle {
     property bool active: false
     property bool commandEnabled: true
     property bool singleLineTitle: false
+    readonly property real readabilityScale: typeof blanky !== "undefined" ? blanky.appearanceTextScale : 1.0
 
     signal triggered(string command)
 
     radius: 8
     height: parent && parent.controlButtonHeight !== undefined ? parent.controlButtonHeight : 42
     color: active ? Qt.lighter(panelColor, 1.45) : panelColor
-    opacity: commandEnabled || active ? 1.0 : 0.42
+    opacity: commandEnabled || active ? 1.0 : 0.62
     border.color: active ? iconColor : borderColor
     border.width: active ? 2 : 1
 
@@ -36,7 +37,7 @@ Rectangle {
             : control.label
         textFormat: Text.RichText
         color: control.textColor
-        font.pixelSize: control.singleLineTitle ? 11 : 12
+        font.pixelSize: Math.round((control.singleLineTitle ? 11 : 12) * control.readabilityScale)
         font.bold: control.active
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
@@ -51,9 +52,9 @@ Rectangle {
         anchors.bottom: parent.bottom
         anchors.rightMargin: 9
         anchors.bottomMargin: 6
-        text: control.stateText
+        text: (control.active ? "✓ " : "○ ") + control.stateText
         color: control.active ? control.iconColor : control.mutedText
-        font.pixelSize: 10
+        font.pixelSize: Math.round(10 * control.readabilityScale)
         font.bold: true
     }
 

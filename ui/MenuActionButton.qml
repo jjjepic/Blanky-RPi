@@ -20,6 +20,7 @@ Rectangle {
     property real textHorizontalOffset: 0
     property real textVerticalOffset: 0
     property bool iconOnly: false
+    readonly property real readabilityScale: typeof blanky !== "undefined" ? blanky.appearanceTextScale : 1.0
     readonly property bool hasStructuredContent: iconText.length > 0 || labelText.length > 0
     readonly property bool glyphButton: iconOnly || (hasStructuredContent && labelText.length === 0)
     readonly property string displayText: hasStructuredContent
@@ -31,6 +32,8 @@ Rectangle {
     signal clicked()
 
     width: 150
+    // Layouts own the button height. Scaling it here as well caused controls
+    // with an explicit layout height to retain stale geometry after a reset.
     height: prominent ? 44 : 40
     radius: 11
     opacity: enabled ? 1.0 : 0.55
@@ -51,7 +54,7 @@ Rectangle {
             text: control.displayText
             textFormat: Text.RichText
             color: control.textColor
-            font.pixelSize: control.textPixelSize
+            font.pixelSize: Math.round(control.textPixelSize * control.readabilityScale)
             font.bold: true
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
@@ -71,7 +74,7 @@ Rectangle {
                 height: parent.height
                 text: control.iconText
                 color: control.textColor
-                font.pixelSize: control.textPixelSize
+                font.pixelSize: Math.round(control.textPixelSize * control.readabilityScale)
                 font.bold: true
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
@@ -84,7 +87,7 @@ Rectangle {
                 text: control.labelText
                 textFormat: Text.RichText
                 color: control.textColor
-                font.pixelSize: control.textPixelSize
+                font.pixelSize: Math.round(control.textPixelSize * control.readabilityScale)
                 font.bold: true
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
@@ -105,7 +108,7 @@ Rectangle {
                 text: control.text
                 textFormat: Text.RichText
                 color: control.textColor
-                font.pixelSize: control.textPixelSize
+                font.pixelSize: Math.round(control.textPixelSize * control.readabilityScale)
                 font.bold: true
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
@@ -117,7 +120,7 @@ Rectangle {
                 width: parent.width
                 text: control.subText
                 color: control.mutedText
-                font.pixelSize: 10
+                font.pixelSize: Math.round(10 * control.readabilityScale)
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
                 wrapMode: Text.NoWrap
@@ -130,7 +133,7 @@ Rectangle {
         anchors.fill: parent
         text: control.iconText.length > 0 ? control.iconText : control.text
         color: control.textColor
-        font.pixelSize: control.textPixelSize
+        font.pixelSize: Math.round(control.textPixelSize * control.readabilityScale)
         font.bold: true
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
@@ -151,5 +154,8 @@ Rectangle {
         visible: mouseArea.containsMouse && control.toolTip.length > 0
         text: control.toolTip
         lightSurface: control.lightSurface
+        surfaceColor: control.panelColor
+        outlineColor: control.accentColor
+        foregroundColor: control.textColor
     }
 }

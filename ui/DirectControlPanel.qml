@@ -14,6 +14,12 @@ Rectangle {
     property color borderColor: "#1f6fa8"
     property color textColor: "#def2ff"
     property color mutedText: "#9dd9ff"
+    property color accentColor: "#63cbff"
+    property color successColor: "#48d66b"
+    property color warningColor: "#f8c25d"
+    property color errorColor: "#ff6b6b"
+    property color inactiveColor: "#8fa8b8"
+    readonly property real readabilityScale: panel.controller ? panel.controller.appearanceTextScale : 1.0
     property var stateMap: ({})
     readonly property bool manualAvailable: stateValue("mode_manual") === 1
     readonly property bool modeChangeActive: stateValue("mode_change") === 1
@@ -21,16 +27,16 @@ Rectangle {
         || stateValue("mode_ideal") === 1 || manualAvailable
     readonly property bool canSelectMode: !modeSelected || modeChangeActive
     readonly property bool canRequestModeChange: modeSelected && !modeChangeActive
-    readonly property color fastModeColor: dark ? "#f8c25d" : "#8a5b00"
-    readonly property color idealModeColor: dark ? "#d66ad9" : "#8f3f9e"
-    readonly property color manualModeColor: dark ? "#b7f7d4" : "#13735e"
-    readonly property color changeModeColor: dark ? "#9dd9ff" : "#146f9e"
+    readonly property color fastModeColor: warningColor
+    readonly property color idealModeColor: accentColor
+    readonly property color manualModeColor: successColor
+    readonly property color changeModeColor: accentColor
     readonly property bool compact: panel.height < 430
-    readonly property int sectionSpacing: compact ? 4 : 8
-    readonly property int blockMargin: compact ? 7 : 10
+    readonly property int sectionSpacing: Math.round((compact ? 4 : 8) * (readabilityScale > 1 ? 1.10 : 1.0))
+    readonly property int blockMargin: Math.round((compact ? 7 : 10) * (readabilityScale > 1 ? 1.08 : 1.0))
     readonly property real actionButtonHeight: compact
         ? Math.max(28, Math.min(36, Math.floor((panel.height - 150) / 5)))
-        : Math.max(40, Math.min(58, Math.floor((panel.height - 180) / 5)))
+        : Math.max(40, Math.min(readabilityScale > 1 ? 62 : 58, Math.floor((panel.height - 180) / 5)))
 
     function t(key, values) {
         return I18n.text(panel.language, key, values)
@@ -50,14 +56,14 @@ Rectangle {
 
     function activeModeText() {
         if (stateValue("mode_fast") === 1)
-            return t("fast")
+            return "▶ " + t("fast")
         if (stateValue("mode_ideal") === 1)
-            return t("ideal")
+            return "▶ " + t("ideal")
         if (stateValue("mode_manual") === 1)
-            return t("manual")
+            return "✓ " + t("manual")
         if (stateValue("mode_change") === 1)
-            return t("change")
-        return "--"
+            return "! " + t("change")
+        return "○ " + t("inactive")
     }
 
     function activeModeColor() {
@@ -78,16 +84,16 @@ Rectangle {
 
     function systemInfo() {
         if (stateValue("start") !== 1)
-            return { text: t("stopped"), color: panel.mutedText }
+            return { text: "○ " + t("stopped"), color: panel.inactiveColor }
         if (stateValue("mode_change") === 1)
-            return { text: t("waitingMode"), color: activeModeColor() }
+            return { text: "! " + t("waitingMode"), color: panel.warningColor }
         if (stateValue("mode_manual") === 1)
-            return { text: t("manualActive"), color: activeModeColor() }
+            return { text: "✓ " + t("manualActive"), color: activeModeColor() }
         if (stateValue("mode_fast") === 1)
-            return { text: t("fastRunning"), color: activeModeColor() }
+            return { text: "▶ " + t("fastRunning"), color: activeModeColor() }
         if (stateValue("mode_ideal") === 1)
-            return { text: t("idealRunning"), color: activeModeColor() }
-        return { text: t("running"), color: "#48d66b" }
+            return { text: "▶ " + t("idealRunning"), color: activeModeColor() }
+        return { text: "✓ " + t("running"), color: panel.successColor }
     }
 
     function processInfo() {
@@ -101,7 +107,7 @@ Rectangle {
             return { text: t("fastCycleActive"), color: activeModeColor() }
         if (stateValue("mode_ideal") === 1)
             return { text: t("idealCycleActive"), color: activeModeColor() }
-        return { text: t("selectMode"), color: "#f8c25d" }
+        return { text: t("selectMode"), color: panel.warningColor }
     }
 
     color: panel.panelColor
@@ -121,8 +127,8 @@ Rectangle {
             Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: panel.borderColor }
             Label {
                 text: panel.t("operationPanel").toUpperCase()
-                color: panel.dark ? "#82d6ff" : "#0d5d8b"
-                font.pixelSize: 14
+                color: panel.accentColor
+                font.pixelSize: Math.round(14 * panel.readabilityScale)
                 font.bold: true
             }
             Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: panel.borderColor }
@@ -138,7 +144,7 @@ Rectangle {
                 id: generalBlock
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                color: panel.dark ? "#06121d" : "#e4edf2"
+                color: panel.panelAltColor
                 border.color: panel.borderColor
                 border.width: 1
                 radius: 9
@@ -151,17 +157,17 @@ Rectangle {
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 6
-                        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: panel.dark ? "#285772" : "#8db7d1" }
+                        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: panel.borderColor }
                         Label {
                             text: panel.t("generalControl")
-                            color: panel.dark ? "#82d6ff" : "#0d5d8b"
-                            font.pixelSize: 14
+                            color: panel.accentColor
+                            font.pixelSize: Math.round(14 * panel.readabilityScale)
                             font.bold: true
                         }
-                        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: panel.dark ? "#285772" : "#8db7d1" }
+                        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: panel.borderColor }
                     }
 
-                    Label { text: panel.t("system"); color: panel.mutedText; font.bold: true; font.pixelSize: panel.compact ? 11 : 12; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+                    Label { text: panel.t("system"); color: panel.mutedText; font.bold: true; font.pixelSize: Math.round((panel.compact ? 11 : 12) * panel.readabilityScale); horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
                     ManualCommandButton {
                         Layout.fillWidth: true
                         Layout.preferredHeight: panel.actionButtonHeight
@@ -171,12 +177,12 @@ Rectangle {
                         command: panel.toggleCommand("start", "START", "STOP")
                         active: panel.stateValue("start") === 1
                         stateText: panel.toggleStateText("start", "ON", "OFF")
-                        iconColor: active ? "#48d66b" : "#ff6b6b"
+                        iconColor: active ? panel.successColor : panel.inactiveColor
                         textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor
                         onTriggered: function(command) { panel.controller.submitButtonCommand(command) }
                     }
 
-                    Label { text: panel.t("modes"); color: panel.mutedText; font.bold: true; font.pixelSize: panel.compact ? 11 : 12; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+                    Label { text: panel.t("modes"); color: panel.mutedText; font.bold: true; font.pixelSize: Math.round((panel.compact ? 11 : 12) * panel.readabilityScale); horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: panel.compact ? 5 : 8
@@ -186,20 +192,20 @@ Rectangle {
                             Layout.preferredHeight: panel.actionButtonHeight
                             spacing: panel.compact ? 5 : 8
 
-                            ManualCommandButton { width: (parent.width - parent.spacing * 2) / 3; height: panel.actionButtonHeight; commandEnabled: panel.canSelectMode; label: panel.t("fast"); iconText: "\u26A1"; command: "MODE_FAST"; active: panel.stateValue("mode_fast") === 1; stateText: ""; iconColor: panel.fastModeColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
-                            ManualCommandButton { width: (parent.width - parent.spacing * 2) / 3; height: panel.actionButtonHeight; commandEnabled: panel.canSelectMode; label: panel.t("ideal"); iconText: "\uD83C\uDFAF"; command: "MODE_IDEAL"; active: panel.stateValue("mode_ideal") === 1; stateText: ""; iconColor: panel.idealModeColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
-                            ManualCommandButton { width: (parent.width - parent.spacing * 2) / 3; height: panel.actionButtonHeight; commandEnabled: panel.canSelectMode; label: panel.t("manual"); iconText: "\uD83D\uDD79"; command: "MODE_MANUAL"; active: panel.stateValue("mode_manual") === 1; stateText: ""; iconColor: panel.manualModeColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
+                            ManualCommandButton { width: (parent.width - parent.spacing * 2) / 3; height: panel.actionButtonHeight; commandEnabled: panel.canSelectMode; label: panel.t("fast"); iconText: "\u26A1"; command: "MODE_FAST"; active: panel.stateValue("mode_fast") === 1; stateText: active ? "ON" : "OFF"; iconColor: panel.fastModeColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
+                            ManualCommandButton { width: (parent.width - parent.spacing * 2) / 3; height: panel.actionButtonHeight; commandEnabled: panel.canSelectMode; label: panel.t("ideal"); iconText: "\uD83C\uDFAF"; command: "MODE_IDEAL"; active: panel.stateValue("mode_ideal") === 1; stateText: active ? "ON" : "OFF"; iconColor: panel.idealModeColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
+                            ManualCommandButton { width: (parent.width - parent.spacing * 2) / 3; height: panel.actionButtonHeight; commandEnabled: panel.canSelectMode; label: panel.t("manual"); iconText: "\uD83D\uDD79"; command: "MODE_MANUAL"; active: panel.stateValue("mode_manual") === 1; stateText: active ? "ON" : "OFF"; iconColor: panel.manualModeColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
                         }
 
-                        ManualCommandButton { Layout.fillWidth: true; Layout.preferredHeight: panel.actionButtonHeight; commandEnabled: panel.canRequestModeChange; label: panel.t("change"); iconText: "\u21C4"; command: "MODE_UNSPEC"; active: panel.modeChangeActive; stateText: ""; iconColor: panel.changeModeColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
+                        ManualCommandButton { Layout.fillWidth: true; Layout.preferredHeight: panel.actionButtonHeight; commandEnabled: panel.canRequestModeChange; label: panel.t("change"); iconText: "\u21C4"; command: "MODE_UNSPEC"; active: panel.modeChangeActive; stateText: active ? "ON" : "OFF"; iconColor: panel.changeModeColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
                     }
 
-                    Label { text: panel.t("currentState"); color: panel.mutedText; font.bold: true; font.pixelSize: panel.compact ? 11 : 12; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+                    Label { text: panel.t("currentState"); color: panel.mutedText; font.bold: true; font.pixelSize: Math.round((panel.compact ? 11 : 12) * panel.readabilityScale); horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
                     Rectangle {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         Layout.minimumHeight: panel.compact ? 80 : 112
-                        color: panel.dark ? "#091722" : "#dbe8ee"
+                        color: panel.panelColor
                         border.color: panel.borderColor
                         border.width: 1
                         radius: 8
@@ -211,18 +217,18 @@ Rectangle {
 
                             RowLayout {
                                 Layout.fillWidth: true
-                                Label { text: panel.t("activeMode"); color: panel.textColor; Layout.fillWidth: true }
-                                Label { text: "● " + panel.modeInfo().text; color: panel.modeInfo().color; font.bold: true }
+                                Label { text: panel.t("activeMode"); color: panel.textColor; font.pixelSize: Math.round(12 * panel.readabilityScale); Layout.fillWidth: true }
+                                Label { text: panel.modeInfo().text; color: panel.modeInfo().color; font.pixelSize: Math.round(12 * panel.readabilityScale); font.bold: true }
                             }
                             RowLayout {
                                 Layout.fillWidth: true
-                                Label { text: panel.t("systemState"); color: panel.textColor; Layout.fillWidth: true }
-                                Label { text: "● " + panel.systemInfo().text; color: panel.systemInfo().color; font.bold: true; elide: Text.ElideRight; Layout.preferredWidth: 148; horizontalAlignment: Text.AlignRight }
+                                Label { text: panel.t("systemState"); color: panel.textColor; font.pixelSize: Math.round(12 * panel.readabilityScale); Layout.fillWidth: true }
+                                Label { text: panel.systemInfo().text; color: panel.systemInfo().color; font.pixelSize: Math.round(12 * panel.readabilityScale); font.bold: true; elide: Text.ElideRight; Layout.preferredWidth: 148; horizontalAlignment: Text.AlignRight }
                             }
                             RowLayout {
                                 Layout.fillWidth: true
-                                Label { text: panel.t("currentProcess"); color: panel.textColor; Layout.fillWidth: true }
-                                Label { text: panel.processInfo().text; color: panel.processInfo().color; elide: Text.ElideNone; Layout.preferredWidth: 148; horizontalAlignment: Text.AlignRight }
+                                Label { text: panel.t("currentProcess"); color: panel.textColor; font.pixelSize: Math.round(12 * panel.readabilityScale); Layout.fillWidth: true }
+                                Label { text: panel.processInfo().text; color: panel.processInfo().color; font.pixelSize: Math.round(12 * panel.readabilityScale); elide: Text.ElideNone; Layout.preferredWidth: 148; horizontalAlignment: Text.AlignRight }
                             }
                         }
                     }
@@ -233,8 +239,8 @@ Rectangle {
                 id: manualBlock
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                color: panel.dark ? "#06121d" : "#e4edf2"
-                border.color: panel.manualAvailable ? "#48d66b" : panel.borderColor
+                color: panel.panelAltColor
+                border.color: panel.manualAvailable ? panel.successColor : panel.borderColor
                 border.width: panel.manualAvailable ? 2 : 1
                 radius: 9
 
@@ -246,14 +252,14 @@ Rectangle {
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 6
-                        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: panel.dark ? "#285772" : "#8db7d1" }
+                        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: panel.borderColor }
                         Label {
                             text: panel.t("manualControl")
-                            color: panel.manualAvailable ? "#b7f7d4" : panel.mutedText
-                            font.pixelSize: 14
+                            color: panel.manualAvailable ? panel.successColor : panel.mutedText
+                            font.pixelSize: Math.round(14 * panel.readabilityScale)
                             font.bold: true
                         }
-                        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: panel.dark ? "#285772" : "#8db7d1" }
+                        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: panel.borderColor }
                     }
 
                     Label { text: panel.t("lights"); color: panel.mutedText; font.bold: true; font.pixelSize: panel.compact ? 11 : 12; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
@@ -262,8 +268,8 @@ Rectangle {
                         Layout.preferredHeight: panel.actionButtonHeight
                         spacing: panel.compact ? 5 : 8
 
-                        ManualCommandButton { width: (parent.width - parent.spacing) / 2; height: panel.actionButtonHeight; commandEnabled: panel.manualAvailable; label: panel.t("greenLight"); iconText: "\u25CF"; command: panel.toggleCommand("light_green", "GREEN_ON", "GREEN_OFF"); active: panel.stateValue("light_green") === 1; stateText: panel.toggleStateText("light_green", "ON", "OFF"); iconColor: active ? "#48d66b" : "#4e6f58"; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
-                        ManualCommandButton { width: (parent.width - parent.spacing) / 2; height: panel.actionButtonHeight; commandEnabled: panel.manualAvailable; label: panel.t("redLight"); iconText: "\u25CF"; command: panel.toggleCommand("light_red", "RED_ON", "RED_OFF"); active: panel.stateValue("light_red") === 1; stateText: panel.toggleStateText("light_red", "ON", "OFF"); iconColor: active ? "#ff5c5c" : "#7d5151"; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
+                        ManualCommandButton { width: (parent.width - parent.spacing) / 2; height: panel.actionButtonHeight; commandEnabled: panel.manualAvailable; label: panel.t("greenLight"); iconText: "\u25CF"; command: panel.toggleCommand("light_green", "GREEN_ON", "GREEN_OFF"); active: panel.stateValue("light_green") === 1; stateText: panel.toggleStateText("light_green", "ON", "OFF"); iconColor: active ? panel.successColor : panel.inactiveColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
+                        ManualCommandButton { width: (parent.width - parent.spacing) / 2; height: panel.actionButtonHeight; commandEnabled: panel.manualAvailable; label: panel.t("redLight"); iconText: "\u25CF"; command: panel.toggleCommand("light_red", "RED_ON", "RED_OFF"); active: panel.stateValue("light_red") === 1; stateText: panel.toggleStateText("light_red", "ON", "OFF"); iconColor: active ? panel.errorColor : panel.inactiveColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
                     }
 
                     Label { text: panel.t("cylinders"); color: panel.mutedText; font.bold: true; font.pixelSize: panel.compact ? 11 : 12; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
@@ -272,10 +278,10 @@ Rectangle {
                         Layout.fillWidth: true
                         spacing: panel.compact ? 5 : 8
 
-                        ManualCommandButton { width: (parent.width - parent.spacing) / 2; commandEnabled: panel.manualAvailable; label: panel.t("cylinder", { letter: "A" }); iconText: "\u25B0"; command: panel.toggleCommand("cyl_a", "CYL_A_EXTEND", "CYL_A_RETRACT"); active: panel.stateValue("cyl_a") === 1; stateText: panel.toggleStateText("cyl_a", panel.t("forward"), panel.t("backward")); iconColor: "#63cbff"; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
-                        ManualCommandButton { width: (parent.width - parent.spacing) / 2; commandEnabled: panel.manualAvailable; label: panel.t("cylinder", { letter: "B" }); iconText: "\u25B0"; command: panel.toggleCommand("cyl_b", "CYL_B_EXTEND", "CYL_B_RETRACT"); active: panel.stateValue("cyl_b") === 1; stateText: panel.toggleStateText("cyl_b", panel.t("forward"), panel.t("backward")); iconColor: "#63cbff"; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
-                        ManualCommandButton { width: (parent.width - parent.spacing) / 2; commandEnabled: panel.manualAvailable; label: panel.t("cylinder", { letter: "C" }); iconText: "\u25B0"; command: panel.toggleCommand("cyl_c", "CYL_C_EXTEND", "CYL_C_RETRACT"); active: panel.stateValue("cyl_c") === 1; stateText: panel.toggleStateText("cyl_c", panel.t("forward"), panel.t("backward")); iconColor: "#63cbff"; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
-                        ManualCommandButton { width: (parent.width - parent.spacing) / 2; commandEnabled: panel.manualAvailable; label: panel.t("cylinder", { letter: "D" }); iconText: "\u25B0"; command: panel.toggleCommand("cyl_d", "CYL_D_EXTEND", "CYL_D_RETRACT"); active: panel.stateValue("cyl_d") === 1; stateText: panel.toggleStateText("cyl_d", panel.t("forward"), panel.t("backward")); iconColor: "#63cbff"; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
+                        ManualCommandButton { width: (parent.width - parent.spacing) / 2; commandEnabled: panel.manualAvailable; label: panel.t("cylinder", { letter: "A" }); iconText: "\u25B0"; command: panel.toggleCommand("cyl_a", "CYL_A_EXTEND", "CYL_A_RETRACT"); active: panel.stateValue("cyl_a") === 1; stateText: panel.toggleStateText("cyl_a", panel.t("forward"), panel.t("backward")); iconColor: panel.accentColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
+                        ManualCommandButton { width: (parent.width - parent.spacing) / 2; commandEnabled: panel.manualAvailable; label: panel.t("cylinder", { letter: "B" }); iconText: "\u25B0"; command: panel.toggleCommand("cyl_b", "CYL_B_EXTEND", "CYL_B_RETRACT"); active: panel.stateValue("cyl_b") === 1; stateText: panel.toggleStateText("cyl_b", panel.t("forward"), panel.t("backward")); iconColor: panel.accentColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
+                        ManualCommandButton { width: (parent.width - parent.spacing) / 2; commandEnabled: panel.manualAvailable; label: panel.t("cylinder", { letter: "C" }); iconText: "\u25B0"; command: panel.toggleCommand("cyl_c", "CYL_C_EXTEND", "CYL_C_RETRACT"); active: panel.stateValue("cyl_c") === 1; stateText: panel.toggleStateText("cyl_c", panel.t("forward"), panel.t("backward")); iconColor: panel.accentColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
+                        ManualCommandButton { width: (parent.width - parent.spacing) / 2; commandEnabled: panel.manualAvailable; label: panel.t("cylinder", { letter: "D" }); iconText: "\u25B0"; command: panel.toggleCommand("cyl_d", "CYL_D_EXTEND", "CYL_D_RETRACT"); active: panel.stateValue("cyl_d") === 1; stateText: panel.toggleStateText("cyl_d", panel.t("forward"), panel.t("backward")); iconColor: panel.accentColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
                     }
 
                     Label { text: panel.t("motors"); color: panel.mutedText; font.bold: true; font.pixelSize: panel.compact ? 11 : 12; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
@@ -284,9 +290,9 @@ Rectangle {
                         Layout.preferredHeight: panel.actionButtonHeight
                         spacing: panel.compact ? 5 : 8
 
-                        ManualCommandButton { width: (parent.width - parent.spacing * 2) / 3; height: panel.actionButtonHeight; commandEnabled: panel.manualAvailable; singleLineTitle: true; label: panel.t("motor", { number: 1 }); iconText: "\u2699"; command: panel.toggleCommand("motor_1", "MOTOR_1_ON", "MOTOR_1_OFF"); active: panel.stateValue("motor_1") === 1; stateText: panel.toggleStateText("motor_1", "ON", "OFF"); iconColor: active ? "#63cbff" : "#8fa8b8"; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
-                        ManualCommandButton { width: (parent.width - parent.spacing * 2) / 3; height: panel.actionButtonHeight; commandEnabled: panel.manualAvailable; singleLineTitle: true; label: panel.t("motor", { number: 2 }); iconText: "\u2699"; command: panel.toggleCommand("motor_2", "MOTOR_2_ON", "MOTOR_2_OFF"); active: panel.stateValue("motor_2") === 1; stateText: panel.toggleStateText("motor_2", "ON", "OFF"); iconColor: active ? "#63cbff" : "#8fa8b8"; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
-                        ManualCommandButton { width: (parent.width - parent.spacing * 2) / 3; height: panel.actionButtonHeight; commandEnabled: panel.manualAvailable; singleLineTitle: true; label: panel.t("motor", { number: 3 }); iconText: "\u2699"; command: panel.toggleCommand("motor_3", "MOTOR_3_ON", "MOTOR_3_OFF"); active: panel.stateValue("motor_3") === 1; stateText: panel.toggleStateText("motor_3", "ON", "OFF"); iconColor: active ? "#63cbff" : "#8fa8b8"; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
+                        ManualCommandButton { width: (parent.width - parent.spacing * 2) / 3; height: panel.actionButtonHeight; commandEnabled: panel.manualAvailable; singleLineTitle: true; label: panel.t("motor", { number: 1 }); iconText: "\u2699"; command: panel.toggleCommand("motor_1", "MOTOR_1_ON", "MOTOR_1_OFF"); active: panel.stateValue("motor_1") === 1; stateText: panel.toggleStateText("motor_1", "ON", "OFF"); iconColor: active ? panel.accentColor : panel.inactiveColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
+                        ManualCommandButton { width: (parent.width - parent.spacing * 2) / 3; height: panel.actionButtonHeight; commandEnabled: panel.manualAvailable; singleLineTitle: true; label: panel.t("motor", { number: 2 }); iconText: "\u2699"; command: panel.toggleCommand("motor_2", "MOTOR_2_ON", "MOTOR_2_OFF"); active: panel.stateValue("motor_2") === 1; stateText: panel.toggleStateText("motor_2", "ON", "OFF"); iconColor: active ? panel.accentColor : panel.inactiveColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
+                        ManualCommandButton { width: (parent.width - parent.spacing * 2) / 3; height: panel.actionButtonHeight; commandEnabled: panel.manualAvailable; singleLineTitle: true; label: panel.t("motor", { number: 3 }); iconText: "\u2699"; command: panel.toggleCommand("motor_3", "MOTOR_3_ON", "MOTOR_3_OFF"); active: panel.stateValue("motor_3") === 1; stateText: panel.toggleStateText("motor_3", "ON", "OFF"); iconColor: active ? panel.accentColor : panel.inactiveColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
                     }
 
                     Label { text: panel.t("robot"); color: panel.mutedText; font.bold: true; font.pixelSize: panel.compact ? 11 : 12; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
@@ -295,8 +301,8 @@ Rectangle {
                         Layout.preferredHeight: panel.actionButtonHeight
                         spacing: panel.compact ? 5 : 8
 
-                        ManualCommandButton { width: (parent.width - parent.spacing) / 2; height: panel.actionButtonHeight; commandEnabled: panel.manualAvailable; label: panel.t("robotMetal"); iconText: "\uD83E\uDD16"; command: "ROBOT_TO_METAL"; active: panel.stateValue("robot_metal") === 1; stateText: ""; iconColor: "#63cbff"; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
-                        ManualCommandButton { width: (parent.width - parent.spacing) / 2; height: panel.actionButtonHeight; commandEnabled: panel.manualAvailable; label: panel.t("robotNonMetal"); iconText: "\uD83E\uDD16"; command: "ROBOT_TO_NONMETAL"; active: panel.stateValue("robot_nonmetal") === 1; stateText: ""; iconColor: "#b7f7d4"; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
+                        ManualCommandButton { width: (parent.width - parent.spacing) / 2; height: panel.actionButtonHeight; commandEnabled: panel.manualAvailable; label: panel.t("robotMetal"); iconText: "\uD83E\uDD16"; command: "ROBOT_TO_METAL"; active: panel.stateValue("robot_metal") === 1; stateText: active ? "ON" : "OFF"; iconColor: panel.accentColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
+                        ManualCommandButton { width: (parent.width - parent.spacing) / 2; height: panel.actionButtonHeight; commandEnabled: panel.manualAvailable; label: panel.t("robotNonMetal"); iconText: "\uD83E\uDD16"; command: "ROBOT_TO_NONMETAL"; active: panel.stateValue("robot_nonmetal") === 1; stateText: active ? "ON" : "OFF"; iconColor: panel.accentColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
                     }
                 }
             }

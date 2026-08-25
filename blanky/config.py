@@ -65,7 +65,9 @@ WAKEWORD_MODEL_NAME = "hey jarvis"
 WAKEWORD_MODEL_PATH = None
 
 TTS_VOICES_PT = ["alloy", "nova", "shimmer", "sage", "coral", "fable"]
-TTS_VOICES_EN = ["alloy", "nova", "ash", "echo", "onyx", "fable"]
+# Keep the same selectable voice names in Portuguese and English. The speech
+# service still renders each preview in the active language.
+TTS_VOICES_EN = list(TTS_VOICES_PT)
 TTS_VOICE_DEFAULT_PT = "nova"
 TTS_VOICE_DEFAULT_EN = "alloy"
 STT_MODEL = "gpt-transcribe"

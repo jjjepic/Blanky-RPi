@@ -14,11 +14,22 @@ Rectangle {
     property color borderColor: "#1f6fa8"
     property color textColor: "#def2ff"
     property color mutedText: "#9dd9ff"
+    property color accentColor: "#63cbff"
+    property color successColor: "#48d66b"
+    property color warningColor: "#f8c25d"
+    property color errorColor: "#ff6b6b"
+    property color inactiveColor: "#8fa8b8"
+    property bool colorIndependent: false
+    property color successSurface: "#0c3423"
+    property color infoSurface: "#0b3040"
+    property color warningSurface: "#382c0d"
+    property color errorSurface: "#38161d"
+    readonly property real readabilityScale: panel.controller ? panel.controller.appearanceTextScale : 1.0
     property var stateMap: ({})
     property var detailsMap: ({})
     readonly property bool compact: panel.height < 300
     readonly property int cardHeight: compact ? 47 : 58
-    readonly property int contentSpacing: compact ? 5 : 8
+    readonly property int contentSpacing: Math.round((compact ? 5 : 8) * (readabilityScale > 1 ? 1.10 : 1.0))
 
     function t(key) {
         return I18n.text(panel.language, key)
@@ -61,42 +72,46 @@ Rectangle {
 
     function stateColor(state) {
         if (state === "connected")
-            return "#48d66b"
+            return panel.successColor
         if (state === "communicating")
-            return "#47c8ff"
+            return panel.accentColor
         if (state === "standby")
-            return "#aab7c2"
+            return panel.inactiveColor
         if (state === "silent")
-            return "#f8c25d"
+            return panel.warningColor
         if (state === "checking")
-            return "#8fa8b8"
-        return "#ff6b6b"
+            return panel.inactiveColor
+        return panel.errorColor
     }
 
     function stateSurfaceColor(state) {
+        if (panel.colorIndependent)
+            return panel.panelAltColor
         if (state === "connected")
-            return panel.dark ? "#0c3423" : "#d7f4df"
+            return panel.successSurface
         if (state === "communicating")
-            return panel.dark ? "#0b3040" : "#d9effa"
+            return panel.infoSurface
         if (state === "standby" || state === "checking")
-            return panel.dark ? "#1e2b34" : "#e1e9ed"
+            return panel.panelColor
         if (state === "silent")
-            return panel.dark ? "#382c0d" : "#fff0c5"
-        return panel.dark ? "#38161d" : "#ffe0e3"
+            return panel.warningSurface
+        return panel.errorSurface
     }
 
     function stateGlyph(state) {
+        if (state === "connected")
+            return "✓"
         if (state === "communicating")
             return "⇄"
         if (state === "standby")
             return "◷"
         if (state === "silent")
-            return "◌"
+            return "!"
         if (state === "error")
-            return "⚠"
+            return "✕"
         if (state === "offline")
-            return "×"
-        return "●"
+            return "✕"
+        return "○"
     }
 
     Connections {
@@ -133,8 +148,8 @@ Rectangle {
             Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: panel.borderColor }
             Label {
                 text: panel.t("communications").toUpperCase()
-                color: panel.dark ? "#82d6ff" : "#0d5d8b"
-                font.pixelSize: 14
+                color: panel.accentColor
+                font.pixelSize: Math.round(14 * panel.readabilityScale)
                 font.bold: true
             }
             Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: panel.borderColor }
@@ -164,7 +179,7 @@ Rectangle {
                     Layout.preferredHeight: panel.compact ? 62 : 70
                     Layout.minimumHeight: panel.compact ? 58 : 66
                     radius: 9
-                    color: panel.dark ? "#06121d" : "#e4edf2"
+                    color: panel.panelAltColor
                     border.color: panel.stateColor(communicationStatus)
                     border.width: 1
 
@@ -192,14 +207,14 @@ Rectangle {
                                     anchors.centerIn: parent
                                     text: modelData.icon
                                     color: panel.stateColor(communicationStatus)
-                                    font.pixelSize: panel.compact ? 15 : 18
+                                    font.pixelSize: Math.round((panel.compact ? 15 : 18) * panel.readabilityScale)
                                 }
                             }
 
                             Label {
                                 text: modelData.label.toUpperCase()
                                 color: panel.textColor
-                                font.pixelSize: panel.compact ? 11 : 13
+                                font.pixelSize: Math.round((panel.compact ? 11 : 13) * panel.readabilityScale)
                                 font.bold: true
                                 elide: Text.ElideRight
                                 Layout.fillWidth: true
@@ -218,9 +233,9 @@ Rectangle {
                                 Label {
                                     id: stateLabel
                                     anchors.centerIn: parent
-                                    text: panel.stateText(communicationStatus).toUpperCase()
+                                    text: panel.stateGlyph(communicationStatus) + " " + panel.stateText(communicationStatus).toUpperCase()
                                     color: panel.stateColor(communicationStatus)
-                                    font.pixelSize: panel.compact ? 9 : 10
+                                    font.pixelSize: Math.round((panel.compact ? 9 : 10) * panel.readabilityScale)
                                     font.bold: true
                                     elide: Text.ElideRight
                                     width: parent.width - 10
@@ -244,7 +259,7 @@ Rectangle {
                         Label {
                             text: panel.detailFor(modelData.key)
                             color: panel.mutedText
-                            font.pixelSize: panel.compact ? 11 : 12
+                            font.pixelSize: Math.round((panel.compact ? 11 : 12) * panel.readabilityScale)
                             font.bold: true
                             elide: Text.ElideRight
                             Layout.fillWidth: true
