@@ -7,7 +7,7 @@ from PySide6.QtCore import QThread, Signal
 from blanky.config import INPUT_WAV, TTS_WAV
 from blanky.audio_service import audio_info, record_wav, play_wav
 from blanky.speech_service import stt_transcribe, tts_speak_to_wav
-from blanky.command_parser import parse_command
+from blanky.command_parser import interpret_online_commands
 from blanky.mqtt_service import get_mqtt_bridge
 
 
@@ -31,6 +31,29 @@ class VoiceWorker(QThread):
         except Exception:
             self.status.emit("Ocorreu um erro" if self.lang == "pt" else "An error occurred")
 
+    def _emit_diagnostic(
+        self,
+        diag: dict,
+        text: str,
+        command: str,
+        accepted: bool,
+        started_at: float,
+        transcribe_duration: float,
+    ):
+        self.diagnostic.emit(
+            {
+                "time": datetime.now().strftime("%H:%M:%S"),
+                "language": self.lang,
+                "capture": float(diag.get("total_duration_s") or 0.0),
+                "stt": transcribe_duration,
+                "end": str(diag.get("end_reason") or "--"),
+                "command": command,
+                "text": text or ("(sem áudio detetado)" if self.lang == "pt" else "(no audio detected)"),
+                "result": "OK" if accepted else "REJECT",
+                "duration": time.perf_counter() - started_at,
+            }
+        )
+
     def run(self):
         try:
             started_at = time.perf_counter()
@@ -43,27 +66,60 @@ class VoiceWorker(QThread):
             t_transcribe = time.perf_counter()
             self.recognized.emit(text if text else "")
 
-            command, response = parse_command(text, self.lang)
-            self.commandRecognized.emit(command)
-
             mqtt_bridge = get_mqtt_bridge()
-            accepted, mqtt_message = mqtt_bridge.process_command(command, self.lang, source="voice")
-            if mqtt_message:
-                response = mqtt_message
+            transcribe_duration = t_transcribe - t_record
+            if not text:
+                command = "NO_AUDIO"
+                self.commandRecognized.emit(command)
+                accepted, response = mqtt_bridge.process_command(command, self.lang, source="voice")
+                self._emit_diagnostic(
+                    diag,
+                    text,
+                    command,
+                    accepted,
+                    started_at,
+                    transcribe_duration,
+                )
+            else:
+                self.status.emit("A interpretar..." if self.lang == "pt" else "Interpreting...")
+                try:
+                    commands = interpret_online_commands(text, self.lang)
+                except Exception:
+                    commands = []
 
-            self.diagnostic.emit(
-                {
-                    "time": datetime.now().strftime("%H:%M:%S"),
-                    "language": self.lang,
-                    "capture": float(diag.get("total_duration_s") or 0.0),
-                    "stt": t_transcribe - t_record,
-                    "end": str(diag.get("end_reason") or "--"),
-                    "command": command,
-                    "text": text or ("(sem áudio detetado)" if self.lang == "pt" else "(no audio detected)"),
-                    "result": "OK" if accepted else "REJECT",
-                    "duration": time.perf_counter() - started_at,
-                }
-            )
+                if not commands:
+                    command = "UNKNOWN"
+                    self.commandRecognized.emit(command)
+                    accepted, response = mqtt_bridge.process_command(command, self.lang, source="voice")
+                    self._emit_diagnostic(
+                        diag,
+                        text,
+                        command,
+                        accepted,
+                        started_at,
+                        transcribe_duration,
+                    )
+                else:
+                    response = ""
+                    for index, command in enumerate(commands):
+                        self.commandRecognized.emit(command)
+                        accepted, mqtt_message = mqtt_bridge.process_command(
+                            command,
+                            self.lang,
+                            source="voice",
+                        )
+                        if mqtt_message:
+                            response = mqtt_message
+                        self._emit_diagnostic(
+                            diag,
+                            text,
+                            command,
+                            accepted,
+                            started_at,
+                            transcribe_duration,
+                        )
+                        if index < len(commands) - 1:
+                            time.sleep(0.3)
             if response:
                 self.spoken.emit(response)
 
