@@ -1,6 +1,7 @@
 from openai import OpenAI
 
 from blanky.config import (
+    STT_MODEL,
     TTS_MODEL,
     TTS_VOICE_DEFAULT_EN,
     TTS_VOICE_DEFAULT_PT,
@@ -53,7 +54,7 @@ def _transcribe_once(wav_path: str, lang: str, use_server_vad: bool):
 
     kwargs = {
         "file": None,
-        "model": "gpt-4o-transcribe",
+        "model": STT_MODEL,
         "language": lang,
         "prompt": prompt,
         "temperature": 0,
@@ -99,14 +100,33 @@ def tts_speak_to_wav(
     out_wav_path: str,
     voice: str | None = None,
     speed: float | None = None,
+    lang: str = "pt",
 ):
     playback_speed = max(0.25, min(4.0, float(speed if speed is not None else 1.0)))
+    if playback_speed < 0.95:
+        instructions = (
+            "Fala mais devagar e com pausas claras."
+            if lang == "pt"
+            else "Speak slowly with clear pauses."
+        )
+    elif playback_speed > 1.05:
+        instructions = (
+            "Fala mais depressa, mantendo os comandos claros."
+            if lang == "pt"
+            else "Speak faster while keeping commands clear."
+        )
+    else:
+        instructions = (
+            "Fala num ritmo natural e claro para comandos industriais."
+            if lang == "pt"
+            else "Speak at a natural, clear pace for industrial commands."
+        )
     speech = client.audio.speech.create(
         model=TTS_MODEL,
         voice=voice or _ACTIVE_VOICE,
         input=text,
         response_format="wav",
-        speed=playback_speed,
+        instructions=instructions,
     )
     with open(out_wav_path, "wb") as f:
         f.write(speech.read())

@@ -55,7 +55,8 @@ OPCUA_URL = "opc.tcp://192.168.30.3:4840"
 OPCUA_NAMESPACE_INDEX = 4
 OPCUA_PULSE_SECONDS = 0.3
 
-WAKEWORD_ENABLED = True
+# A wake word esta desativada no prototipo; fica documentada para trabalho futuro.
+WAKEWORD_ENABLED = False
 WAKEWORD_THRESHOLD = 0.55
 WAKEWORD_COOLDOWN_SECONDS = 2.5
 WAKEWORD_SAMPLE_RATE = 16000
@@ -67,7 +68,8 @@ TTS_VOICES_PT = ["alloy", "nova", "shimmer", "sage", "coral", "fable"]
 TTS_VOICES_EN = ["alloy", "nova", "ash", "echo", "onyx", "fable"]
 TTS_VOICE_DEFAULT_PT = "nova"
 TTS_VOICE_DEFAULT_EN = "alloy"
-TTS_MODEL = "tts-1"
+STT_MODEL = "gpt-transcribe"
+TTS_MODEL = "gpt-4o-mini-tts"
 
 AUDIO_DIR = "audio"
 INPUT_WAV = os.path.join(AUDIO_DIR, "input.wav")

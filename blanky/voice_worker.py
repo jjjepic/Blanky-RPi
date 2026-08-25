@@ -26,7 +26,7 @@ class VoiceWorker(QThread):
 
     def _speak_async(self, response: str):
         try:
-            tts_speak_to_wav(response, TTS_WAV, speed=self.tts_speed)
+            tts_speak_to_wav(response, TTS_WAV, speed=self.tts_speed, lang=self.lang)
             play_wav(TTS_WAV)
         except Exception:
             self.status.emit("Ocorreu um erro" if self.lang == "pt" else "An error occurred")
