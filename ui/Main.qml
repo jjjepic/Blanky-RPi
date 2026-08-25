@@ -1956,11 +1956,13 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 clip: true
+                // Keep the overlay scrollbar outside the command cards.
+                rightPadding: Math.round(14 * root.textScale)
                 ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
                 ScrollBar.vertical.policy: ScrollBar.AlwaysOn
 
                 Column {
-                    width: Math.max(commandHelpScroll.availableWidth - 8, 720)
+                    width: Math.max(commandHelpScroll.availableWidth - Math.round(12 * root.textScale), 720)
                     spacing: 16
 
                     Repeater {
@@ -2928,12 +2930,12 @@ ApplicationWindow {
             id: redesignedAudioScroll
             anchors.fill: parent
             clip: true
-            rightPadding: Math.round(8 * root.textScale)
+            rightPadding: Math.round(14 * root.textScale)
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
             ScrollBar.vertical.policy: ScrollBar.AlwaysOn
 
             Column {
-                width: Math.max(redesignedAudioScroll.availableWidth - 18, 740)
+                width: Math.max(redesignedAudioScroll.availableWidth - Math.round(22 * root.textScale), 740)
                 spacing: 12
 
                 Rectangle {
