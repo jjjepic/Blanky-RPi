@@ -156,14 +156,14 @@ Rectangle {
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 6
-                        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: panel.dark ? "#285772" : "#8db7d1" }
+                        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: panel.borderColor }
                         Label {
                             text: panel.t("generalControl")
                             color: panel.accentColor
                             font.pixelSize: 14
                             font.bold: true
                         }
-                        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: panel.dark ? "#285772" : "#8db7d1" }
+                        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: panel.borderColor }
                     }
 
                     Label { text: panel.t("system"); color: panel.mutedText; font.bold: true; font.pixelSize: panel.compact ? 11 : 12; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
@@ -204,7 +204,7 @@ Rectangle {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         Layout.minimumHeight: panel.compact ? 80 : 112
-                        color: panel.dark ? "#091722" : "#dbe8ee"
+                        color: panel.panelColor
                         border.color: panel.borderColor
                         border.width: 1
                         radius: 8
@@ -217,12 +217,12 @@ Rectangle {
                             RowLayout {
                                 Layout.fillWidth: true
                                 Label { text: panel.t("activeMode"); color: panel.textColor; Layout.fillWidth: true }
-                                Label { text: "● " + panel.modeInfo().text; color: panel.modeInfo().color; font.bold: true }
+                                Label { text: panel.modeInfo().text; color: panel.modeInfo().color; font.bold: true }
                             }
                             RowLayout {
                                 Layout.fillWidth: true
                                 Label { text: panel.t("systemState"); color: panel.textColor; Layout.fillWidth: true }
-                                Label { text: "● " + panel.systemInfo().text; color: panel.systemInfo().color; font.bold: true; elide: Text.ElideRight; Layout.preferredWidth: 148; horizontalAlignment: Text.AlignRight }
+                                Label { text: panel.systemInfo().text; color: panel.systemInfo().color; font.bold: true; elide: Text.ElideRight; Layout.preferredWidth: 148; horizontalAlignment: Text.AlignRight }
                             }
                             RowLayout {
                                 Layout.fillWidth: true
@@ -251,14 +251,14 @@ Rectangle {
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 6
-                        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: panel.dark ? "#285772" : "#8db7d1" }
+                        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: panel.borderColor }
                         Label {
                             text: panel.t("manualControl")
                             color: panel.manualAvailable ? panel.successColor : panel.mutedText
                             font.pixelSize: 14
                             font.bold: true
                         }
-                        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: panel.dark ? "#285772" : "#8db7d1" }
+                        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: panel.borderColor }
                     }
 
                     Label { text: panel.t("lights"); color: panel.mutedText; font.bold: true; font.pixelSize: panel.compact ? 11 : 12; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }

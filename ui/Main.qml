@@ -274,16 +274,16 @@ ApplicationWindow {
 
     function commStateColor(state) {
         if (state === "connected")
-            return "#48d66b"
+            return root.successColor
         if (state === "communicating")
-            return "#47c8ff"
+            return root.accentColor
         if (state === "standby")
-            return "#aab7c2"
+            return root.inactiveColor
         if (state === "silent")
-            return "#f8c25d"
+            return root.warningColor
         if (state === "checking")
-            return "#8fa8b8"
-        return "#ff6b6b"
+            return root.inactiveColor
+        return root.errorColor
     }
 
     function commStateGlyph(state) {
@@ -400,7 +400,7 @@ ApplicationWindow {
                     width: 54
                     height: 44
                     textPixelSize: 20
-                    accentColor: blanky.language === "pt" ? "#48d66b" : "#6f91a8"
+                    accentColor: blanky.language === "pt" ? root.successColor : root.inactiveColor
                     textColor: root.textColor
                     mutedText: root.mutedText
                     borderColor: root.borderColor
@@ -414,7 +414,7 @@ ApplicationWindow {
                     width: 54
                     height: 44
                     textPixelSize: 20
-                    accentColor: blanky.language === "en" ? "#48d66b" : "#6f91a8"
+                    accentColor: blanky.language === "en" ? root.successColor : root.inactiveColor
                     textColor: root.textColor
                     mutedText: root.mutedText
                     borderColor: root.borderColor
@@ -428,7 +428,7 @@ ApplicationWindow {
                     width: 54
                     height: 44
                     textPixelSize: 22
-                    accentColor: "#63cbff"
+                    accentColor: root.accentColor
                     textColor: root.textColor
                     mutedText: root.mutedText
                     borderColor: root.borderColor
@@ -470,7 +470,7 @@ ApplicationWindow {
                     width: 50
                     height: 44
                     textPixelSize: 22
-                    accentColor: blanky.soundEnabled ? "#63cbff" : "#ff6b6b"
+                    accentColor: blanky.soundEnabled ? root.accentColor : root.inactiveColor
                     textColor: root.textColor
                     mutedText: root.mutedText
                     borderColor: root.borderColor
@@ -484,7 +484,7 @@ ApplicationWindow {
                     width: 50
                     height: 44
                     textPixelSize: 21
-                    accentColor: "#b7f7d4"
+                    accentColor: root.accentColor
                     textColor: root.textColor
                     mutedText: root.mutedText
                     borderColor: root.borderColor
@@ -498,7 +498,7 @@ ApplicationWindow {
                     width: 50
                     height: 44
                     textPixelSize: 22
-                    accentColor: "#f8c25d"
+                    accentColor: root.warningColor
                     textColor: root.textColor
                     mutedText: root.mutedText
                     borderColor: root.borderColor
@@ -512,7 +512,7 @@ ApplicationWindow {
                     width: 50
                     height: 44
                     textPixelSize: 21
-                    accentColor: "#ff6b6b"
+                    accentColor: root.errorColor
                     textColor: root.textColor
                     mutedText: root.mutedText
                     borderColor: root.borderColor
@@ -539,7 +539,7 @@ ApplicationWindow {
 
             Label {
                 text: "Blanky"
-                color: dark ? "#63cbff" : "#0a5e8f"
+                color: root.accentColor
                 font.pixelSize: 36
                 font.bold: true
                 horizontalAlignment: Text.AlignHCenter
@@ -707,7 +707,7 @@ ApplicationWindow {
             Layout.fillWidth: true
             Layout.rightMargin: root.rightPanelWidth + 12
             Layout.preferredHeight: 174
-            color: dark ? "#050d17" : "#e3edf2"
+            color: root.panelColor
             border.color: root.borderColor
             border.width: 2
             radius: 16
@@ -719,7 +719,7 @@ ApplicationWindow {
 
                 Label {
                     text: blanky.statusText
-                    color: dark ? "#9fe1ff" : "#0f5882"
+                    color: root.accentColor
                     font.pixelSize: 22
                     font.bold: true
                     horizontalAlignment: Text.AlignHCenter
@@ -737,8 +737,8 @@ ApplicationWindow {
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    color: dark ? "#081a2b" : "#d7e6ed"
-                    border.color: dark ? "#2b83bf" : "#76b2d8"
+                    color: root.panelAltColor
+                    border.color: root.borderColor
                     border.width: 1
                     radius: 12
 
@@ -781,7 +781,7 @@ ApplicationWindow {
                     Layout.preferredHeight: 44
                     prominent: true
                     textPixelSize: 16
-                    accentColor: "#28e6ad"
+                    accentColor: root.successColor
                     textColor: root.textColor
                     mutedText: root.mutedText
                     borderColor: root.borderColor
@@ -798,7 +798,7 @@ ApplicationWindow {
                     Layout.minimumWidth: 150
                     Layout.preferredHeight: 44
                     prominent: true
-                    accentColor: "#f8c25d"
+                    accentColor: root.warningColor
                     textColor: root.textColor
                     mutedText: root.mutedText
                     borderColor: root.borderColor
@@ -816,7 +816,7 @@ ApplicationWindow {
                     Layout.minimumWidth: 175
                     Layout.preferredHeight: 44
                     prominent: true
-                    accentColor: "#63cbff"
+                    accentColor: root.accentColor
                     textColor: root.textColor
                     mutedText: root.mutedText
                     borderColor: root.borderColor
@@ -834,7 +834,7 @@ ApplicationWindow {
                     Layout.minimumWidth: 115
                     Layout.preferredHeight: 44
                     prominent: true
-                    accentColor: "#b7f7d4"
+                    accentColor: root.successColor
                     textColor: root.textColor
                     mutedText: root.mutedText
                     borderColor: root.borderColor
@@ -1254,7 +1254,7 @@ ApplicationWindow {
                                 Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: root.borderColor }
                                 Label {
                                     text: t("events").toUpperCase()
-                                    color: root.dark ? "#82d6ff" : "#0d5d8b"
+                                    color: root.accentColor
                                     font.pixelSize: 14
                                     font.bold: true
                                 }
@@ -1287,7 +1287,7 @@ ApplicationWindow {
                                     toolTip: t("tooltipExportData")
                                     Layout.preferredWidth: 130
                                     Layout.preferredHeight: 38
-                                    accentColor: "#48d66b"
+                                    accentColor: root.successColor
                                     textColor: root.textColor
                                     mutedText: root.mutedText
                                     borderColor: root.borderColor
@@ -1300,7 +1300,7 @@ ApplicationWindow {
                                     toolTip: t("tooltipExportReport")
                                     Layout.preferredWidth: 130
                                     Layout.preferredHeight: 38
-                                    accentColor: "#63cbff"
+                                    accentColor: root.accentColor
                                     textColor: root.textColor
                                     mutedText: root.mutedText
                                     borderColor: root.borderColor
@@ -1355,7 +1355,7 @@ ApplicationWindow {
                                     Rectangle { Layout.preferredWidth: 18; Layout.preferredHeight: 1; color: root.borderColor }
                                     Label {
                                         text: t("textBot").toUpperCase()
-                                        color: root.dark ? "#82d6ff" : "#0d5d8b"
+                                        color: root.accentColor
                                         font.bold: true
                                         font.pixelSize: 14
                                     }
@@ -1363,14 +1363,14 @@ ApplicationWindow {
                                     MenuActionButton {
                                         text: t("textBotOffline")
                                         Layout.preferredWidth: 82; Layout.preferredHeight: 28
-                                        accentColor: root.textBotMode === "offline" ? "#48d66b" : root.borderColor
+                                        accentColor: root.textBotMode === "offline" ? root.successColor : root.inactiveColor
                                         textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor
                                         onClicked: root.textBotMode = "offline"
                                     }
                                     MenuActionButton {
                                         text: t("textBotOnline")
                                         Layout.preferredWidth: 82; Layout.preferredHeight: 28
-                                        accentColor: root.textBotMode === "online" ? "#63cbff" : root.borderColor
+                                        accentColor: root.textBotMode === "online" ? root.accentColor : root.inactiveColor
                                         textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor
                                         onClicked: root.textBotMode = "online"
                                     }
@@ -1396,7 +1396,7 @@ ApplicationWindow {
                                             placeholderText: t("textBotPlaceholder")
                                             color: root.textColor
                                             background: Rectangle {
-                                                color: root.dark ? "#081a2b" : "#d7e6ed"
+                                                color: root.panelColor
                                                 border.color: root.borderColor
                                                 border.width: 1
                                                 radius: 7
@@ -1566,6 +1566,11 @@ ApplicationWindow {
         warningColor: root.warningColor
         errorColor: root.errorColor
         inactiveColor: root.inactiveColor
+        colorIndependent: theme.colorIndependent
+        successSurface: theme.successSurface
+        infoSurface: theme.infoSurface
+        warningSurface: theme.warningSurface
+        errorSurface: theme.errorSurface
         stateMap: root.commStateMap
     }
 
@@ -1577,7 +1582,7 @@ ApplicationWindow {
         z: 200
         visible: root.systemTransitionActive || opacity > 0.01
         opacity: root.systemTransitionActive ? 1 : 0
-        color: root.dark ? "#02060d" : "#d7e3ea"
+        color: root.bgColor
 
         Behavior on opacity {
             NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
@@ -2250,7 +2255,7 @@ ApplicationWindow {
                                 Layout.preferredWidth: 150
                                 Layout.preferredHeight: 34
                                 text: "\u25B6 " + t("previewVoice")
-                                accentColor: "#63cbff"
+                                        accentColor: root.accentColor
                                 textColor: root.textColor
                                 mutedText: root.mutedText
                                 borderColor: root.borderColor
@@ -3020,7 +3025,7 @@ ApplicationWindow {
                         text: "\u21BA " + t("resetRecommended")
                         Layout.preferredWidth: 190
                         Layout.preferredHeight: 36
-                        accentColor: "#48d66b"
+                                        accentColor: root.successColor
                         textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor
                         onClicked: { root.audioManualOverrides = ({}); blanky.resetAudioInputSettings() }
                     }
@@ -3134,7 +3139,7 @@ ApplicationWindow {
                     toolTip: t("tooltipExportAudioData")
                     Layout.preferredWidth: 145
                     Layout.preferredHeight: 36
-                    accentColor: "#48d66b"
+                    accentColor: root.successColor
                     textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor
                     onClicked: root.chooseExportDestination("audio", "csv")
                 }
@@ -3143,7 +3148,7 @@ ApplicationWindow {
                     toolTip: t("tooltipExportAudioReport")
                     Layout.preferredWidth: 160
                     Layout.preferredHeight: 36
-                    accentColor: "#63cbff"
+                    accentColor: root.accentColor
                     textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor
                     onClicked: root.chooseExportDestination("audio", "pdf")
                 }
@@ -3158,7 +3163,7 @@ ApplicationWindow {
         anchors.bottom: parent.bottom
         height: 3
         gradient: Gradient {
-            GradientStop { position: 0.0; color: dark ? "#1d8fd0" : "#6cb7df" }
+            GradientStop { position: 0.0; color: root.accentColor }
             GradientStop { position: 1.0; color: "transparent" }
         }
         opacity: 0.7

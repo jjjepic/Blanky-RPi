@@ -19,6 +19,11 @@ Rectangle {
     property color warningColor: "#f8c25d"
     property color errorColor: "#ff6b6b"
     property color inactiveColor: "#8fa8b8"
+    property bool colorIndependent: false
+    property color successSurface: "#0c3423"
+    property color infoSurface: "#0b3040"
+    property color warningSurface: "#382c0d"
+    property color errorSurface: "#38161d"
     property var stateMap: ({})
     property var detailsMap: ({})
     readonly property bool compact: panel.height < 300
@@ -79,15 +84,17 @@ Rectangle {
     }
 
     function stateSurfaceColor(state) {
+        if (panel.colorIndependent)
+            return panel.panelAltColor
         if (state === "connected")
-            return panel.dark ? "#0c3423" : "#d7f4df"
+            return panel.successSurface
         if (state === "communicating")
-            return panel.dark ? "#0b3040" : "#d9effa"
+            return panel.infoSurface
         if (state === "standby" || state === "checking")
-            return panel.dark ? "#1e2b34" : "#e1e9ed"
+            return panel.panelColor
         if (state === "silent")
-            return panel.dark ? "#382c0d" : "#fff0c5"
-        return panel.dark ? "#38161d" : "#ffe0e3"
+            return panel.warningSurface
+        return panel.errorSurface
     }
 
     function stateGlyph(state) {
