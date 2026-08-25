@@ -1417,7 +1417,6 @@ ApplicationWindow {
                                         Layout.fillWidth: true
                                         Layout.fillHeight: true
                                         clip: true
-                                        rightPadding: Math.round(6 * root.textScale)
                                         ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
                                         ScrollBar.vertical.policy: ScrollBar.AsNeeded
 
