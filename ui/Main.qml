@@ -2053,6 +2053,12 @@ ApplicationWindow {
         titleColor: root.textColor
         textColor: root.textColor
         mutedText: root.mutedText
+        accentColor: root.accentColor
+        successColor: root.successColor
+        warningColor: root.warningColor
+        errorColor: root.errorColor
+        inactiveColor: root.inactiveColor
+        textScale: root.textScale
         onOpening: { root.popupBackdropVisible = true; modalBackdrop.scheduleSnapshot() }
         onOpenedForBackdrop: modalBackdrop.scheduleSnapshot()
         onClosedForBackdrop: root.popupBackdropVisible = false
