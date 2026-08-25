@@ -40,6 +40,8 @@ class BlankyController(QObject):
     dateTimeTextChanged = Signal()
     darkModeChanged = Signal()
     appearanceModeChanged = Signal()
+    appearanceTextScaleChanged = Signal()
+    customAppearanceChanged = Signal()
     monitorLeftTextChanged = Signal()
     monitorEventsTextChanged = Signal()
     listeningChanged = Signal()
@@ -216,9 +218,16 @@ class BlankyController(QObject):
         self._datetime_text = ""
         self._settings = QSettings("Blanky", "Blanky")
         saved_appearance = str(self._settings.value("appearanceMode", "dark") or "dark").lower()
+        legacy_large_readability = saved_appearance == "large_readability"
         self._appearance_mode = saved_appearance if saved_appearance in {
-            "light", "dark", "high_contrast", "colorblind", "monochrome", "large_readability"
+            "dark", "light", "high_contrast", "colorblind", "monochrome", "custom"
         } else "dark"
+        self._appearance_text_scale = self._saved_appearance_value(
+            "appearanceTextScale", 1.18 if legacy_large_readability else 1.0, 1.0, 1.25
+        )
+        self._custom_hue = self._saved_appearance_value("customHue", 205.0, 0.0, 360.0)
+        self._custom_brightness = self._saved_appearance_value("customBrightness", 46.0, 20.0, 80.0)
+        self._custom_contrast = self._saved_appearance_value("customContrast", 88.0, 60.0, 100.0)
         self._dark_mode = self._appearance_mode != "light"
         self._monitor_left_text = ""
         self._monitor_events_text = ""
@@ -270,6 +279,26 @@ class BlankyController(QObject):
         self._timer.start()
         self._refresh()
 
+    def _saved_appearance_value(self, key: str, default: float, minimum: float, maximum: float) -> float:
+        try:
+            return max(minimum, min(maximum, float(self._settings.value(key, default))))
+        except (TypeError, ValueError):
+            return default
+
+    def _set_custom_appearance_value(self, key: str, value: float, minimum: float, maximum: float):
+        value = max(minimum, min(maximum, float(value)))
+        attribute = {
+            "customHue": "_custom_hue",
+            "customBrightness": "_custom_brightness",
+            "customContrast": "_custom_contrast",
+        }[key]
+        if abs(getattr(self, attribute) - value) < 0.001:
+            return
+        setattr(self, attribute, value)
+        self._settings.setValue(key, value)
+        self._settings.sync()
+        self.customAppearanceChanged.emit()
+
     # ---------- QML Properties ----------
     @Property(str, notify=statusTextChanged)
     def statusText(self):
@@ -302,6 +331,22 @@ class BlankyController(QObject):
     @Property(str, notify=appearanceModeChanged)
     def appearanceMode(self):
         return self._appearance_mode
+
+    @Property(float, notify=appearanceTextScaleChanged)
+    def appearanceTextScale(self):
+        return self._appearance_text_scale
+
+    @Property(float, notify=customAppearanceChanged)
+    def customHue(self):
+        return self._custom_hue
+
+    @Property(float, notify=customAppearanceChanged)
+    def customBrightness(self):
+        return self._custom_brightness
+
+    @Property(float, notify=customAppearanceChanged)
+    def customContrast(self):
+        return self._custom_contrast
 
     @Property(str, notify=monitorLeftTextChanged)
     def monitorLeftText(self):
@@ -493,7 +538,7 @@ class BlankyController(QObject):
     @Slot(str)
     def setAppearanceMode(self, mode: str):
         mode = (mode or "").strip().lower()
-        if mode not in {"light", "dark", "high_contrast", "colorblind", "monochrome", "large_readability"}:
+        if mode not in {"dark", "light", "high_contrast", "colorblind", "monochrome", "custom"}:
             return
         if self._appearance_mode == mode:
             return
@@ -505,6 +550,29 @@ class BlankyController(QObject):
         self.appearanceModeChanged.emit()
         if previous_dark != self._dark_mode:
             self.darkModeChanged.emit()
+
+    @Slot(float)
+    def setAppearanceTextScale(self, value: float):
+        scale = max(1.0, min(1.25, float(value)))
+        if abs(self._appearance_text_scale - scale) < 0.001:
+            return
+        self._appearance_text_scale = scale
+        self._settings.setValue("appearanceTextScale", scale)
+        self._settings.sync()
+        self.appearanceTextScaleChanged.emit()
+        self.monitorEventsTextChanged.emit()
+
+    @Slot(float)
+    def setCustomHue(self, value: float):
+        self._set_custom_appearance_value("customHue", value, 0.0, 360.0)
+
+    @Slot(float)
+    def setCustomBrightness(self, value: float):
+        self._set_custom_appearance_value("customBrightness", value, 20.0, 80.0)
+
+    @Slot(float)
+    def setCustomContrast(self, value: float):
+        self._set_custom_appearance_value("customContrast", value, 60.0, 100.0)
 
     @Slot(str)
     def setLanguage(self, lang: str):
@@ -1371,7 +1439,7 @@ class BlankyController(QObject):
                 f"<span style='color:{color};'>{html.escape(row)}</span>"
                 for row in event_rows
             )
-        event_font_size = 14 if self._appearance_mode == "large_readability" else 12
+        event_font_size = round(12 * self._appearance_text_scale)
         return f"<pre style='font-family:Consolas; font-size:{event_font_size}px;'>" + "\n".join(rich_rows) + "</pre>"
 
     def _localized_event_detail(self, event: dict) -> str:

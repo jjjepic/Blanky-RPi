@@ -20,7 +20,7 @@ Rectangle {
     property real textHorizontalOffset: 0
     property real textVerticalOffset: 0
     property bool iconOnly: false
-    readonly property real readabilityScale: typeof blanky !== "undefined" && blanky.appearanceMode === "large_readability" ? 1.18 : 1.0
+    readonly property real readabilityScale: typeof blanky !== "undefined" ? blanky.appearanceTextScale : 1.0
     readonly property bool hasStructuredContent: iconText.length > 0 || labelText.length > 0
     readonly property bool glyphButton: iconOnly || (hasStructuredContent && labelText.length === 0)
     readonly property string displayText: hasStructuredContent

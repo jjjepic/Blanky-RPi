@@ -17,7 +17,7 @@ Rectangle {
     property bool active: false
     property bool commandEnabled: true
     property bool singleLineTitle: false
-    readonly property real readabilityScale: typeof blanky !== "undefined" && blanky.appearanceMode === "large_readability" ? 1.18 : 1.0
+    readonly property real readabilityScale: typeof blanky !== "undefined" ? blanky.appearanceTextScale : 1.0
 
     signal triggered(string command)
 

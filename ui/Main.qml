@@ -13,7 +13,14 @@ ApplicationWindow {
     minimumHeight: 850
     title: "Blanky"
 
-    ThemePalette { id: theme; mode: blanky.appearanceMode }
+    ThemePalette {
+        id: theme
+        mode: blanky.appearanceMode
+        readabilityScale: blanky.appearanceTextScale
+        customHue: blanky.customHue
+        customBrightness: blanky.customBrightness
+        customContrast: blanky.customContrast
+    }
     readonly property bool dark: theme.dark
     readonly property color bgColor: theme.background
     readonly property color panelColor: theme.surface
@@ -72,19 +79,19 @@ ApplicationWindow {
             return "\u25C9"
         if (blanky.appearanceMode === "monochrome")
             return "\u25FB"
-        if (blanky.appearanceMode === "large_readability")
-            return "\uD83D\uDD0E"
+        if (blanky.appearanceMode === "custom")
+            return "\u2699"
         return "\u263E"
     }
 
     function appearanceOptions() {
         return [
-            { id: "light", icon: "☀", title: t("lightAppearance"), description: blanky.language === "pt" ? "Interface clara e equilibrada." : "Balanced light interface." },
             { id: "dark", icon: "☾", title: t("darkAppearance"), description: blanky.language === "pt" ? "Interface escura atual." : "Current dark interface." },
+            { id: "light", icon: "☀", title: t("lightAppearance"), description: blanky.language === "pt" ? "Interface clara e equilibrada." : "Balanced light interface." },
             { id: "high_contrast", icon: "◐", title: t("highContrast"), description: blanky.language === "pt" ? "Máxima legibilidade e contornos fortes." : "Maximum legibility and strong borders." },
             { id: "colorblind", icon: "◉", title: t("colorblindUniversal"), description: blanky.language === "pt" ? "Estados com símbolos, texto e cores acessíveis." : "States with symbols, text and accessible colours." },
             { id: "monochrome", icon: "◻", title: t("monochrome"), description: blanky.language === "pt" ? "Estados compreensíveis sem depender da cor." : "States that do not depend on colour." },
-            { id: "large_readability", icon: "🔎", title: t("enhancedReadability"), description: t("enhancedReadabilityDescription") }
+            { id: "custom", icon: "⚙", title: t("customAppearance"), description: t("customAppearanceDescription") }
         ]
     }
 
@@ -2059,7 +2066,7 @@ ApplicationWindow {
         rememberPosition: false
         onOpening: { root.popupBackdropVisible = true; modalBackdrop.scheduleSnapshot() }
         onOpenedForBackdrop: modalBackdrop.scheduleSnapshot()
-        onClosedForBackdrop: root.popupBackdropVisible = false
+        onClosedForBackdrop: root.popupBackdropVisible = customAppearancePanel.visible
 
         ColumnLayout {
             anchors.fill: parent
@@ -2113,8 +2120,45 @@ ApplicationWindow {
                         MouseArea {
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: blanky.setAppearanceMode(modelData.id)
+                            onClicked: {
+                                blanky.setAppearanceMode(modelData.id)
+                                if (modelData.id === "custom") {
+                                    appearancePanel.close()
+                                    customAppearancePanel.open()
+                                }
+                            }
                         }
+                    }
+                }
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: Math.round(58 * root.controlScale)
+                radius: 9
+                color: root.panelAltColor
+                border.color: root.borderColor
+                border.width: 1
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 12
+                    anchors.rightMargin: 12
+                    spacing: 2
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Label { text: "🔎 " + t("readabilitySize"); color: root.textColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale); Layout.fillWidth: true }
+                        Label { text: Math.round(blanky.appearanceTextScale * 100) + "%"; color: root.accentColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
+                    }
+
+                    Slider {
+                        Layout.fillWidth: true
+                        from: 1.0
+                        to: 1.25
+                        stepSize: 0.01
+                        value: blanky.appearanceTextScale
+                        onMoved: blanky.setAppearanceTextScale(value)
                     }
                 }
             }
@@ -2137,6 +2181,97 @@ ApplicationWindow {
                     Label { text: "! " + t("warning"); color: root.warningColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
                     Label { text: "✕ " + t("error"); color: root.errorColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
                     Label { text: "○ " + t("inactive"); color: root.inactiveColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
+                }
+            }
+        }
+    }
+
+    FloatingPanel {
+        id: customAppearancePanel
+        width: 540
+        height: 390
+        panelTitle: t("customAppearanceTitle")
+        panelColor: root.panelColor
+        borderColor: root.borderColor
+        titleColor: root.textColor
+        textColor: root.textColor
+        rememberPosition: false
+        onOpening: { root.popupBackdropVisible = true; modalBackdrop.scheduleSnapshot() }
+        onOpenedForBackdrop: modalBackdrop.scheduleSnapshot()
+        onClosedForBackdrop: root.popupBackdropVisible = false
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 14
+
+            Label {
+                Layout.fillWidth: true
+                text: t("customAppearanceIntro")
+                color: root.mutedText
+                font.pixelSize: Math.round(12 * root.textScale)
+                wrapMode: Text.WordWrap
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 72
+                radius: 10
+                color: root.panelAltColor
+                border.color: root.borderColor
+                border.width: 1
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    spacing: 3
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Label { text: t("accentHue"); color: root.textColor; font.bold: true; Layout.fillWidth: true }
+                        Label { text: Math.round(blanky.customHue) + "°"; color: root.accentColor; font.bold: true }
+                    }
+                    Slider { Layout.fillWidth: true; from: 0; to: 360; stepSize: 1; value: blanky.customHue; onMoved: blanky.setCustomHue(value) }
+                }
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 72
+                radius: 10
+                color: root.panelAltColor
+                border.color: root.borderColor
+                border.width: 1
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    spacing: 3
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Label { text: t("interfaceBrightness"); color: root.textColor; font.bold: true; Layout.fillWidth: true }
+                        Label { text: Math.round(blanky.customBrightness) + "%"; color: root.accentColor; font.bold: true }
+                    }
+                    Slider { Layout.fillWidth: true; from: 20; to: 80; stepSize: 1; value: blanky.customBrightness; onMoved: blanky.setCustomBrightness(value) }
+                }
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 72
+                radius: 10
+                color: root.panelAltColor
+                border.color: root.borderColor
+                border.width: 1
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    spacing: 3
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Label { text: t("textContrast"); color: root.textColor; font.bold: true; Layout.fillWidth: true }
+                        Label { text: Math.round(blanky.customContrast) + "%"; color: root.accentColor; font.bold: true }
+                    }
+                    Slider { Layout.fillWidth: true; from: 60; to: 100; stepSize: 1; value: blanky.customContrast; onMoved: blanky.setCustomContrast(value) }
                 }
             }
         }

@@ -19,7 +19,7 @@ Rectangle {
     property color warningColor: "#f8c25d"
     property color errorColor: "#ff6b6b"
     property color inactiveColor: "#8fa8b8"
-    readonly property real readabilityScale: panel.controller && panel.controller.appearanceMode === "large_readability" ? 1.18 : 1.0
+    readonly property real readabilityScale: panel.controller ? panel.controller.appearanceTextScale : 1.0
     property var stateMap: ({})
     readonly property bool manualAvailable: stateValue("mode_manual") === 1
     readonly property bool modeChangeActive: stateValue("mode_change") === 1

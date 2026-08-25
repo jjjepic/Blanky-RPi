@@ -4,77 +4,99 @@ QtObject {
     id: theme
 
     property string mode: "dark"
+    property real readabilityScale: 1.0
+    property real customHue: 205.0
+    property real customBrightness: 46.0
+    property real customContrast: 88.0
     readonly property bool dark: mode !== "light"
     readonly property bool colorIndependent: mode === "monochrome"
     readonly property bool highContrast: mode === "high_contrast"
-    readonly property bool largeReadability: mode === "large_readability"
-    readonly property real textScale: largeReadability ? 1.18 : 1.0
-    readonly property real controlScale: largeReadability ? 1.10 : 1.0
-    readonly property real spacingScale: largeReadability ? 1.12 : 1.0
+    readonly property real textScale: readabilityScale
+    readonly property real controlScale: 1.0 + (readabilityScale - 1.0) * 0.55
+    readonly property real spacingScale: 1.0 + (readabilityScale - 1.0) * 0.60
 
-    readonly property color background: mode === "light" ? "#d7e3ea"
+    readonly property color background: mode === "custom" ? Qt.hsla(customHue / 360, 0.38, 0.06 + customBrightness / 100 * 0.24, 1)
+        : mode === "light" ? "#d7e3ea"
         : mode === "high_contrast" ? "#000000"
         : mode === "colorblind" ? "#07121d"
         : mode === "monochrome" ? "#101010" : "#02060d"
-    readonly property color backgroundTop: mode === "light" ? "#e3edf2"
+    readonly property color backgroundTop: mode === "custom" ? Qt.lighter(background, 1.22)
+        : mode === "light" ? "#e3edf2"
         : mode === "high_contrast" ? "#080808"
         : mode === "colorblind" ? "#0b1c2b"
         : mode === "monochrome" ? "#1b1b1b" : "#03101b"
-    readonly property color surface: mode === "light" ? "#c5d8e4"
+    readonly property color surface: mode === "custom" ? Qt.lighter(background, 1.16)
+        : mode === "light" ? "#c5d8e4"
         : mode === "high_contrast" ? "#111111"
         : mode === "colorblind" ? "#0d2030"
         : mode === "monochrome" ? "#181818" : "#091722"
-    readonly property color surfaceSecondary: mode === "light" ? "#e3edf2"
+    readonly property color surfaceSecondary: mode === "custom" ? Qt.lighter(background, 1.08)
+        : mode === "light" ? "#e3edf2"
         : mode === "high_contrast" ? "#050505"
         : mode === "colorblind" ? "#091825"
         : mode === "monochrome" ? "#252525" : "#07111a"
-    readonly property color textPrimary: mode === "light" ? "#16384c" : "#f2f7fb"
-    readonly property color textSecondary: mode === "light" ? "#386b85"
+    readonly property color textPrimary: mode === "custom" ? Qt.hsla(customHue / 360, 0.08, 0.45 + customContrast / 100 * 0.50, 1)
+        : mode === "light" ? "#16384c" : "#f2f7fb"
+    readonly property color textSecondary: mode === "custom" ? Qt.hsla(customHue / 360, 0.18, 0.34 + customContrast / 100 * 0.38, 1)
+        : mode === "light" ? "#386b85"
         : mode === "high_contrast" ? "#d2d2d2"
         : mode === "monochrome" ? "#c5c5c5" : "#a8d8ee"
-    readonly property color textDisabled: mode === "light" ? "#526e7d" : "#8fa8b8"
-    readonly property color border: mode === "light" ? "#5f98b8"
+    readonly property color textDisabled: mode === "custom" ? Qt.hsla(customHue / 360, 0.12, 0.38 + customContrast / 100 * 0.25, 1)
+        : mode === "light" ? "#526e7d" : "#8fa8b8"
+    readonly property color border: mode === "custom" ? Qt.hsla(customHue / 360, 0.65, 0.40 + customContrast / 100 * 0.18, 1)
+        : mode === "light" ? "#5f98b8"
         : mode === "high_contrast" ? "#f2f2f2"
         : mode === "monochrome" ? "#c8c8c8" : "#1f6fa8"
-    readonly property color borderStrong: mode === "light" ? "#0d5d8b"
+    readonly property color borderStrong: mode === "custom" ? Qt.lighter(border, 1.25)
+        : mode === "light" ? "#0d5d8b"
         : mode === "high_contrast" ? "#ffffff"
         : mode === "monochrome" ? "#ffffff" : "#4ab7e8"
-    readonly property color accent: mode === "light" ? "#0d5d8b"
+    readonly property color accent: mode === "custom" ? Qt.hsla(customHue / 360, 0.82, 0.62, 1)
+        : mode === "light" ? "#0d5d8b"
         : mode === "high_contrast" ? "#00e5ff"
         : mode === "colorblind" ? "#4fc3f7"
         : mode === "monochrome" ? "#ffffff" : "#63cbff"
-    readonly property color success: mode === "light" ? "#147a3d"
+    readonly property color success: mode === "custom" ? accent
+        : mode === "light" ? "#147a3d"
         : mode === "high_contrast" ? "#00e5ff"
         : mode === "colorblind" ? "#4fc3f7"
         : mode === "monochrome" ? "#f2f2f2" : "#48d66b"
-    readonly property color warning: mode === "light" ? "#8a5b00"
+    readonly property color warning: mode === "custom" ? Qt.hsla(((customHue + 45) % 360) / 360, 0.78, 0.64, 1)
+        : mode === "light" ? "#8a5b00"
         : mode === "high_contrast" ? "#ffd740"
         : mode === "colorblind" ? "#ffd166"
         : mode === "monochrome" ? "#d8d8d8" : "#f8c25d"
-    readonly property color error: mode === "light" ? "#b32635"
+    readonly property color error: mode === "custom" ? Qt.hsla(((customHue + 320) % 360) / 360, 0.78, 0.65, 1)
+        : mode === "light" ? "#b32635"
         : mode === "high_contrast" ? "#ff8a65"
         : mode === "colorblind" ? "#ff9f43"
         : mode === "monochrome" ? "#ffffff" : "#ff6b6b"
-    readonly property color inactive: mode === "light" ? "#526e7d"
+    readonly property color inactive: mode === "custom" ? Qt.hsla(customHue / 360, 0.16, 0.55, 1)
+        : mode === "light" ? "#526e7d"
         : mode === "high_contrast" ? "#c0c0c0"
         : mode === "monochrome" ? "#a8a8a8" : "#8fa8b8"
-    readonly property color selected: mode === "light" ? "#146f9e"
+    readonly property color selected: mode === "custom" ? accent
+        : mode === "light" ? "#146f9e"
         : mode === "high_contrast" ? "#00e5ff"
         : mode === "colorblind" ? "#4fc3f7"
         : mode === "monochrome" ? "#ffffff" : "#9dd9ff"
-    readonly property color successSurface: mode === "light" ? "#d7f4df"
+    readonly property color successSurface: mode === "custom" ? Qt.lighter(surfaceSecondary, 1.18)
+        : mode === "light" ? "#d7f4df"
         : mode === "high_contrast" ? "#111111"
         : mode === "colorblind" ? "#102a3c"
         : mode === "monochrome" ? "#252525" : "#0c3423"
-    readonly property color infoSurface: mode === "light" ? "#d9effa"
+    readonly property color infoSurface: mode === "custom" ? Qt.lighter(surfaceSecondary, 1.14)
+        : mode === "light" ? "#d9effa"
         : mode === "high_contrast" ? "#111111"
         : mode === "colorblind" ? "#102a3c"
         : mode === "monochrome" ? "#252525" : "#0b3040"
-    readonly property color warningSurface: mode === "light" ? "#fff0c5"
+    readonly property color warningSurface: mode === "custom" ? Qt.lighter(surfaceSecondary, 1.10)
+        : mode === "light" ? "#fff0c5"
         : mode === "high_contrast" ? "#111111"
         : mode === "colorblind" ? "#2d2615"
         : mode === "monochrome" ? "#252525" : "#382c0d"
-    readonly property color errorSurface: mode === "light" ? "#ffe0e3"
+    readonly property color errorSurface: mode === "custom" ? Qt.lighter(surfaceSecondary, 1.06)
+        : mode === "light" ? "#ffe0e3"
         : mode === "high_contrast" ? "#111111"
         : mode === "colorblind" ? "#321f18"
         : mode === "monochrome" ? "#252525" : "#38161d"

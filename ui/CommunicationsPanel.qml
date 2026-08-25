@@ -24,7 +24,7 @@ Rectangle {
     property color infoSurface: "#0b3040"
     property color warningSurface: "#382c0d"
     property color errorSurface: "#38161d"
-    readonly property real readabilityScale: panel.controller && panel.controller.appearanceMode === "large_readability" ? 1.18 : 1.0
+    readonly property real readabilityScale: panel.controller ? panel.controller.appearanceTextScale : 1.0
     property var stateMap: ({})
     property var detailsMap: ({})
     readonly property bool compact: panel.height < 300
