@@ -86,12 +86,12 @@ ApplicationWindow {
 
     function appearanceOptions() {
         return [
-            { id: "dark", icon: "☾", title: t("darkAppearance"), description: blanky.language === "pt" ? "Interface escura atual." : "Current dark interface." },
-            { id: "light", icon: "☀", title: t("lightAppearance"), description: blanky.language === "pt" ? "Interface clara e equilibrada." : "Balanced light interface." },
-            { id: "high_contrast", icon: "◐", title: t("highContrast"), description: blanky.language === "pt" ? "Máxima legibilidade e contornos fortes." : "Maximum legibility and strong borders." },
-            { id: "colorblind", icon: "◉", title: t("colorblindUniversal"), description: blanky.language === "pt" ? "Estados com símbolos, texto e cores acessíveis." : "States with symbols, text and accessible colours." },
-            { id: "monochrome", icon: "◻", title: t("monochrome"), description: blanky.language === "pt" ? "Estados compreensíveis sem depender da cor." : "States that do not depend on colour." },
-            { id: "custom", icon: "⚙", title: t("customAppearance"), description: t("customAppearanceDescription") }
+            { id: "dark", icon: "☾", tone: "#91a1b5", title: t("darkAppearance"), description: blanky.language === "pt" ? "Interface escura atual." : "Current dark interface." },
+            { id: "light", icon: "☀", tone: "#f8c25d", title: t("lightAppearance"), description: blanky.language === "pt" ? "Interface clara e equilibrada." : "Balanced light interface." },
+            { id: "high_contrast", icon: "◐", tone: "#00e5ff", title: t("highContrast"), description: blanky.language === "pt" ? "Máxima legibilidade e contornos fortes." : "Maximum legibility and strong borders." },
+            { id: "colorblind", icon: "◉", tone: "#20c7b4", title: t("colorblindUniversal"), description: blanky.language === "pt" ? "Estados com símbolos, texto e cores acessíveis." : "States with symbols, text and accessible colours." },
+            { id: "monochrome", icon: "◻", tone: "#d7d7d7", title: t("monochrome"), description: blanky.language === "pt" ? "Estados compreensíveis sem depender da cor." : "States that do not depend on colour." },
+            { id: "custom", icon: "⚙", tone: "#cf8cff", title: t("customAppearance"), description: t("customAppearanceDescription") }
         ]
     }
 
@@ -1100,6 +1100,7 @@ ApplicationWindow {
                                         Layout.fillHeight: true
                                         wrapMode: TextEdit.WordWrap
                                         placeholderText: t("textBotPlaceholder")
+                                        placeholderTextColor: root.mutedText
                                         color: root.textColor
                                         background: Rectangle {
                                             color: root.dark ? "#081a2b" : "#d7e6ed"
@@ -1209,6 +1210,7 @@ ApplicationWindow {
                                         Layout.fillHeight: true
                                         wrapMode: TextEdit.WordWrap
                                         placeholderText: t("textBotPlaceholder")
+                                        placeholderTextColor: root.mutedText
                                         color: root.textColor
                                         background: Rectangle {
                                             color: root.dark ? "#081a2b" : "#d7e6ed"
@@ -1366,7 +1368,8 @@ ApplicationWindow {
                         Rectangle {
                             visible: !root.systemTransitionActive
                             Layout.fillWidth: true
-                            Layout.preferredHeight: Math.round(88 * root.controlScale)
+                            Layout.preferredHeight: Math.round(88 * root.controlScale + (root.textScale - 1.0) * 34)
+                            Layout.minimumHeight: Layout.preferredHeight
                             color: root.panelAltColor
                             border.color: root.borderColor
                             border.width: 1
@@ -1423,6 +1426,7 @@ ApplicationWindow {
                                             height: Math.max(eventsTextBotScroll.availableHeight, contentHeight + topPadding + bottomPadding)
                                             wrapMode: TextEdit.WordWrap
                                             placeholderText: t("textBotPlaceholder")
+                                            placeholderTextColor: root.mutedText
                                             color: root.textColor
                                             font.pixelSize: Math.round(12 * root.textScale)
                                             background: Rectangle {
@@ -2095,11 +2099,12 @@ ApplicationWindow {
                     Rectangle {
                         required property var modelData
                         readonly property bool selected: blanky.appearanceMode === modelData.id
+                        readonly property color modeColor: modelData.tone
                         Layout.fillWidth: true
                         Layout.preferredHeight: Math.round(74 * (root.textScale > 1 ? 1.06 : 1.0))
                         radius: 10
                         color: selected ? Qt.lighter(root.panelAltColor, root.dark ? 1.16 : 1.03) : root.panelAltColor
-                        border.color: selected ? root.accentColor : root.borderColor
+                        border.color: selected ? modeColor : Qt.darker(modeColor, root.dark ? 1.65 : 1.18)
                         border.width: selected ? 2 : 1
 
                         RowLayout {
@@ -2107,14 +2112,20 @@ ApplicationWindow {
                             anchors.margins: 10
                             spacing: 10
 
-                                Label { text: modelData.icon; color: selected ? root.accentColor : root.mutedText; font.pixelSize: Math.round(23 * root.textScale) }
+                            Rectangle {
+                                Layout.preferredWidth: 4
+                                Layout.fillHeight: true
+                                radius: 2
+                                color: modeColor
+                            }
+                            Label { text: modelData.icon; color: modeColor; font.pixelSize: Math.round(23 * root.textScale) }
                             ColumnLayout {
                                 Layout.fillWidth: true
                                 spacing: 3
-                                Label { text: modelData.title; color: root.textColor; font.bold: true; font.pixelSize: Math.round(14 * root.textScale); Layout.fillWidth: true }
+                                Label { text: modelData.title; color: selected ? modeColor : root.textColor; font.bold: true; font.pixelSize: Math.round(14 * root.textScale); Layout.fillWidth: true }
                                 Label { text: modelData.description; color: root.mutedText; font.pixelSize: Math.round(10 * root.textScale); Layout.fillWidth: true; elide: Text.ElideRight }
                             }
-                            Label { text: selected ? "✓" : "○"; color: selected ? root.successColor : root.inactiveColor; font.pixelSize: Math.round(18 * root.textScale); font.bold: true }
+                            Label { text: selected ? "✓" : "○"; color: selected ? modeColor : root.inactiveColor; font.pixelSize: Math.round(18 * root.textScale); font.bold: true }
                         }
 
                         MouseArea {
@@ -2150,6 +2161,17 @@ ApplicationWindow {
                         Layout.fillWidth: true
                         Label { text: "🔎 " + t("readabilitySize"); color: root.textColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale); Layout.fillWidth: true }
                         Label { text: Math.round(blanky.appearanceTextScale * 100) + "%"; color: root.accentColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
+                        MenuActionButton {
+                            text: t("resetSize")
+                            Layout.preferredWidth: 58
+                            Layout.preferredHeight: 24
+                            accentColor: root.inactiveColor
+                            textColor: root.textColor
+                            mutedText: root.mutedText
+                            borderColor: root.borderColor
+                            panelColor: root.panelColor
+                            onClicked: blanky.setAppearanceTextScale(1.0)
+                        }
                     }
 
                     Slider {

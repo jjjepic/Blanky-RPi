@@ -32,7 +32,9 @@ Rectangle {
     signal clicked()
 
     width: 150
-    height: Math.round((prominent ? 44 : 40) * (readabilityScale > 1 ? 1.10 : 1.0))
+    // Layouts own the button height. Scaling it here as well caused controls
+    // with an explicit layout height to retain stale geometry after a reset.
+    height: prominent ? 44 : 40
     radius: 11
     opacity: enabled ? 1.0 : 0.55
     color: mouseArea.containsMouse ? Qt.lighter(panelColor, 1.28) : panelColor
