@@ -1417,6 +1417,7 @@ ApplicationWindow {
                                         Layout.fillWidth: true
                                         Layout.fillHeight: true
                                         clip: true
+                                        rightPadding: Math.round(6 * root.textScale)
                                         ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
                                         ScrollBar.vertical.policy: ScrollBar.AsNeeded
 
@@ -2472,6 +2473,7 @@ ApplicationWindow {
             id: audioScroll
             anchors.fill: parent
             clip: true
+            rightPadding: Math.round(8 * root.textScale)
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
             ScrollBar.vertical.policy: ScrollBar.AlwaysOn
 
@@ -2926,11 +2928,12 @@ ApplicationWindow {
             id: redesignedAudioScroll
             anchors.fill: parent
             clip: true
+            rightPadding: Math.round(8 * root.textScale)
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
             ScrollBar.vertical.policy: ScrollBar.AlwaysOn
 
             Column {
-                width: Math.max(redesignedAudioScroll.availableWidth - 10, 760)
+                width: Math.max(redesignedAudioScroll.availableWidth - 18, 740)
                 spacing: 12
 
                 Rectangle {
