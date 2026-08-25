@@ -7,6 +7,10 @@ QtObject {
     readonly property bool dark: mode !== "light"
     readonly property bool colorIndependent: mode === "monochrome"
     readonly property bool highContrast: mode === "high_contrast"
+    readonly property bool largeReadability: mode === "large_readability"
+    readonly property real textScale: largeReadability ? 1.18 : 1.0
+    readonly property real controlScale: largeReadability ? 1.10 : 1.0
+    readonly property real spacingScale: largeReadability ? 1.12 : 1.0
 
     readonly property color background: mode === "light" ? "#d7e3ea"
         : mode === "high_contrast" ? "#000000"

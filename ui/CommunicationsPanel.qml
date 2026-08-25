@@ -24,11 +24,12 @@ Rectangle {
     property color infoSurface: "#0b3040"
     property color warningSurface: "#382c0d"
     property color errorSurface: "#38161d"
+    readonly property real readabilityScale: panel.controller && panel.controller.appearanceMode === "large_readability" ? 1.18 : 1.0
     property var stateMap: ({})
     property var detailsMap: ({})
     readonly property bool compact: panel.height < 300
     readonly property int cardHeight: compact ? 47 : 58
-    readonly property int contentSpacing: compact ? 5 : 8
+    readonly property int contentSpacing: Math.round((compact ? 5 : 8) * (readabilityScale > 1 ? 1.10 : 1.0))
 
     function t(key) {
         return I18n.text(panel.language, key)
@@ -148,7 +149,7 @@ Rectangle {
             Label {
                 text: panel.t("communications").toUpperCase()
                 color: panel.accentColor
-                font.pixelSize: 14
+                font.pixelSize: Math.round(14 * panel.readabilityScale)
                 font.bold: true
             }
             Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: panel.borderColor }
@@ -206,14 +207,14 @@ Rectangle {
                                     anchors.centerIn: parent
                                     text: modelData.icon
                                     color: panel.stateColor(communicationStatus)
-                                    font.pixelSize: panel.compact ? 15 : 18
+                                    font.pixelSize: Math.round((panel.compact ? 15 : 18) * panel.readabilityScale)
                                 }
                             }
 
                             Label {
                                 text: modelData.label.toUpperCase()
                                 color: panel.textColor
-                                font.pixelSize: panel.compact ? 11 : 13
+                                font.pixelSize: Math.round((panel.compact ? 11 : 13) * panel.readabilityScale)
                                 font.bold: true
                                 elide: Text.ElideRight
                                 Layout.fillWidth: true
@@ -234,7 +235,7 @@ Rectangle {
                                     anchors.centerIn: parent
                                     text: panel.stateGlyph(communicationStatus) + " " + panel.stateText(communicationStatus).toUpperCase()
                                     color: panel.stateColor(communicationStatus)
-                                    font.pixelSize: panel.compact ? 9 : 10
+                                    font.pixelSize: Math.round((panel.compact ? 9 : 10) * panel.readabilityScale)
                                     font.bold: true
                                     elide: Text.ElideRight
                                     width: parent.width - 10
@@ -258,7 +259,7 @@ Rectangle {
                         Label {
                             text: panel.detailFor(modelData.key)
                             color: panel.mutedText
-                            font.pixelSize: panel.compact ? 11 : 12
+                            font.pixelSize: Math.round((panel.compact ? 11 : 12) * panel.readabilityScale)
                             font.bold: true
                             elide: Text.ElideRight
                             Layout.fillWidth: true

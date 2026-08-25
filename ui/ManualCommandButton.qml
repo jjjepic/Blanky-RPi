@@ -17,6 +17,7 @@ Rectangle {
     property bool active: false
     property bool commandEnabled: true
     property bool singleLineTitle: false
+    readonly property real readabilityScale: typeof blanky !== "undefined" && blanky.appearanceMode === "large_readability" ? 1.18 : 1.0
 
     signal triggered(string command)
 
@@ -36,7 +37,7 @@ Rectangle {
             : control.label
         textFormat: Text.RichText
         color: control.textColor
-        font.pixelSize: control.singleLineTitle ? 11 : 12
+        font.pixelSize: Math.round((control.singleLineTitle ? 11 : 12) * control.readabilityScale)
         font.bold: control.active
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
@@ -53,7 +54,7 @@ Rectangle {
         anchors.bottomMargin: 6
         text: (control.active ? "✓ " : "○ ") + control.stateText
         color: control.active ? control.iconColor : control.mutedText
-        font.pixelSize: 10
+        font.pixelSize: Math.round(10 * control.readabilityScale)
         font.bold: true
     }
 

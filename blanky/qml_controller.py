@@ -217,7 +217,7 @@ class BlankyController(QObject):
         self._settings = QSettings("Blanky", "Blanky")
         saved_appearance = str(self._settings.value("appearanceMode", "dark") or "dark").lower()
         self._appearance_mode = saved_appearance if saved_appearance in {
-            "light", "dark", "high_contrast", "colorblind", "monochrome"
+            "light", "dark", "high_contrast", "colorblind", "monochrome", "large_readability"
         } else "dark"
         self._dark_mode = self._appearance_mode != "light"
         self._monitor_left_text = ""
@@ -493,7 +493,7 @@ class BlankyController(QObject):
     @Slot(str)
     def setAppearanceMode(self, mode: str):
         mode = (mode or "").strip().lower()
-        if mode not in {"light", "dark", "high_contrast", "colorblind", "monochrome"}:
+        if mode not in {"light", "dark", "high_contrast", "colorblind", "monochrome", "large_readability"}:
             return
         if self._appearance_mode == mode:
             return
@@ -1362,14 +1362,17 @@ class BlankyController(QObject):
                 f"{event_label:<{id_w}} | {event_time:<{time_w}} | "
                 f"{source:<{source_w}} | {command:<{command_w}} | {status:<{status_w}} | "
             )
-            continuation = f"{'':<{id_w}} | {'':<{time_w}} | {'':<{source_w}} | {'':<{command_w}} | {'':<{status_w}} | "
+            # Continuations begin under Description only; repeating separators
+            # makes wrapped rows look like misaligned columns.
+            continuation = " " * len(prefix)
             event_rows = [prefix + detail_lines[0]]
             event_rows.extend(continuation + line for line in detail_lines[1:])
             rich_rows.extend(
                 f"<span style='color:{color};'>{html.escape(row)}</span>"
                 for row in event_rows
             )
-        return "<pre style='font-family:Consolas; font-size:12px;'>" + "\n".join(rich_rows) + "</pre>"
+        event_font_size = 14 if self._appearance_mode == "large_readability" else 12
+        return f"<pre style='font-family:Consolas; font-size:{event_font_size}px;'>" + "\n".join(rich_rows) + "</pre>"
 
     def _localized_event_detail(self, event: dict) -> str:
         command = str(event.get("command") or "")

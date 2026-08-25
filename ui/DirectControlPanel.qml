@@ -19,6 +19,7 @@ Rectangle {
     property color warningColor: "#f8c25d"
     property color errorColor: "#ff6b6b"
     property color inactiveColor: "#8fa8b8"
+    readonly property real readabilityScale: panel.controller && panel.controller.appearanceMode === "large_readability" ? 1.18 : 1.0
     property var stateMap: ({})
     readonly property bool manualAvailable: stateValue("mode_manual") === 1
     readonly property bool modeChangeActive: stateValue("mode_change") === 1
@@ -31,11 +32,11 @@ Rectangle {
     readonly property color manualModeColor: successColor
     readonly property color changeModeColor: accentColor
     readonly property bool compact: panel.height < 430
-    readonly property int sectionSpacing: compact ? 4 : 8
-    readonly property int blockMargin: compact ? 7 : 10
+    readonly property int sectionSpacing: Math.round((compact ? 4 : 8) * (readabilityScale > 1 ? 1.10 : 1.0))
+    readonly property int blockMargin: Math.round((compact ? 7 : 10) * (readabilityScale > 1 ? 1.08 : 1.0))
     readonly property real actionButtonHeight: compact
         ? Math.max(28, Math.min(36, Math.floor((panel.height - 150) / 5)))
-        : Math.max(40, Math.min(58, Math.floor((panel.height - 180) / 5)))
+        : Math.max(40, Math.min(readabilityScale > 1 ? 62 : 58, Math.floor((panel.height - 180) / 5)))
 
     function t(key, values) {
         return I18n.text(panel.language, key, values)
@@ -127,7 +128,7 @@ Rectangle {
             Label {
                 text: panel.t("operationPanel").toUpperCase()
                 color: panel.accentColor
-                font.pixelSize: 14
+                font.pixelSize: Math.round(14 * panel.readabilityScale)
                 font.bold: true
             }
             Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: panel.borderColor }
@@ -160,13 +161,13 @@ Rectangle {
                         Label {
                             text: panel.t("generalControl")
                             color: panel.accentColor
-                            font.pixelSize: 14
+                            font.pixelSize: Math.round(14 * panel.readabilityScale)
                             font.bold: true
                         }
                         Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: panel.borderColor }
                     }
 
-                    Label { text: panel.t("system"); color: panel.mutedText; font.bold: true; font.pixelSize: panel.compact ? 11 : 12; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+                    Label { text: panel.t("system"); color: panel.mutedText; font.bold: true; font.pixelSize: Math.round((panel.compact ? 11 : 12) * panel.readabilityScale); horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
                     ManualCommandButton {
                         Layout.fillWidth: true
                         Layout.preferredHeight: panel.actionButtonHeight
@@ -181,7 +182,7 @@ Rectangle {
                         onTriggered: function(command) { panel.controller.submitButtonCommand(command) }
                     }
 
-                    Label { text: panel.t("modes"); color: panel.mutedText; font.bold: true; font.pixelSize: panel.compact ? 11 : 12; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+                    Label { text: panel.t("modes"); color: panel.mutedText; font.bold: true; font.pixelSize: Math.round((panel.compact ? 11 : 12) * panel.readabilityScale); horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: panel.compact ? 5 : 8
@@ -199,7 +200,7 @@ Rectangle {
                         ManualCommandButton { Layout.fillWidth: true; Layout.preferredHeight: panel.actionButtonHeight; commandEnabled: panel.canRequestModeChange; label: panel.t("change"); iconText: "\u21C4"; command: "MODE_UNSPEC"; active: panel.modeChangeActive; stateText: active ? "ON" : "OFF"; iconColor: panel.changeModeColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
                     }
 
-                    Label { text: panel.t("currentState"); color: panel.mutedText; font.bold: true; font.pixelSize: panel.compact ? 11 : 12; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+                    Label { text: panel.t("currentState"); color: panel.mutedText; font.bold: true; font.pixelSize: Math.round((panel.compact ? 11 : 12) * panel.readabilityScale); horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
                     Rectangle {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
@@ -216,18 +217,18 @@ Rectangle {
 
                             RowLayout {
                                 Layout.fillWidth: true
-                                Label { text: panel.t("activeMode"); color: panel.textColor; Layout.fillWidth: true }
-                                Label { text: panel.modeInfo().text; color: panel.modeInfo().color; font.bold: true }
+                                Label { text: panel.t("activeMode"); color: panel.textColor; font.pixelSize: Math.round(12 * panel.readabilityScale); Layout.fillWidth: true }
+                                Label { text: panel.modeInfo().text; color: panel.modeInfo().color; font.pixelSize: Math.round(12 * panel.readabilityScale); font.bold: true }
                             }
                             RowLayout {
                                 Layout.fillWidth: true
-                                Label { text: panel.t("systemState"); color: panel.textColor; Layout.fillWidth: true }
-                                Label { text: panel.systemInfo().text; color: panel.systemInfo().color; font.bold: true; elide: Text.ElideRight; Layout.preferredWidth: 148; horizontalAlignment: Text.AlignRight }
+                                Label { text: panel.t("systemState"); color: panel.textColor; font.pixelSize: Math.round(12 * panel.readabilityScale); Layout.fillWidth: true }
+                                Label { text: panel.systemInfo().text; color: panel.systemInfo().color; font.pixelSize: Math.round(12 * panel.readabilityScale); font.bold: true; elide: Text.ElideRight; Layout.preferredWidth: 148; horizontalAlignment: Text.AlignRight }
                             }
                             RowLayout {
                                 Layout.fillWidth: true
-                                Label { text: panel.t("currentProcess"); color: panel.textColor; Layout.fillWidth: true }
-                                Label { text: panel.processInfo().text; color: panel.processInfo().color; elide: Text.ElideNone; Layout.preferredWidth: 148; horizontalAlignment: Text.AlignRight }
+                                Label { text: panel.t("currentProcess"); color: panel.textColor; font.pixelSize: Math.round(12 * panel.readabilityScale); Layout.fillWidth: true }
+                                Label { text: panel.processInfo().text; color: panel.processInfo().color; font.pixelSize: Math.round(12 * panel.readabilityScale); elide: Text.ElideNone; Layout.preferredWidth: 148; horizontalAlignment: Text.AlignRight }
                             }
                         }
                     }
@@ -255,7 +256,7 @@ Rectangle {
                         Label {
                             text: panel.t("manualControl")
                             color: panel.manualAvailable ? panel.successColor : panel.mutedText
-                            font.pixelSize: 14
+                            font.pixelSize: Math.round(14 * panel.readabilityScale)
                             font.bold: true
                         }
                         Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: panel.borderColor }
