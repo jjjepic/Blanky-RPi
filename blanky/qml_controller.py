@@ -27,9 +27,7 @@ from blanky.config import (
     AUDIO_DIR,
     MQTT_BROKER_HOST,
     MQTT_BROKER_PORT,
-    MQTT_CLIENT_ID,
     MQTT_TOPIC_PREFIX,
-    OPCUA_NAMESPACE_INDEX,
     OPCUA_URL,
     WAKEWORD_ENABLED,
 )
@@ -496,16 +494,8 @@ class BlankyController(QObject):
         return self._mqtt_topic_prefix
 
     @Property(str, notify=communicationSettingsChanged)
-    def mqttClientId(self):
-        return MQTT_CLIENT_ID
-
-    @Property(str, notify=communicationSettingsChanged)
     def opcuaUrl(self):
         return self._opcua_url
-
-    @Property(int, constant=True)
-    def opcuaNamespaceIndex(self):
-        return OPCUA_NAMESPACE_INDEX
 
     @Property(bool, notify=openAiKeyConfiguredChanged)
     def openAiKeyConfigured(self):

@@ -534,8 +534,8 @@ ApplicationWindow {
                     mutedText: root.mutedText
                     borderColor: root.borderColor
                     panelColor: root.panelAltColor
-                    toolTip: t("tooltipAudioSettings")
-                    onClicked: audioSettingsPanel.open()
+                    toolTip: t("tooltipSettings")
+                    onClicked: settingsPanel.open()
                 }
 
                 MenuActionButton {
@@ -2169,7 +2169,7 @@ ApplicationWindow {
 
             Rectangle {
                 Layout.fillWidth: true
-                Layout.preferredHeight: Math.round(58 * root.controlScale)
+                Layout.preferredHeight: Math.round(72 * root.controlScale)
                 radius: 9
                 color: root.panelAltColor
                 border.color: root.borderColor
@@ -2179,7 +2179,7 @@ ApplicationWindow {
                     anchors.fill: parent
                     anchors.leftMargin: 12
                     anchors.rightMargin: 12
-                    spacing: 2
+                    spacing: 5
 
                     RowLayout {
                         Layout.fillWidth: true
@@ -2200,6 +2200,8 @@ ApplicationWindow {
 
                     Slider {
                         Layout.fillWidth: true
+                        Layout.preferredHeight: 22
+                        Layout.bottomMargin: 4
                         from: 1.0
                         to: 1.25
                         stepSize: 0.01
@@ -3220,14 +3222,6 @@ ApplicationWindow {
                     width: parent.width
                     spacing: 10
                     MenuActionButton {
-                        text: "\u2699 " + t("communicationsSettings")
-                        Layout.preferredWidth: 190
-                        Layout.preferredHeight: 36
-                        accentColor: root.accentColor
-                        textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor
-                        onClicked: communicationsSettingsPanel.open()
-                    }
-                    MenuActionButton {
                         text: "\u266B " + t("testBeep")
                         Layout.preferredWidth: 150
                         Layout.preferredHeight: 36
@@ -3252,6 +3246,75 @@ ApplicationWindow {
                         textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor
                         onClicked: audioLogsPanel.open()
                     }
+                }
+            }
+        }
+    }
+
+    FloatingPanel {
+        id: settingsPanel
+        width: 700
+        height: 390
+        panelTitle: t("settingsTitle")
+        panelColor: root.panelColor
+        borderColor: root.borderColor
+        titleColor: root.textColor
+        textColor: root.textColor
+        onOpening: { root.popupBackdropVisible = true; modalBackdrop.scheduleSnapshot() }
+        onOpenedForBackdrop: modalBackdrop.scheduleSnapshot()
+        onClosedForBackdrop: root.popupBackdropVisible = audioSettingsPanel.visible || communicationsSettingsPanel.visible
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 14
+
+            Label {
+                Layout.fillWidth: true
+                text: t("settingsIntro")
+                color: root.mutedText
+                wrapMode: Text.WordWrap
+                font.pixelSize: 13
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                spacing: 14
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    radius: 14
+                    color: root.panelAltColor
+                    border.color: root.accentColor
+                    border.width: 1
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 18
+                        spacing: 10
+                        Label { text: "\uD83C\uDFA4"; color: root.accentColor; font.pixelSize: 30 }
+                        Label { text: t("audioTitle"); color: root.textColor; font.bold: true; font.pixelSize: 18; width: parent.width; wrapMode: Text.WordWrap }
+                        Label { text: t("audioSettingsCardInfo"); color: root.mutedText; width: parent.width; wrapMode: Text.WordWrap; font.pixelSize: 13 }
+                    }
+                    MouseArea { anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { settingsPanel.close(); audioSettingsPanel.open() } }
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    radius: 14
+                    color: root.panelAltColor
+                    border.color: root.successColor
+                    border.width: 1
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 18
+                        spacing: 10
+                        Label { text: "\uD83D\uDD17"; color: root.successColor; font.pixelSize: 30 }
+                        Label { text: t("communicationsSettings"); color: root.textColor; font.bold: true; font.pixelSize: 18; width: parent.width; wrapMode: Text.WordWrap }
+                        Label { text: t("communicationsSettingsCardInfo"); color: root.mutedText; width: parent.width; wrapMode: Text.WordWrap; font.pixelSize: 13 }
+                    }
+                    MouseArea { anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { settingsPanel.close(); communicationsSettingsPanel.open() } }
                 }
             }
         }
@@ -3349,8 +3412,8 @@ ApplicationWindow {
                         id: automaticDetails
                         anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 11
                         spacing: 5
-                        Label { text: t("automaticTechnicalSettings"); color: root.textColor; font.bold: true; font.pixelSize: 14 }
-                        Label { text: t("mqttClientLabel") + ": " + blanky.mqttClientId + "     |     " + t("opcuaNamespaceLabel") + ": " + blanky.opcuaNamespaceIndex; color: root.mutedText; wrapMode: Text.WordWrap; width: parent.width; font.pixelSize: 12 }
+                        Label { text: t("connectionGuidance"); color: root.textColor; font.bold: true; font.pixelSize: 14 }
+                        Label { text: t("connectionGuidanceInfo"); color: root.mutedText; wrapMode: Text.WordWrap; width: parent.width; font.pixelSize: 12 }
                     }
                 }
 
@@ -3361,7 +3424,8 @@ ApplicationWindow {
                     implicitHeight: mqttSettingsColumn.implicitHeight + 22
                     radius: 12
                     color: root.panelAltColor
-                    border.color: root.borderColor
+                    opacity: communicationsSettingsPanel.mqttEditable ? 1 : 0.56
+                    border.color: communicationsSettingsPanel.mqttEditable ? root.warningColor : root.borderColor
                     border.width: 1
                     Column {
                         id: mqttSettingsColumn
@@ -3369,13 +3433,13 @@ ApplicationWindow {
                         spacing: 8
                         RowLayout { width: parent.width
                             Label { text: "\uD83D\uDCE1 " + t("mqttBrokerSettings"); color: root.textColor; font.bold: true; font.pixelSize: 14; Layout.fillWidth: true }
-                            MenuActionButton { text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 28; Layout.preferredHeight: 26; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockCommunicationSetting"); onClicked: communicationsSettingsPanel.mqttEditable = true }
+                            MenuActionButton { text: communicationsSettingsPanel.mqttEditable ? "\u2713" : "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 28; Layout.preferredHeight: 26; accentColor: communicationsSettingsPanel.mqttEditable ? root.successColor : "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockCommunicationSetting"); onClicked: communicationsSettingsPanel.mqttEditable = !communicationsSettingsPanel.mqttEditable }
                         }
                         Label { text: t("mqttBrokerHelp"); color: root.mutedText; width: parent.width; wrapMode: Text.WordWrap; font.pixelSize: 12 }
                         RowLayout { width: parent.width; spacing: 8
-                            TextField { id: mqttHostField; Layout.fillWidth: true; enabled: communicationsSettingsPanel.mqttEditable; placeholderText: t("mqttHost"); color: root.textColor; placeholderTextColor: root.mutedText; background: Rectangle { radius: 7; color: root.panelColor; border.color: root.borderColor; border.width: 1 } }
-                            TextField { id: mqttPortField; Layout.preferredWidth: 96; enabled: communicationsSettingsPanel.mqttEditable; inputMethodHints: Qt.ImhDigitsOnly; placeholderText: t("mqttPort"); color: root.textColor; placeholderTextColor: root.mutedText; background: Rectangle { radius: 7; color: root.panelColor; border.color: root.borderColor; border.width: 1 } }
-                            TextField { id: mqttPrefixField; Layout.preferredWidth: 130; enabled: communicationsSettingsPanel.mqttEditable; placeholderText: t("mqttPrefix"); color: root.textColor; placeholderTextColor: root.mutedText; background: Rectangle { radius: 7; color: root.panelColor; border.color: root.borderColor; border.width: 1 } }
+                            TextField { id: mqttHostField; Layout.fillWidth: true; enabled: communicationsSettingsPanel.mqttEditable; placeholderText: t("mqttHost"); color: root.textColor; placeholderTextColor: root.mutedText; background: Rectangle { radius: 7; color: mqttHostField.enabled ? root.panelColor : root.panelAltColor; border.color: mqttHostField.enabled ? root.warningColor : root.borderColor; border.width: 1 } }
+                            TextField { id: mqttPortField; Layout.preferredWidth: 96; enabled: communicationsSettingsPanel.mqttEditable; inputMethodHints: Qt.ImhDigitsOnly; placeholderText: t("mqttPort"); color: root.textColor; placeholderTextColor: root.mutedText; background: Rectangle { radius: 7; color: mqttPortField.enabled ? root.panelColor : root.panelAltColor; border.color: mqttPortField.enabled ? root.warningColor : root.borderColor; border.width: 1 } }
+                            TextField { id: mqttPrefixField; Layout.preferredWidth: 130; enabled: communicationsSettingsPanel.mqttEditable; placeholderText: t("mqttPrefix"); color: root.textColor; placeholderTextColor: root.mutedText; background: Rectangle { radius: 7; color: mqttPrefixField.enabled ? root.panelColor : root.panelAltColor; border.color: mqttPrefixField.enabled ? root.warningColor : root.borderColor; border.width: 1 } }
                         }
                     }
                 }
@@ -3385,7 +3449,8 @@ ApplicationWindow {
                     implicitHeight: opcuaSettingsColumn.implicitHeight + 22
                     radius: 12
                     color: root.panelAltColor
-                    border.color: root.borderColor
+                    opacity: communicationsSettingsPanel.opcuaEditable ? 1 : 0.56
+                    border.color: communicationsSettingsPanel.opcuaEditable ? root.warningColor : root.borderColor
                     border.width: 1
                     Column {
                         id: opcuaSettingsColumn
@@ -3393,10 +3458,10 @@ ApplicationWindow {
                         spacing: 8
                         RowLayout { width: parent.width
                             Label { text: "\uD83D\uDD17 " + t("opcuaSettings"); color: root.textColor; font.bold: true; font.pixelSize: 14; Layout.fillWidth: true }
-                            MenuActionButton { text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 28; Layout.preferredHeight: 26; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockCommunicationSetting"); onClicked: communicationsSettingsPanel.opcuaEditable = true }
+                            MenuActionButton { text: communicationsSettingsPanel.opcuaEditable ? "\u2713" : "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 28; Layout.preferredHeight: 26; accentColor: communicationsSettingsPanel.opcuaEditable ? root.successColor : "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockCommunicationSetting"); onClicked: communicationsSettingsPanel.opcuaEditable = !communicationsSettingsPanel.opcuaEditable }
                         }
                         Label { text: t("opcuaHelp"); color: root.mutedText; width: parent.width; wrapMode: Text.WordWrap; font.pixelSize: 12 }
-                        TextField { id: opcuaUrlField; width: parent.width; enabled: communicationsSettingsPanel.opcuaEditable; placeholderText: t("opcuaEndpoint"); color: root.textColor; placeholderTextColor: root.mutedText; background: Rectangle { radius: 7; color: root.panelColor; border.color: root.borderColor; border.width: 1 } }
+                        TextField { id: opcuaUrlField; width: parent.width; enabled: communicationsSettingsPanel.opcuaEditable; placeholderText: t("opcuaEndpoint"); color: root.textColor; placeholderTextColor: root.mutedText; background: Rectangle { radius: 7; color: opcuaUrlField.enabled ? root.panelColor : root.panelAltColor; border.color: opcuaUrlField.enabled ? root.warningColor : root.borderColor; border.width: 1 } }
                     }
                 }
 
@@ -3405,7 +3470,8 @@ ApplicationWindow {
                     implicitHeight: openAiSettingsColumn.implicitHeight + 22
                     radius: 12
                     color: root.panelAltColor
-                    border.color: root.borderColor
+                    opacity: communicationsSettingsPanel.aiEditable ? 1 : 0.56
+                    border.color: communicationsSettingsPanel.aiEditable ? root.warningColor : root.borderColor
                     border.width: 1
                     Column {
                         id: openAiSettingsColumn
@@ -3414,11 +3480,11 @@ ApplicationWindow {
                         RowLayout { width: parent.width
                             Label { text: "\u2728 " + t("openAiSettings"); color: root.textColor; font.bold: true; font.pixelSize: 14; Layout.fillWidth: true }
                             Label { text: blanky.openAiKeyConfigured ? t("apiKeyConfigured") : t("apiKeyMissing"); color: blanky.openAiKeyConfigured ? root.successColor : root.warningColor; font.bold: true; font.pixelSize: 12 }
-                            MenuActionButton { text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 28; Layout.preferredHeight: 26; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockCommunicationSetting"); onClicked: communicationsSettingsPanel.aiEditable = true }
+                            MenuActionButton { text: communicationsSettingsPanel.aiEditable ? "\u2713" : "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 28; Layout.preferredHeight: 26; accentColor: communicationsSettingsPanel.aiEditable ? root.successColor : "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockCommunicationSetting"); onClicked: communicationsSettingsPanel.aiEditable = !communicationsSettingsPanel.aiEditable }
                         }
                         Label { text: t("openAiKeyHelp"); color: root.mutedText; width: parent.width; wrapMode: Text.WordWrap; font.pixelSize: 12 }
                         RowLayout { width: parent.width; spacing: 8
-                            TextField { id: openAiKeyField; Layout.fillWidth: true; enabled: communicationsSettingsPanel.aiEditable; echoMode: TextInput.Password; placeholderText: t("openAiKeyPlaceholder"); color: root.textColor; placeholderTextColor: root.mutedText; background: Rectangle { radius: 7; color: root.panelColor; border.color: root.borderColor; border.width: 1 } }
+                            TextField { id: openAiKeyField; Layout.fillWidth: true; enabled: communicationsSettingsPanel.aiEditable; echoMode: TextInput.Password; placeholderText: t("openAiKeyPlaceholder"); color: root.textColor; placeholderTextColor: root.mutedText; background: Rectangle { radius: 7; color: openAiKeyField.enabled ? root.panelColor : root.panelAltColor; border.color: openAiKeyField.enabled ? root.warningColor : root.borderColor; border.width: 1 } }
                             MenuActionButton { text: t("applyApiKey"); Layout.preferredWidth: 110; Layout.preferredHeight: 34; enabled: communicationsSettingsPanel.aiEditable && openAiKeyField.text.length > 0; accentColor: root.successColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; onClicked: { blanky.setOpenAiApiKey(openAiKeyField.text); openAiKeyField.text = ""; communicationsSettingsPanel.aiEditable = false } }
                         }
                     }
