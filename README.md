@@ -1,5 +1,7 @@
 # Blanky
 
+[Português](README.md) | [English](README_EN.md)
+
 Blanky é uma interface assistiva para controlo de uma célula industrial simulada. Reúne interação por voz, Text-Bot, botões diretos, MQTT e OPC UA, mantendo as regras de segurança num único ponto de validação.
 
 ## O que permite fazer
@@ -23,7 +25,7 @@ pip install -r requirements.txt
 python main.py
 ```
 
-Para o atalho de ambiente de trabalho no Raspberry Pi, consulte [raspberrypi/README.md](raspberrypi/README.md).
+Para o atalho de ambiente de trabalho no Raspberry Pi, consulte [raspberrypi/README_PT.md](raspberrypi/README_PT.md).
 
 ## Chave OpenAI
 
