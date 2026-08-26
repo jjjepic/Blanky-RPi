@@ -2941,11 +2941,27 @@ ApplicationWindow {
         titleColor: root.textColor
         onOpening: { root.popupBackdropVisible = true; modalBackdrop.scheduleSnapshot() }
         onOpenedForBackdrop: modalBackdrop.scheduleSnapshot()
-        onClosedForBackdrop: root.popupBackdropVisible = false
+        onClosedForBackdrop: root.popupBackdropVisible = settingsPanel.visible
+
+        MenuActionButton {
+            anchors.left: parent.left
+            anchors.top: parent.top
+            z: 2
+            text: "\u2190 " + t("backToSettings")
+            width: 150
+            height: 30
+            accentColor: root.accentColor
+            textColor: root.textColor
+            mutedText: root.mutedText
+            borderColor: root.borderColor
+            panelColor: root.panelAltColor
+            onClicked: { audioSettingsPanel.close(); settingsPanel.open() }
+        }
 
         ScrollView {
             id: redesignedAudioScroll
             anchors.fill: parent
+            anchors.topMargin: 38
             clip: true
             rightPadding: Math.round(14 * root.textScale)
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
@@ -3282,39 +3298,103 @@ ApplicationWindow {
                 spacing: 14
 
                 Rectangle {
+                    id: audioSettingsCard
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     radius: 14
-                    color: root.panelAltColor
-                    border.color: root.accentColor
-                    border.width: 1
-                    Column {
+                    property bool hovered: audioSettingsCardMouse.containsMouse
+                    color: hovered ? Qt.lighter(root.panelAltColor, 1.08) : root.panelAltColor
+                    border.color: hovered ? root.textColor : root.accentColor
+                    border.width: hovered ? 2 : 1
+                    scale: hovered ? 1.015 : 1.0
+                    Behavior on color { ColorAnimation { duration: 150 } }
+                    Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                    ColumnLayout {
                         anchors.fill: parent
                         anchors.margins: 18
-                        spacing: 10
-                        Label { text: "\uD83C\uDFA4"; color: root.accentColor; font.pixelSize: 30 }
-                        Label { text: t("audioTitle"); color: root.textColor; font.bold: true; font.pixelSize: 18; width: parent.width; wrapMode: Text.WordWrap }
-                        Label { text: t("audioSettingsCardInfo"); color: root.mutedText; width: parent.width; wrapMode: Text.WordWrap; font.pixelSize: 13 }
+                        spacing: 11
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Rectangle {
+                                Layout.preferredWidth: 58
+                                Layout.preferredHeight: 58
+                                radius: 29
+                                color: Qt.darker(root.accentColor, 1.65)
+                                border.color: root.accentColor
+                                border.width: 1
+                                Label { anchors.centerIn: parent; text: "\uD83C\uDFA4"; color: root.textColor; font.pixelSize: 28 }
+                            }
+                            Item { Layout.fillWidth: true }
+                            Label { text: "\u203A"; color: root.accentColor; font.pixelSize: 34; font.bold: true }
+                        }
+                        Label { text: t("audioTitle"); color: root.textColor; font.bold: true; font.pixelSize: 19; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+                        Label { text: t("audioSettingsCardInfo"); color: root.mutedText; Layout.fillWidth: true; wrapMode: Text.WordWrap; font.pixelSize: 13 }
+                        Item { Layout.fillWidth: true; Layout.fillHeight: true }
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 32
+                            radius: 8
+                            color: audioSettingsCard.hovered ? root.accentColor : Qt.darker(root.panelColor, 1.05)
+                            border.color: root.accentColor
+                            border.width: 1
+                            RowLayout {
+                                anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10
+                                Label { text: t("openSettingsCard"); color: audioSettingsCard.hovered ? root.panelColor : root.textColor; font.bold: true; font.pixelSize: 12; Layout.fillWidth: true }
+                                Label { text: "\u2192"; color: audioSettingsCard.hovered ? root.panelColor : root.accentColor; font.bold: true; font.pixelSize: 15 }
+                            }
+                        }
                     }
-                    MouseArea { anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { settingsPanel.close(); audioSettingsPanel.open() } }
+                    MouseArea { id: audioSettingsCardMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { settingsPanel.close(); audioSettingsPanel.open() } }
                 }
 
                 Rectangle {
+                    id: communicationsSettingsCard
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     radius: 14
-                    color: root.panelAltColor
-                    border.color: root.successColor
-                    border.width: 1
-                    Column {
+                    property bool hovered: communicationsSettingsCardMouse.containsMouse
+                    color: hovered ? Qt.lighter(root.panelAltColor, 1.08) : root.panelAltColor
+                    border.color: hovered ? root.textColor : root.successColor
+                    border.width: hovered ? 2 : 1
+                    scale: hovered ? 1.015 : 1.0
+                    Behavior on color { ColorAnimation { duration: 150 } }
+                    Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                    ColumnLayout {
                         anchors.fill: parent
                         anchors.margins: 18
-                        spacing: 10
-                        Label { text: "\uD83D\uDD17"; color: root.successColor; font.pixelSize: 30 }
-                        Label { text: t("communicationsSettings"); color: root.textColor; font.bold: true; font.pixelSize: 18; width: parent.width; wrapMode: Text.WordWrap }
-                        Label { text: t("communicationsSettingsCardInfo"); color: root.mutedText; width: parent.width; wrapMode: Text.WordWrap; font.pixelSize: 13 }
+                        spacing: 11
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Rectangle {
+                                Layout.preferredWidth: 58
+                                Layout.preferredHeight: 58
+                                radius: 29
+                                color: Qt.darker(root.successColor, 1.65)
+                                border.color: root.successColor
+                                border.width: 1
+                                Label { anchors.centerIn: parent; text: "\uD83D\uDD17"; color: root.textColor; font.pixelSize: 28 }
+                            }
+                            Item { Layout.fillWidth: true }
+                            Label { text: "\u203A"; color: root.successColor; font.pixelSize: 34; font.bold: true }
+                        }
+                        Label { text: t("communicationsSettings"); color: root.textColor; font.bold: true; font.pixelSize: 19; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+                        Label { text: t("communicationsSettingsCardInfo"); color: root.mutedText; Layout.fillWidth: true; wrapMode: Text.WordWrap; font.pixelSize: 13 }
+                        Item { Layout.fillWidth: true; Layout.fillHeight: true }
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 32
+                            radius: 8
+                            color: communicationsSettingsCard.hovered ? root.successColor : Qt.darker(root.panelColor, 1.05)
+                            border.color: root.successColor
+                            border.width: 1
+                            RowLayout {
+                                anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10
+                                Label { text: t("openSettingsCard"); color: communicationsSettingsCard.hovered ? root.panelColor : root.textColor; font.bold: true; font.pixelSize: 12; Layout.fillWidth: true }
+                                Label { text: "\u2192"; color: communicationsSettingsCard.hovered ? root.panelColor : root.successColor; font.bold: true; font.pixelSize: 15 }
+                            }
+                        }
                     }
-                    MouseArea { anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { settingsPanel.close(); communicationsSettingsPanel.open() } }
+                    MouseArea { id: communicationsSettingsCardMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { settingsPanel.close(); communicationsSettingsPanel.open() } }
                 }
             }
         }
@@ -3345,11 +3425,27 @@ ApplicationWindow {
             modalBackdrop.scheduleSnapshot()
         }
         onOpenedForBackdrop: modalBackdrop.scheduleSnapshot()
-        onClosedForBackdrop: root.popupBackdropVisible = audioSettingsPanel.visible
+        onClosedForBackdrop: root.popupBackdropVisible = settingsPanel.visible
+
+        MenuActionButton {
+            anchors.left: parent.left
+            anchors.top: parent.top
+            z: 2
+            text: "\u2190 " + t("backToSettings")
+            width: 150
+            height: 30
+            accentColor: root.accentColor
+            textColor: root.textColor
+            mutedText: root.mutedText
+            borderColor: root.borderColor
+            panelColor: root.panelAltColor
+            onClicked: { communicationsSettingsPanel.close(); settingsPanel.open() }
+        }
 
         ScrollView {
             id: communicationsSettingsScroll
             anchors.fill: parent
+            anchors.topMargin: 38
             clip: true
             rightPadding: Math.round(14 * root.textScale)
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
