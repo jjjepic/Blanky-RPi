@@ -13,6 +13,12 @@ client = OpenAI()
 _ACTIVE_VOICE = TTS_VOICE_DEFAULT_PT
 
 
+def set_openai_api_key(api_key: str):
+    """Refresh the session client after the user changes the API key in settings."""
+    global client
+    client = OpenAI(api_key=api_key)
+
+
 def _looks_like_prompt_echo(text: str) -> bool:
     t = (text or "").strip().lower()
     if not t:
