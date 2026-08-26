@@ -6,7 +6,7 @@ from PySide6.QtCore import QThread, Signal
 
 from blanky.config import INPUT_WAV, TTS_WAV
 from blanky.audio_service import audio_info, record_wav, play_wav
-from blanky.speech_service import stt_transcribe, tts_speak_to_wav
+from blanky.speech_service import is_openai_configured, stt_transcribe, tts_speak_to_wav
 from blanky.command_parser import interpret_online_commands
 from blanky.mqtt_service import get_mqtt_bridge
 
@@ -64,6 +64,16 @@ class VoiceWorker(QThread):
 
     def run(self):
         try:
+            if not is_openai_configured():
+                self.status.emit(
+                    "Modo Online indisponível" if self.lang == "pt" else "Online mode unavailable"
+                )
+                self.recognized.emit(
+                    "Configure a chave OpenAI em Definições." if self.lang == "pt"
+                    else "Configure the OpenAI key in Settings."
+                )
+                return
+
             started_at = time.perf_counter()
             self.status.emit("A ouvir..." if self.lang == "pt" else "Listening...")
             record_wav(INPUT_WAV)

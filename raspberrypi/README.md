@@ -2,6 +2,34 @@
 
 This folder creates a desktop shortcut for Blanky without storing secrets in the project.
 
+## Start from the terminal
+
+From the project folder, activate the virtual environment and launch normally. The application automatically reads `~/.blanky/openai.env` when that file exists.
+
+```bash
+cd /home/jorge/Blanky20
+source venv/bin/activate
+python main.py
+```
+
+No `export OPENAI_API_KEY=...` command is needed. Without a key, Blanky still opens and keeps direct controls, MQTT and Text-Bot Offline available.
+
+## Configure the key without a shortcut
+
+If the shortcut is not installed yet, create the private local file once:
+
+```bash
+mkdir -p ~/.blanky
+nano ~/.blanky/openai.env
+chmod 600 ~/.blanky/openai.env
+```
+
+The file must contain only:
+
+```bash
+OPENAI_API_KEY="your_key_here"
+```
+
 On the Raspberry Pi, from the Blanky folder:
 
 ```bash
@@ -21,11 +49,12 @@ Use this format:
 OPENAI_API_KEY="your_key_here"
 ```
 
-Defaults:
+Protect the file after creating it:
 
 ```bash
-BLANKY_DIR=/home/jorge/Blanky15
-BLANKY_MAIN=main15.py
+chmod 600 ~/.blanky/openai.env
 ```
 
-To use another folder/version, edit `raspberrypi/run_blanky.sh` or launch with those environment variables changed.
+O launcher identifica automaticamente a pasta onde está instalado e inicia `main.py`. Mesmo sem chave, abre o Blanky com as funcionalidades Online indisponíveis; os botões diretos, MQTT e Text-Bot Offline continuam disponíveis.
+
+Para usar outra pasta ou ficheiro de entrada, inicie o launcher com as variáveis `BLANKY_DIR` e `BLANKY_MAIN` alteradas.

@@ -17,10 +17,9 @@ Blanky é uma interface assistiva para controlo de uma célula industrial simula
 No Raspberry Pi ou numa máquina com Python 3.10+:
 
 ```bash
-python3 -m venv venv
+cd /home/jorge/Blanky20
 source venv/bin/activate
 pip install -r requirements.txt
-export OPENAI_API_KEY="a_sua_chave"
 python main.py
 ```
 
@@ -30,9 +29,10 @@ Para o atalho de ambiente de trabalho no Raspberry Pi, consulte [raspberrypi/REA
 
 Não guarde a chave API no repositório, em capturas de ecrã ou em documentos partilhados. Pode defini-la:
 
-- na variável de ambiente `OPENAI_API_KEY` antes de iniciar a aplicação;
 - no Raspberry Pi, no ficheiro local `~/.blanky/openai.env` criado pelo launcher;
 - durante a sessão, em `Definições` > `Comunicações e IA` > `OpenAI`.
+
+Também pode definir `OPENAI_API_KEY` como variável de ambiente, mas já não é necessário para abrir a aplicação.
 
 O campo da interface é mascarado e a chave introduzida aí fica apenas na sessão atual. Se uma chave tiver sido exposta, deve ser revogada e substituída no painel da OpenAI.
 

@@ -1,4 +1,8 @@
-from blanky.config import ensure_dirs
+from blanky.config import ensure_dirs, load_local_environment
+
+# Optional local credentials must be available before importing services that use OpenAI.
+load_local_environment()
+
 from blanky.audio_service import init_audio
 from blanky.qml_app import run_app_qml
 

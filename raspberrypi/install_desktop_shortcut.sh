@@ -2,7 +2,7 @@
 set -euo pipefail
 
 BLANKY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BLANKY_MAIN="${BLANKY_MAIN:-main15.py}"
+BLANKY_MAIN="${BLANKY_MAIN:-main.py}"
 DESKTOP_DIR="$HOME/Desktop"
 APP_DIR="$HOME/.local/share/applications"
 ENV_DIR="$HOME/.blanky"
