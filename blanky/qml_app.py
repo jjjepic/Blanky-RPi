@@ -10,7 +10,9 @@ from blanky.qml_controller import BlankyController
 def run_app_qml():
     app = QGuiApplication(sys.argv)
 
-    icon_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "Blanky_icon.jpeg"))
+    icon_path = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "assets", "blanky_logo_dark.png")
+    )
     if os.path.exists(icon_path):
         app.setWindowIcon(QIcon(icon_path))
 

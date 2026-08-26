@@ -24,7 +24,9 @@ from blanky.speech_service import tts_speak_to_wav
 from blanky.voice_worker import VoiceWorker
 
 
-ICON_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "Blanky_icon.jpeg"))
+ICON_PATH = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "assets", "blanky_logo_dark.png")
+)
 
 
 class MonitorWindow(QWidget):
