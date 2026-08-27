@@ -52,6 +52,7 @@ class BlankyController(QObject):
     dateTimeTextChanged = Signal()
     darkModeChanged = Signal()
     appearanceModeChanged = Signal()
+    colorVisionProfileChanged = Signal()
     appearanceTextScaleChanged = Signal()
     customAppearanceChanged = Signal()
     monitorLeftTextChanged = Signal()
@@ -246,6 +247,12 @@ class BlankyController(QObject):
         self._appearance_mode = saved_appearance if saved_appearance in {
             "dark", "light", "high_contrast", "colorblind", "monochrome", "custom"
         } else "dark"
+        saved_color_vision_profile = str(
+            self._settings.value("colorVisionProfile", "universal") or "universal"
+        ).lower()
+        self._color_vision_profile = saved_color_vision_profile if saved_color_vision_profile in {
+            "universal", "protan", "deutan", "tritan"
+        } else "universal"
         self._appearance_text_scale = self._saved_appearance_value(
             "appearanceTextScale", 1.18 if legacy_large_readability else 1.0, 1.0, 1.25
         )
@@ -365,6 +372,10 @@ class BlankyController(QObject):
     @Property(str, notify=appearanceModeChanged)
     def appearanceMode(self):
         return self._appearance_mode
+
+    @Property(str, notify=colorVisionProfileChanged)
+    def colorVisionProfile(self):
+        return self._color_vision_profile
 
     @Property(float, notify=appearanceTextScaleChanged)
     def appearanceTextScale(self):
@@ -602,8 +613,26 @@ class BlankyController(QObject):
         self._settings.setValue("appearanceMode", mode)
         self._settings.sync()
         self.appearanceModeChanged.emit()
+        self.monitorEventsTextChanged.emit()
+        self.audioDiagnosticLogTextChanged.emit()
         if previous_dark != self._dark_mode:
             self.darkModeChanged.emit()
+
+    @Slot(str)
+    def setColorVisionProfile(self, profile: str):
+        profile = (profile or "universal").strip().lower()
+        if profile not in {"universal", "protan", "deutan", "tritan"}:
+            return
+        changed = self._color_vision_profile != profile
+        self._color_vision_profile = profile
+        self._settings.setValue("colorVisionProfile", profile)
+        self._settings.sync()
+        if self._appearance_mode != "colorblind":
+            self.setAppearanceMode("colorblind")
+        if changed:
+            self.colorVisionProfileChanged.emit()
+            self.monitorEventsTextChanged.emit()
+            self.audioDiagnosticLogTextChanged.emit()
 
     @Slot(float)
     def setAppearanceTextScale(self, value: float):
@@ -1428,12 +1457,35 @@ class BlankyController(QObject):
                 "green": "#00e5ff", "red": "#ff8a65", "robot": "#00e5ff",
             }
         elif self._appearance_mode == "colorblind":
-            colors = {
-                "normal": "#eef6fb", "inactive": "#b6c4cf", "error": "#ff9f43",
-                "start": "#4fc3f7", "fast": "#ffd166", "ideal": "#4fc3f7",
-                "manual": "#4fc3f7", "change": "#4fc3f7", "motor": "#4fc3f7",
-                "green": "#4fc3f7", "red": "#ff9f43", "robot": "#4fc3f7",
+            # Rich-text logs are rendered in Python, so they mirror the
+            # semantic colour-vision tokens used by ThemePalette.qml.
+            color_vision_colors = {
+                "universal": {
+                    "normal": "#eef6fb", "inactive": "#b6c4cf", "error": "#ff9f43",
+                    "start": "#4fc3f7", "fast": "#ffd166", "ideal": "#4fc3f7",
+                    "manual": "#4fc3f7", "change": "#4fc3f7", "motor": "#4fc3f7",
+                    "green": "#4fc3f7", "red": "#ff9f43", "robot": "#4fc3f7",
+                },
+                "protan": {
+                    "normal": "#f2f7fb", "inactive": "#c7d0d8", "error": "#ffb000",
+                    "start": "#55c8f2", "fast": "#ffe066", "ideal": "#d6b5ff",
+                    "manual": "#55c8f2", "change": "#f2f7fb", "motor": "#55c8f2",
+                    "green": "#55c8f2", "red": "#ffb000", "robot": "#d6b5ff",
+                },
+                "deutan": {
+                    "normal": "#f2f7fb", "inactive": "#c6d0d8", "error": "#f28e2b",
+                    "start": "#5ab4e5", "fast": "#f6c445", "ideal": "#c084fc",
+                    "manual": "#5ab4e5", "change": "#f2f7fb", "motor": "#5ab4e5",
+                    "green": "#5ab4e5", "red": "#f28e2b", "robot": "#c084fc",
+                },
+                "tritan": {
+                    "normal": "#f3f6fa", "inactive": "#cad0d8", "error": "#ff5f8a",
+                    "start": "#f3f6fa", "fast": "#ffad8a", "ideal": "#d6b5ff",
+                    "manual": "#f3f6fa", "change": "#d6b5ff", "motor": "#d6b5ff",
+                    "green": "#f3f6fa", "red": "#ff5f8a", "robot": "#d6b5ff",
+                },
             }
+            colors = color_vision_colors.get(self._color_vision_profile, color_vision_colors["universal"])
         elif self._appearance_mode == "monochrome":
             colors = {
                 "normal": "#f2f2f2", "inactive": "#a8a8a8", "error": "#ffffff",

@@ -4,6 +4,7 @@ QtObject {
     id: theme
 
     property string mode: "dark"
+    property string colorVisionProfile: "universal"
     property real readabilityScale: 1.0
     property real customHue: 205.0
     property real customBrightness: 46.0
@@ -14,6 +15,16 @@ QtObject {
     readonly property real textScale: readabilityScale
     readonly property real controlScale: 1.0 + (readabilityScale - 1.0) * 0.55
     readonly property real spacingScale: 1.0 + (readabilityScale - 1.0) * 0.60
+
+    function profileColor(universal, protan, deutan, tritan) {
+        if (colorVisionProfile === "protan")
+            return protan
+        if (colorVisionProfile === "deutan")
+            return deutan
+        if (colorVisionProfile === "tritan")
+            return tritan
+        return universal
+    }
 
     readonly property color background: mode === "custom" ? Qt.hsla(customHue / 360, 0.38, 0.06 + customBrightness / 100 * 0.24, 1)
         : mode === "light" ? "#d7e3ea"
@@ -54,50 +65,63 @@ QtObject {
     readonly property color accent: mode === "custom" ? Qt.hsla(customHue / 360, 0.82, 0.62, 1)
         : mode === "light" ? "#0d5d8b"
         : mode === "high_contrast" ? "#00e5ff"
-        : mode === "colorblind" ? "#4fc3f7"
+        : mode === "colorblind" ? profileColor("#4fc3f7", "#55c8f2", "#5ab4e5", "#d6b5ff")
         : mode === "monochrome" ? "#ffffff" : "#63cbff"
     readonly property color success: mode === "custom" ? accent
         : mode === "light" ? "#147a3d"
         : mode === "high_contrast" ? "#00e5ff"
-        : mode === "colorblind" ? "#4fc3f7"
+        : mode === "colorblind" ? profileColor("#4fc3f7", "#55c8f2", "#5ab4e5", "#f3f6fa")
         : mode === "monochrome" ? "#f2f2f2" : "#48d66b"
     readonly property color warning: mode === "custom" ? Qt.hsla(((customHue + 45) % 360) / 360, 0.78, 0.64, 1)
         : mode === "light" ? "#8a5b00"
         : mode === "high_contrast" ? "#ffd740"
-        : mode === "colorblind" ? "#ffd166"
+        : mode === "colorblind" ? profileColor("#ffd166", "#ffe066", "#f6c445", "#ffad8a")
         : mode === "monochrome" ? "#d8d8d8" : "#f8c25d"
     readonly property color error: mode === "custom" ? Qt.hsla(((customHue + 320) % 360) / 360, 0.78, 0.65, 1)
         : mode === "light" ? "#b32635"
         : mode === "high_contrast" ? "#ff8a65"
-        : mode === "colorblind" ? "#ff9f43"
+        : mode === "colorblind" ? profileColor("#ff9f43", "#ffb000", "#f28e2b", "#ff5f8a")
         : mode === "monochrome" ? "#ffffff" : "#ff6b6b"
     readonly property color inactive: mode === "custom" ? Qt.hsla(customHue / 360, 0.16, 0.55, 1)
         : mode === "light" ? "#526e7d"
         : mode === "high_contrast" ? "#c0c0c0"
+        : mode === "colorblind" ? profileColor("#b6c4cf", "#c7d0d8", "#c6d0d8", "#cad0d8")
         : mode === "monochrome" ? "#a8a8a8" : "#8fa8b8"
     readonly property color selected: mode === "custom" ? accent
         : mode === "light" ? "#146f9e"
         : mode === "high_contrast" ? "#00e5ff"
-        : mode === "colorblind" ? "#4fc3f7"
+        : mode === "colorblind" ? profileColor("#4fc3f7", "#55c8f2", "#5ab4e5", "#d6b5ff")
         : mode === "monochrome" ? "#ffffff" : "#9dd9ff"
     readonly property color successSurface: mode === "custom" ? Qt.lighter(surfaceSecondary, 1.18)
         : mode === "light" ? "#d7f4df"
         : mode === "high_contrast" ? "#111111"
-        : mode === "colorblind" ? "#102a3c"
+        : mode === "colorblind" ? profileColor("#102a3c", "#102b3d", "#102a3c", "#27303c")
         : mode === "monochrome" ? "#252525" : "#0c3423"
     readonly property color infoSurface: mode === "custom" ? Qt.lighter(surfaceSecondary, 1.14)
         : mode === "light" ? "#d9effa"
         : mode === "high_contrast" ? "#111111"
-        : mode === "colorblind" ? "#102a3c"
+        : mode === "colorblind" ? profileColor("#102a3c", "#102b3d", "#102a3c", "#2b2339")
         : mode === "monochrome" ? "#252525" : "#0b3040"
     readonly property color warningSurface: mode === "custom" ? Qt.lighter(surfaceSecondary, 1.10)
         : mode === "light" ? "#fff0c5"
         : mode === "high_contrast" ? "#111111"
-        : mode === "colorblind" ? "#2d2615"
+        : mode === "colorblind" ? profileColor("#2d2615", "#332d12", "#352b12", "#3a231a")
         : mode === "monochrome" ? "#252525" : "#382c0d"
     readonly property color errorSurface: mode === "custom" ? Qt.lighter(surfaceSecondary, 1.06)
         : mode === "light" ? "#ffe0e3"
         : mode === "high_contrast" ? "#111111"
-        : mode === "colorblind" ? "#321f18"
+        : mode === "colorblind" ? profileColor("#321f18", "#35280d", "#35220f", "#361a29")
         : mode === "monochrome" ? "#252525" : "#38161d"
+
+    // Semantic aliases keep state meaning independent from a concrete palette.
+    readonly property color successText: success
+    readonly property color successBorder: success
+    readonly property color warningText: warning
+    readonly property color warningBorder: warning
+    readonly property color errorText: error
+    readonly property color errorBorder: error
+    readonly property color inactiveText: inactive
+    readonly property color inactiveBorder: inactive
+    readonly property color information: accent
+    readonly property color focus: selected
 }

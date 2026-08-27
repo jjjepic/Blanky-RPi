@@ -1,0 +1,2 @@
+# Optional development tools. They are not required to run Blanky.
+colorspacious>=1.1.2
