@@ -75,3 +75,14 @@ audio/        Áudio temporário gerado localmente, não versionado
 Todos os pedidos convergem para a mesma validação antes de produzir efeitos. Os Eventos mantêm a origem, o comando canónico e o resultado `OK` ou `REJECT`; a interface principal privilegia mensagens claras para o utilizador.
 
 O modo Manual é necessário para comandar componentes individuais. Ao trocar de modo, os componentes manuais são desligados de forma segura antes de o novo modo ser aceite.
+
+## Validação de acessibilidade cromática
+
+Os perfis Universal, Protan, Deutan e Tritan usam cores semânticas, símbolos e texto; não constituem um diagnóstico nem uma declaração de conformidade legal. Para verificar contrastes, pares de estados e a simulação Machado, instale as dependências de desenvolvimento e execute:
+
+```bash
+pip install -r requirements-dev.txt
+python tools/validate_color_profiles.py
+```
+
+O resultado detalhado é gravado em `docs/color_profile_validation.md`.

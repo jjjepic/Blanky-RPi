@@ -41,6 +41,7 @@ from blanky.speech_service import (
 from blanky.voice_worker import VoiceWorker
 from blanky.wakeword_service import get_wakeword_service
 from blanky.command_parser import command_catalog_text, interpret_online_commands, parse_command
+from blanky.color_vision_profiles import get_profile_tokens
 
 
 class BlankyController(QObject):
@@ -52,6 +53,7 @@ class BlankyController(QObject):
     dateTimeTextChanged = Signal()
     darkModeChanged = Signal()
     appearanceModeChanged = Signal()
+    colorVisionProfileChanged = Signal()
     appearanceTextScaleChanged = Signal()
     customAppearanceChanged = Signal()
     monitorLeftTextChanged = Signal()
@@ -246,6 +248,12 @@ class BlankyController(QObject):
         self._appearance_mode = saved_appearance if saved_appearance in {
             "dark", "light", "high_contrast", "colorblind", "monochrome", "custom"
         } else "dark"
+        saved_color_vision_profile = str(
+            self._settings.value("colorVisionProfile", "universal") or "universal"
+        ).lower()
+        self._color_vision_profile = saved_color_vision_profile if saved_color_vision_profile in {
+            "universal", "protan", "deutan", "tritan"
+        } else "universal"
         self._appearance_text_scale = self._saved_appearance_value(
             "appearanceTextScale", 1.18 if legacy_large_readability else 1.0, 1.0, 1.25
         )
@@ -365,6 +373,10 @@ class BlankyController(QObject):
     @Property(str, notify=appearanceModeChanged)
     def appearanceMode(self):
         return self._appearance_mode
+
+    @Property(str, notify=colorVisionProfileChanged)
+    def colorVisionProfile(self):
+        return self._color_vision_profile
 
     @Property(float, notify=appearanceTextScaleChanged)
     def appearanceTextScale(self):
@@ -602,8 +614,26 @@ class BlankyController(QObject):
         self._settings.setValue("appearanceMode", mode)
         self._settings.sync()
         self.appearanceModeChanged.emit()
+        self.monitorEventsTextChanged.emit()
+        self.audioDiagnosticLogTextChanged.emit()
         if previous_dark != self._dark_mode:
             self.darkModeChanged.emit()
+
+    @Slot(str)
+    def setColorVisionProfile(self, profile: str):
+        profile = (profile or "universal").strip().lower()
+        if profile not in {"universal", "protan", "deutan", "tritan"}:
+            return
+        changed = self._color_vision_profile != profile
+        self._color_vision_profile = profile
+        self._settings.setValue("colorVisionProfile", profile)
+        self._settings.sync()
+        if self._appearance_mode != "colorblind":
+            self.setAppearanceMode("colorblind")
+        if changed:
+            self.colorVisionProfileChanged.emit()
+            self.monitorEventsTextChanged.emit()
+            self.audioDiagnosticLogTextChanged.emit()
 
     @Slot(float)
     def setAppearanceTextScale(self, value: float):
@@ -1428,11 +1458,16 @@ class BlankyController(QObject):
                 "green": "#00e5ff", "red": "#ff8a65", "robot": "#00e5ff",
             }
         elif self._appearance_mode == "colorblind":
+            # Python renders the event and audio logs. Reuse the QML token
+            # source so a profile cannot drift between those two surfaces.
+            tokens = get_profile_tokens(self._color_vision_profile)
             colors = {
-                "normal": "#eef6fb", "inactive": "#b6c4cf", "error": "#ff9f43",
-                "start": "#4fc3f7", "fast": "#ffd166", "ideal": "#4fc3f7",
-                "manual": "#4fc3f7", "change": "#4fc3f7", "motor": "#4fc3f7",
-                "green": "#4fc3f7", "red": "#ff9f43", "robot": "#4fc3f7",
+                "normal": tokens["textPrimary"], "inactive": tokens["inactive"],
+                "error": tokens["error"], "start": tokens["success"],
+                "fast": tokens["warning"], "ideal": tokens["selected"],
+                "manual": tokens["success"], "change": tokens["information"],
+                "motor": tokens["information"], "green": tokens["success"],
+                "red": tokens["error"], "robot": tokens["selected"],
             }
         elif self._appearance_mode == "monochrome":
             colors = {

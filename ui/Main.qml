@@ -3,6 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Dialogs
 import "Translations.js" as I18n
+import "ColorVisionProfiles.js" as ColorVisionProfiles
 
 ApplicationWindow {
     id: root
@@ -16,6 +17,7 @@ ApplicationWindow {
     ThemePalette {
         id: theme
         mode: blanky.appearanceMode
+        colorVisionProfile: blanky.colorVisionProfile
         readabilityScale: blanky.appearanceTextScale
         customHue: blanky.customHue
         customBrightness: blanky.customBrightness
@@ -102,9 +104,28 @@ ApplicationWindow {
             { id: "dark", icon: "☾", tone: "#91a1b5", title: t("darkAppearance"), description: blanky.language === "pt" ? "Interface escura atual." : "Current dark interface." },
             { id: "light", icon: "☀", tone: "#f8c25d", title: t("lightAppearance"), description: blanky.language === "pt" ? "Interface clara e equilibrada." : "Balanced light interface." },
             { id: "high_contrast", icon: "◐", tone: "#00e5ff", title: t("highContrast"), description: blanky.language === "pt" ? "Máxima legibilidade e contornos fortes." : "Maximum legibility and strong borders." },
-            { id: "colorblind", icon: "◉", tone: "#20c7b4", title: t("colorblindUniversal"), description: blanky.language === "pt" ? "Estados com símbolos, texto e cores acessíveis." : "States with symbols, text and accessible colours." },
+            { id: "colorblind", icon: "◉", tone: theme.accent, title: t("colorblindUniversal"), description: t("colorVisionProfileSelected", { profile: colorVisionProfileName(blanky.colorVisionProfile) }) },
             { id: "monochrome", icon: "◻", tone: "#d7d7d7", title: t("monochrome"), description: blanky.language === "pt" ? "Estados compreensíveis sem depender da cor." : "States that do not depend on colour." },
             { id: "custom", icon: "⚙", tone: "#cf8cff", title: t("customAppearance"), description: t("customAppearanceDescription") }
+        ]
+    }
+
+    function colorVisionProfileName(profile) {
+        if (profile === "protan")
+            return t("colorVisionProtan")
+        if (profile === "deutan")
+            return t("colorVisionDeutan")
+        if (profile === "tritan")
+            return t("colorVisionTritan")
+        return t("colorVisionUniversal")
+    }
+
+    function colorVisionProfiles() {
+        return [
+            { id: "universal", icon: "◉", tone: ColorVisionProfiles.profile("universal").information, title: t("colorVisionUniversal"), description: t("colorVisionUniversalDescription"), recommended: true },
+            { id: "protan", icon: "P", tone: ColorVisionProfiles.profile("protan").information, title: t("colorVisionProtan"), description: t("colorVisionProtanDescription"), recommended: false },
+            { id: "deutan", icon: "D", tone: ColorVisionProfiles.profile("deutan").information, title: t("colorVisionDeutan"), description: t("colorVisionDeutanDescription"), recommended: false },
+            { id: "tritan", icon: "T", tone: ColorVisionProfiles.profile("tritan").information, title: t("colorVisionTritan"), description: t("colorVisionTritanDescription"), recommended: false }
         ]
     }
 
@@ -2094,7 +2115,7 @@ ApplicationWindow {
         rememberPosition: false
         onOpening: { root.popupBackdropVisible = true; modalBackdrop.scheduleSnapshot() }
         onOpenedForBackdrop: modalBackdrop.scheduleSnapshot()
-        onClosedForBackdrop: root.popupBackdropVisible = customAppearancePanel.visible
+        onClosedForBackdrop: root.popupBackdropVisible = customAppearancePanel.visible || colorVisionProfilesPanel.visible
 
         ColumnLayout {
             anchors.fill: parent
@@ -2156,10 +2177,14 @@ ApplicationWindow {
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
-                                blanky.setAppearanceMode(modelData.id)
-                                if (modelData.id === "custom") {
+                                if (modelData.id === "colorblind") {
+                                    colorVisionProfilesPanel.open()
+                                } else if (modelData.id === "custom") {
+                                    blanky.setAppearanceMode(modelData.id)
                                     appearancePanel.close()
                                     customAppearancePanel.open()
+                                } else {
+                                    blanky.setAppearanceMode(modelData.id)
                                 }
                             }
                         }
@@ -2213,22 +2238,144 @@ ApplicationWindow {
 
             Rectangle {
                 Layout.fillWidth: true
-                Layout.preferredHeight: Math.round(48 * root.controlScale)
+                Layout.preferredHeight: Math.round(74 * root.controlScale)
                 radius: 9
                 color: root.panelAltColor
                 border.color: root.borderColor
                 border.width: 1
 
-                RowLayout {
+                ColumnLayout {
                     anchors.fill: parent
                     anchors.leftMargin: 12
                     anchors.rightMargin: 12
-                    spacing: 16
+                    spacing: 4
                     Label { text: t("appearancePreview"); color: root.textColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale); Layout.fillWidth: true }
-                    Label { text: "✓ " + t("connected"); color: root.successColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
-                    Label { text: "! " + t("warning"); color: root.warningColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
-                    Label { text: "✕ " + t("error"); color: root.errorColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
-                    Label { text: "○ " + t("inactive"); color: root.inactiveColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
+                    Flow {
+                        Layout.fillWidth: true
+                        spacing: 14
+                        Label { text: "✓ " + t("connected"); color: root.successColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
+                        Label { text: "! " + t("warning"); color: root.warningColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
+                        Label { text: "✕ " + t("error"); color: root.errorColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
+                        Label { text: "○ " + t("inactive"); color: root.inactiveColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
+                        Label { text: "✓ ON"; color: root.successColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
+                        Label { text: "○ OFF"; color: root.inactiveColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
+                    }
+                }
+            }
+        }
+    }
+
+    FloatingPanel {
+        id: colorVisionProfilesPanel
+        width: 650
+        height: 490
+        panelTitle: t("colorVisionProfilesTitle")
+        panelColor: root.panelColor
+        borderColor: root.borderColor
+        titleColor: root.textColor
+        textColor: root.textColor
+        rememberPosition: false
+        onOpening: { root.popupBackdropVisible = true; modalBackdrop.scheduleSnapshot() }
+        onOpenedForBackdrop: modalBackdrop.scheduleSnapshot()
+        onClosedForBackdrop: root.popupBackdropVisible = appearancePanel.visible
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 12
+
+            Label {
+                Layout.fillWidth: true
+                text: t("colorVisionProfileIntro")
+                color: root.mutedText
+                font.pixelSize: Math.round(12 * root.textScale)
+                wrapMode: Text.WordWrap
+            }
+
+            GridLayout {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                columns: 2
+                columnSpacing: 10
+                rowSpacing: 10
+
+                Repeater {
+                    model: root.colorVisionProfiles()
+
+                    Rectangle {
+                        required property var modelData
+                        readonly property bool selected: blanky.colorVisionProfile === modelData.id
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        Layout.minimumHeight: 102
+                        radius: 10
+                        color: selected ? Qt.lighter(root.panelAltColor, root.dark ? 1.18 : 1.04) : root.panelAltColor
+                        border.color: selected ? modelData.tone : Qt.darker(modelData.tone, root.dark ? 1.55 : 1.12)
+                        border.width: selected ? 2 : 1
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.margins: 12
+                            spacing: 10
+
+                            Rectangle {
+                                Layout.preferredWidth: 36
+                                Layout.preferredHeight: 36
+                                radius: 18
+                                color: Qt.darker(modelData.tone, root.dark ? 2.8 : 1.18)
+                                border.color: modelData.tone
+                                border.width: 1
+                                Label { anchors.centerIn: parent; text: modelData.icon; color: modelData.tone; font.bold: true; font.pixelSize: Math.round(17 * root.textScale) }
+                            }
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 4
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    Label { text: modelData.title; color: selected ? modelData.tone : root.textColor; font.bold: true; font.pixelSize: Math.round(14 * root.textScale); Layout.fillWidth: true }
+                                    Label { visible: modelData.recommended; text: t("recommended"); color: root.warningColor; font.bold: true; font.pixelSize: Math.round(9 * root.textScale) }
+                                }
+                                Label { text: modelData.description; color: root.mutedText; font.pixelSize: Math.round(10 * root.textScale); Layout.fillWidth: true; wrapMode: Text.WordWrap; maximumLineCount: 2; elide: Text.ElideRight }
+                                Label { text: selected ? "✓ " + t("active") : "○ " + t("inactive"); color: selected ? modelData.tone : root.inactiveColor; font.bold: true; font.pixelSize: Math.round(10 * root.textScale) }
+                            }
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                blanky.setColorVisionProfile(modelData.id)
+                            }
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 86
+                radius: 8
+                color: root.panelAltColor
+                border.color: root.borderColor
+                border.width: 1
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    spacing: 4
+                    Label { text: t("colorVisionStateMatrix"); color: root.textColor; font.bold: true; font.pixelSize: Math.round(11 * root.textScale) }
+                    GridLayout {
+                        Layout.fillWidth: true
+                        columns: 3
+                        columnSpacing: 10
+                        rowSpacing: 3
+                        Label { text: "✓ ON"; color: root.successColor; font.bold: true; font.pixelSize: Math.round(11 * root.textScale) }
+                        Label { text: "! " + t("warning"); color: root.warningColor; font.bold: true; font.pixelSize: Math.round(11 * root.textScale) }
+                        Label { text: "✕ " + t("error"); color: root.errorColor; font.bold: true; font.pixelSize: Math.round(11 * root.textScale) }
+                        Label { text: "○ OFF"; color: root.inactiveColor; font.bold: true; font.pixelSize: Math.round(11 * root.textScale) }
+                        Label { text: "✓ " + t("eventOk"); color: root.successColor; font.bold: true; font.pixelSize: Math.round(11 * root.textScale) }
+                        Label { text: "✕ " + t("eventReject"); color: root.errorColor; font.bold: true; font.pixelSize: Math.round(11 * root.textScale) }
+                    }
+                    Label { text: t("colorVisionDisclaimer"); color: root.mutedText; font.pixelSize: Math.round(9 * root.textScale); Layout.fillWidth: true; wrapMode: Text.WordWrap; horizontalAlignment: Text.AlignRight }
                 }
             }
         }

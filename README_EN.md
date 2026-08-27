@@ -70,3 +70,14 @@ audio/        Locally generated temporary audio, not versioned
 Every request reaches the same validation before producing effects. Events retain the origin, canonical command and `OK` or `REJECT` result, while the main interface prioritises clear messages for the user.
 
 Manual mode is required to control individual components. When changing mode, manual components are switched off safely before the new mode is accepted.
+
+## Colour vision accessibility validation
+
+Universal, Protan, Deutan and Tritan profiles use semantic colours, symbols and text; they are not a diagnosis or a legal conformance claim. To verify contrast, state pairs and the Machado simulation, install the development dependencies and run:
+
+```bash
+pip install -r requirements-dev.txt
+python tools/validate_color_profiles.py
+```
+
+The detailed result is written to `docs/color_profile_validation.md`.
