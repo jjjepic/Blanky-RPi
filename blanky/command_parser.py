@@ -13,35 +13,6 @@ JSON_PATH = os.path.join(BASE_DIR, "commands.json")
 with open(JSON_PATH, "r", encoding="utf-8") as f:
     DATA = json.load(f)
 
-CATALOG_DESCRIPTIONS = {
-    "pt": {
-        "START": "Inicia o sistema.",
-        "STOP": "Para e repõe todos os componentes.",
-        "MODE_FAST": "Seleciona o modo rápido.",
-        "MODE_IDEAL": "Seleciona o modo ideal.",
-        "MODE_MANUAL": "Seleciona o modo manual.",
-        "MODE_CHANGE": "Permite escolher outro modo.",
-        "MOTOR_ON/OFF": "Ativa ou desativa um motor.",
-        "CYL_EXTEND/RETRACT": "Avança ou recua um cilindro.",
-        "GREEN_ON/OFF": "Liga ou desliga a luz verde.",
-        "RED_ON/OFF": "Liga ou desliga a luz vermelha.",
-        "ROBOT_TO_METAL/NONMETAL": "Envia o robô para metal ou não metal.",
-    },
-    "en": {
-        "START": "Starts the system.",
-        "STOP": "Stops and resets all components.",
-        "MODE_FAST": "Selects fast mode.",
-        "MODE_IDEAL": "Selects ideal mode.",
-        "MODE_MANUAL": "Selects manual mode.",
-        "MODE_CHANGE": "Allows selecting another mode.",
-        "MOTOR_ON/OFF": "Activates or deactivates a motor.",
-        "CYL_EXTEND/RETRACT": "Extends or retracts a cylinder.",
-        "GREEN_ON/OFF": "Turns the green light on or off.",
-        "RED_ON/OFF": "Turns the red light on or off.",
-        "ROBOT_TO_METAL/NONMETAL": "Sends the robot to metal or non-metal.",
-    },
-}
-
 VALID_COMMANDS = frozenset({
     "START", "STOP", "MODE_FAST", "MODE_IDEAL", "MODE_MANUAL", "MODE_UNSPEC",
     "MOTOR_1_ON", "MOTOR_1_OFF", "MOTOR_2_ON", "MOTOR_2_OFF", "MOTOR_3_ON", "MOTOR_3_OFF",
@@ -354,39 +325,3 @@ def parse_command(raw_text: str, lang: str) -> Tuple[str, str]:
                 )
 
     return "UNKNOWN", "Comando não reconhecido." if lang == "pt" else "Command not recognized."
-
-def command_catalog_text(lang: str) -> str:
-    d = DATA.get(lang, DATA["pt"])
-    descriptions = CATALOG_DESCRIPTIONS.get(lang, CATALOG_DESCRIPTIONS["pt"])
-    lines: list[str] = []
-    lines.append("=== COMANDOS DISPONIVEIS ===" if lang == "pt" else "=== AVAILABLE COMMANDS ===")
-    lines.append("")
-
-    sections = [
-        ("START", d.get("start", [])),
-        ("STOP", d.get("stop", [])),
-        ("MODE_FAST", d.get("mode_fast_ph", []) + d.get("mode_fast_words", [])),
-        ("MODE_IDEAL", d.get("mode_ideal_ph", []) + d.get("mode_ideal_words", [])),
-        ("MODE_MANUAL", d.get("mode_manual_ph", []) + d.get("mode_manual_words", [])),
-        ("MODE_CHANGE", d.get("change_mode_ph", []) + d.get("change_mode_words", [])),
-        ("MOTOR_ON/OFF", d.get("motor_word", []) + d.get("activate", []) + d.get("deactivate", [])),
-        ("CYL_EXTEND/RETRACT", d.get("cylinder_word", []) + d.get("cylinder_retract", []) + d.get("activate", [])),
-        ("GREEN_ON/OFF", d.get("light_green", []) + d.get("light_on", []) + d.get("light_off", [])),
-        ("RED_ON/OFF", d.get("light_red", []) + d.get("light_on", []) + d.get("light_off", [])),
-        ("ROBOT_TO_METAL/NONMETAL", d.get("robot_word", []) + d.get("robot_go", []) + d.get("metal", []) + d.get("nonmetal", [])),
-    ]
-
-    for title, words in sections:
-        uniq = []
-        seen = set()
-        for w in words:
-            if w not in seen:
-                uniq.append(w)
-                seen.add(w)
-        if not uniq:
-            continue
-        lines.append(f"{title}: {descriptions.get(title, '')}".rstrip())
-        lines.append(", ".join(uniq))
-        lines.append("")
-
-    return "\n".join(lines).strip()
