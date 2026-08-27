@@ -227,18 +227,18 @@ FloatingPanel {
                         spacing: 10
                         MenuActionButton {
                             text: dialog.tr("← Secção anterior", "← Previous section")
+                            visible: dialog.currentIndex() > 0
                             Layout.preferredWidth: Math.round(180 * dialog.textScale)
                             Layout.preferredHeight: Math.round(36 * dialog.textScale)
-                            enabled: dialog.currentIndex() > 0
                             accentColor: dialog.inactiveColor; textColor: dialog.titleColor; mutedText: dialog.mutedText; borderColor: dialog.borderColor; panelColor: dialog.panelAltColor
                             onClicked: dialog.moveSection(-1)
                         }
                         Item { Layout.fillWidth: true }
                         MenuActionButton {
                             text: dialog.tr("Próxima secção →", "Next section →")
+                            visible: dialog.currentIndex() >= 0 && dialog.currentIndex() < dialog.sectionList().length - 1
                             Layout.preferredWidth: Math.round(180 * dialog.textScale)
                             Layout.preferredHeight: Math.round(36 * dialog.textScale)
-                            enabled: dialog.currentIndex() < dialog.sectionList().length - 1
                             accentColor: dialog.currentSection() ? dialog.semanticColor(dialog.currentSection().tone) : dialog.accentColor
                             textColor: dialog.titleColor; mutedText: dialog.mutedText; borderColor: dialog.borderColor; panelColor: dialog.panelAltColor
                             onClicked: dialog.moveSection(1)

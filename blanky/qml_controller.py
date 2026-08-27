@@ -41,6 +41,7 @@ from blanky.speech_service import (
 from blanky.voice_worker import VoiceWorker
 from blanky.wakeword_service import get_wakeword_service
 from blanky.command_parser import command_catalog_text, interpret_online_commands, parse_command
+from blanky.color_vision_profiles import get_profile_tokens
 
 
 class BlankyController(QObject):
@@ -1457,35 +1458,17 @@ class BlankyController(QObject):
                 "green": "#00e5ff", "red": "#ff8a65", "robot": "#00e5ff",
             }
         elif self._appearance_mode == "colorblind":
-            # Rich-text logs are rendered in Python, so they mirror the
-            # semantic colour-vision tokens used by ThemePalette.qml.
-            color_vision_colors = {
-                "universal": {
-                    "normal": "#eef6fb", "inactive": "#b6c4cf", "error": "#ff9f43",
-                    "start": "#4fc3f7", "fast": "#ffd166", "ideal": "#4fc3f7",
-                    "manual": "#4fc3f7", "change": "#4fc3f7", "motor": "#4fc3f7",
-                    "green": "#4fc3f7", "red": "#ff9f43", "robot": "#4fc3f7",
-                },
-                "protan": {
-                    "normal": "#f2f7fb", "inactive": "#c7d0d8", "error": "#ffb000",
-                    "start": "#55c8f2", "fast": "#ffe066", "ideal": "#d6b5ff",
-                    "manual": "#55c8f2", "change": "#f2f7fb", "motor": "#55c8f2",
-                    "green": "#55c8f2", "red": "#ffb000", "robot": "#d6b5ff",
-                },
-                "deutan": {
-                    "normal": "#f2f7fb", "inactive": "#c6d0d8", "error": "#f28e2b",
-                    "start": "#5ab4e5", "fast": "#f6c445", "ideal": "#c084fc",
-                    "manual": "#5ab4e5", "change": "#f2f7fb", "motor": "#5ab4e5",
-                    "green": "#5ab4e5", "red": "#f28e2b", "robot": "#c084fc",
-                },
-                "tritan": {
-                    "normal": "#f3f6fa", "inactive": "#cad0d8", "error": "#ff5f8a",
-                    "start": "#f3f6fa", "fast": "#ffad8a", "ideal": "#d6b5ff",
-                    "manual": "#f3f6fa", "change": "#d6b5ff", "motor": "#d6b5ff",
-                    "green": "#f3f6fa", "red": "#ff5f8a", "robot": "#d6b5ff",
-                },
+            # Python renders the event and audio logs. Reuse the QML token
+            # source so a profile cannot drift between those two surfaces.
+            tokens = get_profile_tokens(self._color_vision_profile)
+            colors = {
+                "normal": tokens["textPrimary"], "inactive": tokens["inactive"],
+                "error": tokens["error"], "start": tokens["success"],
+                "fast": tokens["warning"], "ideal": tokens["selected"],
+                "manual": tokens["success"], "change": tokens["information"],
+                "motor": tokens["information"], "green": tokens["success"],
+                "red": tokens["error"], "robot": tokens["selected"],
             }
-            colors = color_vision_colors.get(self._color_vision_profile, color_vision_colors["universal"])
         elif self._appearance_mode == "monochrome":
             colors = {
                 "normal": "#f2f2f2", "inactive": "#a8a8a8", "error": "#ffffff",

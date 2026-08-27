@@ -73,9 +73,11 @@ Manual mode is required to control individual components. When changing mode, ma
 
 ## Colour vision accessibility validation
 
-Universal, Protan, Deutan and Tritan profiles use semantic colours, symbols and text; they are not a diagnosis or a legal conformance claim. To verify contrast and run the optional validation simulation, install the development dependencies and run:
+Universal, Protan, Deutan and Tritan profiles use semantic colours, symbols and text; they are not a diagnosis or a legal conformance claim. To verify contrast, state pairs and the Machado simulation, install the development dependencies and run:
 
 ```bash
 pip install -r requirements-dev.txt
-python tools/validate_color_vision_profiles.py
+python tools/validate_color_profiles.py
 ```
+
+The detailed result is written to `docs/color_profile_validation.md`.

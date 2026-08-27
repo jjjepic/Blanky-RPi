@@ -3,6 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Dialogs
 import "Translations.js" as I18n
+import "ColorVisionProfiles.js" as ColorVisionProfiles
 
 ApplicationWindow {
     id: root
@@ -121,10 +122,10 @@ ApplicationWindow {
 
     function colorVisionProfiles() {
         return [
-            { id: "universal", icon: "◉", tone: "#4fc3f7", title: t("colorVisionUniversal"), description: t("colorVisionUniversalDescription"), recommended: true },
-            { id: "protan", icon: "P", tone: "#55c8f2", title: t("colorVisionProtan"), description: t("colorVisionProtanDescription"), recommended: false },
-            { id: "deutan", icon: "D", tone: "#5ab4e5", title: t("colorVisionDeutan"), description: t("colorVisionDeutanDescription"), recommended: false },
-            { id: "tritan", icon: "T", tone: "#d6b5ff", title: t("colorVisionTritan"), description: t("colorVisionTritanDescription"), recommended: false }
+            { id: "universal", icon: "◉", tone: ColorVisionProfiles.profile("universal").information, title: t("colorVisionUniversal"), description: t("colorVisionUniversalDescription"), recommended: true },
+            { id: "protan", icon: "P", tone: ColorVisionProfiles.profile("protan").information, title: t("colorVisionProtan"), description: t("colorVisionProtanDescription"), recommended: false },
+            { id: "deutan", icon: "D", tone: ColorVisionProfiles.profile("deutan").information, title: t("colorVisionDeutan"), description: t("colorVisionDeutanDescription"), recommended: false },
+            { id: "tritan", icon: "T", tone: ColorVisionProfiles.profile("tritan").information, title: t("colorVisionTritan"), description: t("colorVisionTritanDescription"), recommended: false }
         ]
     }
 
@@ -2267,7 +2268,7 @@ ApplicationWindow {
     FloatingPanel {
         id: colorVisionProfilesPanel
         width: 650
-        height: 430
+        height: 490
         panelTitle: t("colorVisionProfilesTitle")
         panelColor: root.panelColor
         borderColor: root.borderColor
@@ -2353,22 +2354,29 @@ ApplicationWindow {
 
             Rectangle {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 44
+                Layout.preferredHeight: 86
                 radius: 8
                 color: root.panelAltColor
                 border.color: root.borderColor
                 border.width: 1
-                RowLayout {
+                ColumnLayout {
                     anchors.fill: parent
-                    anchors.leftMargin: 12
-                    anchors.rightMargin: 12
-                    spacing: 14
-                    Label { text: "✓ ON"; color: root.successColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
-                    Label { text: "! " + t("warning"); color: root.warningColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
-                    Label { text: "✕ " + t("error"); color: root.errorColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
-                    Label { text: "○ OFF"; color: root.inactiveColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
-                    Item { Layout.fillWidth: true }
-                    Label { text: t("colorVisionDisclaimer"); color: root.mutedText; font.pixelSize: Math.round(9 * root.textScale); Layout.maximumWidth: 260; wrapMode: Text.WordWrap; horizontalAlignment: Text.AlignRight }
+                    anchors.margins: 10
+                    spacing: 4
+                    Label { text: t("colorVisionStateMatrix"); color: root.textColor; font.bold: true; font.pixelSize: Math.round(11 * root.textScale) }
+                    GridLayout {
+                        Layout.fillWidth: true
+                        columns: 3
+                        columnSpacing: 10
+                        rowSpacing: 3
+                        Label { text: "✓ ON"; color: root.successColor; font.bold: true; font.pixelSize: Math.round(11 * root.textScale) }
+                        Label { text: "! " + t("warning"); color: root.warningColor; font.bold: true; font.pixelSize: Math.round(11 * root.textScale) }
+                        Label { text: "✕ " + t("error"); color: root.errorColor; font.bold: true; font.pixelSize: Math.round(11 * root.textScale) }
+                        Label { text: "○ OFF"; color: root.inactiveColor; font.bold: true; font.pixelSize: Math.round(11 * root.textScale) }
+                        Label { text: "✓ " + t("eventOk"); color: root.successColor; font.bold: true; font.pixelSize: Math.round(11 * root.textScale) }
+                        Label { text: "✕ " + t("eventReject"); color: root.errorColor; font.bold: true; font.pixelSize: Math.round(11 * root.textScale) }
+                    }
+                    Label { text: t("colorVisionDisclaimer"); color: root.mutedText; font.pixelSize: Math.round(9 * root.textScale); Layout.fillWidth: true; wrapMode: Text.WordWrap; horizontalAlignment: Text.AlignRight }
                 }
             }
         }

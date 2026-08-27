@@ -78,9 +78,11 @@ O modo Manual é necessário para comandar componentes individuais. Ao trocar de
 
 ## Validação de acessibilidade cromática
 
-Os perfis Universal, Protan, Deutan e Tritan usam cores semânticas, símbolos e texto; não constituem um diagnóstico nem uma declaração de conformidade legal. Para verificar os contrastes e executar a simulação opcional de validação, instale as dependências de desenvolvimento e execute:
+Os perfis Universal, Protan, Deutan e Tritan usam cores semânticas, símbolos e texto; não constituem um diagnóstico nem uma declaração de conformidade legal. Para verificar contrastes, pares de estados e a simulação Machado, instale as dependências de desenvolvimento e execute:
 
 ```bash
 pip install -r requirements-dev.txt
-python tools/validate_color_vision_profiles.py
+python tools/validate_color_profiles.py
 ```
+
+O resultado detalhado é gravado em `docs/color_profile_validation.md`.
