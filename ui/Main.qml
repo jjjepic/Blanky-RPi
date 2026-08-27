@@ -2345,7 +2345,6 @@ ApplicationWindow {
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 blanky.setColorVisionProfile(modelData.id)
-                                colorVisionProfilesPanel.close()
                             }
                         }
                     }
