@@ -1,6 +1,6 @@
 # MQTT and IoT MQTT Panel
 
-[Português](MQTT_PANEL_SETUP.md) | [English](MQTT_PANEL_SETUP_EN.md)
+[Português](MQTT_PANEL_SETUP_PT.md) | [English](MQTT_PANEL_SETUP_EN.md)
 
 This guide connects Blanky to the Mosquitto broker and configures a mobile phone in IoT MQTT Panel. Every MQTT command is subject to the same safety rules as local controls.
 

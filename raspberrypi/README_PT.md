@@ -1,6 +1,6 @@
 # Atalho do Blanky no Raspberry Pi
 
-[Português](README_PT.md) | [English](README.md)
+[Português](README_PT.md) | [English](README_EN.md)
 
 Esta pasta cria um atalho de ambiente de trabalho para o Blanky sem guardar segredos no projeto.
 

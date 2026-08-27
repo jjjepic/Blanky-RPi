@@ -1,6 +1,6 @@
 # Blanky
 
-[Português](README.md) | [English](README_EN.md)
+[Português](README_PT.md) | [English](README_EN.md)
 
 Blanky é uma interface assistiva para controlo de uma célula industrial simulada. Reúne interação por voz, Text-Bot, botões diretos, MQTT e OPC UA, mantendo as regras de segurança num único ponto de validação.
 
@@ -57,7 +57,7 @@ Os campos que podem alterar uma ligação começam bloqueados. Use o ícone de l
 
 ## MQTT e telemóvel
 
-O guia completo para Mosquitto e IoT MQTT Panel está em [MQTT_PANEL_SETUP.md](MQTT_PANEL_SETUP.md). Inclui tópicos de comando, tópicos de estado, configuração no telemóvel e testes de ligação.
+O guia completo para Mosquitto e IoT MQTT Panel está em [MQTT_PANEL_SETUP_PT.md](MQTT_PANEL_SETUP_PT.md). Inclui tópicos de comando, tópicos de estado, configuração no telemóvel e testes de ligação.
 
 ## Estrutura do projeto
 

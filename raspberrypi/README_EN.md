@@ -1,6 +1,6 @@
 # Blanky Raspberry Pi Launcher
 
-[Português](README_PT.md) | [English](README.md)
+[Português](README_PT.md) | [English](README_EN.md)
 
 This folder creates a desktop shortcut for Blanky without storing secrets in the project.
 
