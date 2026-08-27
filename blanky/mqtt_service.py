@@ -29,6 +29,12 @@ class MQTTBridge:
         self.enabled = bool(MQTT_ENABLED)
         self._lock = threading.Lock()
         self._connected = False
+        self._broker_host = str(MQTT_BROKER_HOST)
+        self._broker_port = int(MQTT_BROKER_PORT)
+        self._topic_prefix = str(MQTT_TOPIC_PREFIX)
+        self._username = MQTT_USERNAME
+        self._password = MQTT_PASSWORD
+        self._client_id = str(MQTT_CLIENT_ID)
         self._pulse_seconds = float(MQTT_PULSE_SECONDS)
         self._echo_suppression: dict[tuple[str, str], float] = {}
         self._events: list[dict[str, Any]] = []
@@ -66,15 +72,67 @@ class MQTTBridge:
             self.enabled = False
             return
 
-        self.client = mqtt.Client(client_id=MQTT_CLIENT_ID, clean_session=True)
-        if MQTT_USERNAME:
-            self.client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
-        self.client.on_connect = self._on_connect
-        self.client.on_disconnect = self._on_disconnect
-        self.client.on_message = self._on_message
+        self._mqtt = mqtt
+        self.client = self._create_client()
 
         if self.enabled:
             self._connect()
+
+    def _create_client(self):
+        client = self._mqtt.Client(client_id=self._client_id, clean_session=True)
+        if self._username:
+            client.username_pw_set(self._username, self._password)
+        client.on_connect = self._on_connect
+        client.on_disconnect = self._on_disconnect
+        client.on_message = self._on_message
+        return client
+
+    def configure_connection(self, host: str, port: int, topic_prefix: str):
+        """Reconnect MQTT using editable, locally stored endpoint settings."""
+        host = (host or MQTT_BROKER_HOST).strip()
+        topic_prefix = (topic_prefix or MQTT_TOPIC_PREFIX).strip().strip("/")
+        try:
+            port = int(port)
+        except (TypeError, ValueError):
+            port = MQTT_BROKER_PORT
+        port = max(1, min(port, 65535))
+
+        # Keep the editable values available even on installations without paho-mqtt.
+        if not hasattr(self, "_mqtt"):
+            self._broker_host = host
+            self._broker_port = port
+            self._topic_prefix = topic_prefix
+            return
+
+        if (
+            host == self._broker_host
+            and port == self._broker_port
+            and topic_prefix == self._topic_prefix
+        ):
+            return
+
+        previous_client = self.client
+        self._connected = False
+        if previous_client is not None:
+            try:
+                previous_client.disconnect()
+            except Exception:
+                pass
+            try:
+                previous_client.loop_stop()
+            except Exception:
+                pass
+
+        self._broker_host = host
+        self._broker_port = port
+        self._topic_prefix = topic_prefix
+        self.enabled = bool(MQTT_ENABLED)
+        self.client = self._create_client()
+        if self.enabled:
+            self._connect()
+
+    def configure_opcua_connection(self, url: str):
+        self._opcua.configure_connection(url)
 
     def _on_connect(self, client, userdata, flags, rc):
         self._connected = (rc == 0)
@@ -105,7 +163,7 @@ class MQTTBridge:
 
     def _connect(self):
         try:
-            self.client.connect(MQTT_BROKER_HOST, MQTT_BROKER_PORT, 30)
+            self.client.connect(self._broker_host, self._broker_port, 30)
             self.client.loop_start()
             self._connected = False
         except Exception:
@@ -113,7 +171,7 @@ class MQTTBridge:
             self._connected = False
 
     def _topic(self, suffix: str) -> str:
-        return f"{MQTT_TOPIC_PREFIX}/{suffix}"
+        return f"{self._topic_prefix}/{suffix}"
 
     def _publish(self, topic_suffix: str, payload, retain: bool = True, suppress_echo: bool = False):
         if not self.enabled or self.client is None:
@@ -133,7 +191,7 @@ class MQTTBridge:
                 self.client.subscribe(self._topic(suffix), qos=1)
 
     def _extract_suffix(self, full_topic: str) -> Optional[str]:
-        prefix = f"{MQTT_TOPIC_PREFIX}/"
+        prefix = f"{self._topic_prefix}/"
         if not full_topic.startswith(prefix):
             return None
         return full_topic[len(prefix):]
@@ -674,6 +732,11 @@ class MQTTBridge:
             "opcua_connected": bool(opcua_health.get("connected")),
             "opcua_last_error": str(opcua_health.get("last_error") or ""),
             "opcua_last_write": str(opcua_health.get("last_write") or ""),
+            "opcua_url": str(opcua_health.get("url") or ""),
+            "mqtt_host": self._broker_host,
+            "mqtt_port": self._broker_port,
+            "mqtt_topic_prefix": self._topic_prefix,
+            "mqtt_client_id": self._client_id,
         }
 
     def set_ui_lang(self, lang: str):

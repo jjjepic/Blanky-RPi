@@ -1,5 +1,33 @@
 import os
 
+
+def load_local_environment() -> bool:
+    """Load the optional local OpenAI key without executing a shell file."""
+    if os.environ.get("OPENAI_API_KEY"):
+        return True
+
+    env_path = os.environ.get(
+        "BLANKY_ENV_FILE", os.path.join(os.path.expanduser("~"), ".blanky", "openai.env")
+    )
+    try:
+        with open(env_path, "r", encoding="utf-8") as env_file:
+            for raw_line in env_file:
+                line = raw_line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if line.startswith("export "):
+                    line = line[7:].strip()
+                key, separator, value = line.partition("=")
+                if key.strip() != "OPENAI_API_KEY" or not separator:
+                    continue
+                value = value.strip().strip('"').strip("'")
+                if value:
+                    os.environ["OPENAI_API_KEY"] = value
+                    return True
+    except OSError:
+        pass
+    return False
+
 # ===== CONFIG =====
 FS = 16000
 SECONDS = 6

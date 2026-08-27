@@ -55,6 +55,7 @@ class OPCUABridge:
     def __init__(self):
         self.enabled = bool(OPCUA_ENABLED and Client is not None and ua is not None)
         self._pulse_seconds = float(OPCUA_PULSE_SECONDS)
+        self._url = str(OPCUA_URL)
         self._client: Optional[Client] = None
         self._lock = threading.Lock()
         self._queue: queue.Queue[str] = queue.Queue()
@@ -73,6 +74,14 @@ class OPCUABridge:
             return
         self._queue.put(command)
 
+    def configure_connection(self, url: str):
+        """Use a new OPC UA endpoint for the next queued command."""
+        url = (url or OPCUA_URL).strip()
+        if url == self._url:
+            return
+        self._url = url
+        self._disconnect()
+
     def _worker_loop(self):
         while True:
             command = self._queue.get()
@@ -89,7 +98,7 @@ class OPCUABridge:
                 self._connected = True
                 return
 
-            client = Client(OPCUA_URL)
+            client = Client(self._url)
             client.connect()
             self._client = client
             self._connected = True
@@ -145,7 +154,7 @@ class OPCUABridge:
         return {
             "enabled": self.enabled,
             "connected": self._connected,
-            "url": OPCUA_URL,
+            "url": self._url,
             "last_error": self._last_error,
             "last_write": self._last_write,
             "last_command": self._last_command,

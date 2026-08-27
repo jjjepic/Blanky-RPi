@@ -44,7 +44,7 @@ ApplicationWindow {
     property string systemTransitionAction: ""
     property int systemTransitionProgress: 0
     property double systemTransitionStartedAt: 0
-    property string textBotMode: "offline"
+    property string textBotMode: "online"
     property var audioManualOverrides: ({})
     readonly property int rightPanelWidth: 660
 
@@ -82,6 +82,19 @@ ApplicationWindow {
         if (blanky.appearanceMode === "custom")
             return "\u2699"
         return "\u263E"
+    }
+
+    function logoSource() {
+        if (blanky.appearanceMode === "light")
+            return "../assets/blanky_logo_light.png"
+        if (blanky.appearanceMode === "high_contrast")
+            return "../assets/blanky_logo_high_contrast.png"
+        if (blanky.appearanceMode === "colorblind")
+            return "../assets/blanky_logo_colorblind.png"
+        if (blanky.appearanceMode === "monochrome")
+            return "../assets/blanky_logo_monochrome.png"
+        // Custom keeps the dark logo as a neutral base while the interface palette is personalised.
+        return "../assets/blanky_logo_dark.png"
     }
 
     function appearanceOptions() {
@@ -355,6 +368,9 @@ ApplicationWindow {
         function onMonitorEventsTextChanged() {
             eventsAutoscrollTimer.restart()
         }
+        function onTextOnlineFallbackRequested() {
+            root.textBotMode = "offline"
+        }
     }
 
     Timer {
@@ -518,8 +534,8 @@ ApplicationWindow {
                     mutedText: root.mutedText
                     borderColor: root.borderColor
                     panelColor: root.panelAltColor
-                    toolTip: t("tooltipAudioSettings")
-                    onClicked: audioSettingsPanel.open()
+                    toolTip: t("tooltipSettings")
+                    onClicked: settingsPanel.open()
                 }
 
                 MenuActionButton {
@@ -559,7 +575,7 @@ ApplicationWindow {
             Item { Layout.fillWidth: true }
 
             Image {
-                source: dark ? "../assets/blanky_logo_dark.png" : "../assets/blanky_logo_light.png"
+                source: root.logoSource()
                 Layout.preferredWidth: 58
                 Layout.preferredHeight: 58
                 fillMode: Image.PreserveAspectFit
@@ -2153,7 +2169,7 @@ ApplicationWindow {
 
             Rectangle {
                 Layout.fillWidth: true
-                Layout.preferredHeight: Math.round(58 * root.controlScale)
+                Layout.preferredHeight: Math.round(72 * root.controlScale)
                 radius: 9
                 color: root.panelAltColor
                 border.color: root.borderColor
@@ -2163,7 +2179,7 @@ ApplicationWindow {
                     anchors.fill: parent
                     anchors.leftMargin: 12
                     anchors.rightMargin: 12
-                    spacing: 2
+                    spacing: 5
 
                     RowLayout {
                         Layout.fillWidth: true
@@ -2184,6 +2200,8 @@ ApplicationWindow {
 
                     Slider {
                         Layout.fillWidth: true
+                        Layout.preferredHeight: 22
+                        Layout.bottomMargin: 4
                         from: 1.0
                         to: 1.25
                         stepSize: 0.01
@@ -2923,11 +2941,27 @@ ApplicationWindow {
         titleColor: root.textColor
         onOpening: { root.popupBackdropVisible = true; modalBackdrop.scheduleSnapshot() }
         onOpenedForBackdrop: modalBackdrop.scheduleSnapshot()
-        onClosedForBackdrop: root.popupBackdropVisible = false
+        onClosedForBackdrop: root.popupBackdropVisible = settingsPanel.visible
+
+        MenuActionButton {
+            anchors.left: parent.left
+            anchors.top: parent.top
+            z: 2
+            text: "\u2190 " + t("backToSettings")
+            width: 150
+            height: 30
+            accentColor: root.accentColor
+            textColor: root.textColor
+            mutedText: root.mutedText
+            borderColor: root.borderColor
+            panelColor: root.panelAltColor
+            onClicked: { audioSettingsPanel.close(); settingsPanel.open() }
+        }
 
         ScrollView {
             id: redesignedAudioScroll
             anchors.fill: parent
+            anchors.topMargin: 38
             clip: true
             rightPadding: Math.round(14 * root.textScale)
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
@@ -3228,6 +3262,336 @@ ApplicationWindow {
                         textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor
                         onClicked: audioLogsPanel.open()
                     }
+                }
+            }
+        }
+    }
+
+    FloatingPanel {
+        id: settingsPanel
+        width: 700
+        height: 390
+        panelTitle: t("settingsTitle")
+        panelColor: root.panelColor
+        borderColor: root.borderColor
+        titleColor: root.textColor
+        textColor: root.textColor
+        onOpening: { root.popupBackdropVisible = true; modalBackdrop.scheduleSnapshot() }
+        onOpenedForBackdrop: modalBackdrop.scheduleSnapshot()
+        onClosedForBackdrop: root.popupBackdropVisible = audioSettingsPanel.visible || communicationsSettingsPanel.visible
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 14
+
+            Label {
+                Layout.fillWidth: true
+                text: t("settingsIntro")
+                color: root.mutedText
+                wrapMode: Text.WordWrap
+                font.pixelSize: 13
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                spacing: 14
+
+                Rectangle {
+                    id: audioSettingsCard
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    radius: 14
+                    property bool hovered: audioSettingsCardMouse.containsMouse
+                    color: hovered ? Qt.lighter(root.panelAltColor, 1.08) : root.panelAltColor
+                    border.color: hovered ? root.textColor : root.accentColor
+                    border.width: hovered ? 2 : 1
+                    scale: hovered ? 1.015 : 1.0
+                    Behavior on color { ColorAnimation { duration: 150 } }
+                    Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.margins: 18
+                        spacing: 11
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Rectangle {
+                                Layout.preferredWidth: 58
+                                Layout.preferredHeight: 58
+                                radius: 29
+                                color: Qt.darker(root.accentColor, 1.65)
+                                border.color: root.accentColor
+                                border.width: 1
+                                Label { anchors.centerIn: parent; text: "\uD83C\uDFA4"; color: root.textColor; font.pixelSize: 28 }
+                            }
+                            Item { Layout.fillWidth: true }
+                            Label { text: "\u203A"; color: root.accentColor; font.pixelSize: 34; font.bold: true }
+                        }
+                        Label { text: t("audioTitle"); color: root.textColor; font.bold: true; font.pixelSize: 19; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+                        Label { text: t("audioSettingsCardInfo"); color: root.mutedText; Layout.fillWidth: true; wrapMode: Text.WordWrap; font.pixelSize: 13 }
+                        Item { Layout.fillWidth: true; Layout.fillHeight: true }
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 32
+                            radius: 8
+                            color: audioSettingsCard.hovered ? root.accentColor : Qt.darker(root.panelColor, 1.05)
+                            border.color: root.accentColor
+                            border.width: 1
+                            RowLayout {
+                                anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10
+                                Label { text: t("openSettingsCard"); color: audioSettingsCard.hovered ? root.panelColor : root.textColor; font.bold: true; font.pixelSize: 12; Layout.fillWidth: true }
+                                Label { text: "\u2192"; color: audioSettingsCard.hovered ? root.panelColor : root.accentColor; font.bold: true; font.pixelSize: 15 }
+                            }
+                        }
+                    }
+                    MouseArea { id: audioSettingsCardMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { settingsPanel.close(); audioSettingsPanel.open() } }
+                }
+
+                Rectangle {
+                    id: communicationsSettingsCard
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    radius: 14
+                    property bool hovered: communicationsSettingsCardMouse.containsMouse
+                    color: hovered ? Qt.lighter(root.panelAltColor, 1.08) : root.panelAltColor
+                    border.color: hovered ? root.textColor : root.successColor
+                    border.width: hovered ? 2 : 1
+                    scale: hovered ? 1.015 : 1.0
+                    Behavior on color { ColorAnimation { duration: 150 } }
+                    Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.margins: 18
+                        spacing: 11
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Rectangle {
+                                Layout.preferredWidth: 58
+                                Layout.preferredHeight: 58
+                                radius: 29
+                                color: Qt.darker(root.successColor, 1.65)
+                                border.color: root.successColor
+                                border.width: 1
+                                Label { anchors.centerIn: parent; text: "\uD83D\uDD17"; color: root.textColor; font.pixelSize: 28 }
+                            }
+                            Item { Layout.fillWidth: true }
+                            Label { text: "\u203A"; color: root.successColor; font.pixelSize: 34; font.bold: true }
+                        }
+                        Label { text: t("communicationsSettings"); color: root.textColor; font.bold: true; font.pixelSize: 19; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+                        Label { text: t("communicationsSettingsCardInfo"); color: root.mutedText; Layout.fillWidth: true; wrapMode: Text.WordWrap; font.pixelSize: 13 }
+                        Item { Layout.fillWidth: true; Layout.fillHeight: true }
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 32
+                            radius: 8
+                            color: communicationsSettingsCard.hovered ? root.successColor : Qt.darker(root.panelColor, 1.05)
+                            border.color: root.successColor
+                            border.width: 1
+                            RowLayout {
+                                anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10
+                                Label { text: t("openSettingsCard"); color: communicationsSettingsCard.hovered ? root.panelColor : root.textColor; font.bold: true; font.pixelSize: 12; Layout.fillWidth: true }
+                                Label { text: "\u2192"; color: communicationsSettingsCard.hovered ? root.panelColor : root.successColor; font.bold: true; font.pixelSize: 15 }
+                            }
+                        }
+                    }
+                    MouseArea { id: communicationsSettingsCardMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { settingsPanel.close(); communicationsSettingsPanel.open() } }
+                }
+            }
+        }
+    }
+
+    FloatingPanel {
+        id: communicationsSettingsPanel
+        width: 760
+        height: 650
+        panelTitle: t("communicationsSettings")
+        panelColor: root.panelColor
+        borderColor: root.borderColor
+        titleColor: root.textColor
+        textColor: root.textColor
+        property bool mqttEditable: false
+        property bool opcuaEditable: false
+        property bool aiEditable: false
+        onOpening: {
+            mqttEditable = false
+            opcuaEditable = false
+            aiEditable = false
+            mqttHostField.text = blanky.mqttBrokerHost
+            mqttPortField.text = String(blanky.mqttBrokerPort)
+            mqttPrefixField.text = blanky.mqttTopicPrefix
+            opcuaUrlField.text = blanky.opcuaUrl
+            openAiKeyField.text = ""
+            root.popupBackdropVisible = true
+            modalBackdrop.scheduleSnapshot()
+        }
+        onOpenedForBackdrop: modalBackdrop.scheduleSnapshot()
+        onClosedForBackdrop: root.popupBackdropVisible = settingsPanel.visible
+
+        MenuActionButton {
+            anchors.left: parent.left
+            anchors.top: parent.top
+            z: 2
+            text: "\u2190 " + t("backToSettings")
+            width: 150
+            height: 30
+            accentColor: root.accentColor
+            textColor: root.textColor
+            mutedText: root.mutedText
+            borderColor: root.borderColor
+            panelColor: root.panelAltColor
+            onClicked: { communicationsSettingsPanel.close(); settingsPanel.open() }
+        }
+
+        ScrollView {
+            id: communicationsSettingsScroll
+            anchors.fill: parent
+            anchors.topMargin: 38
+            clip: true
+            rightPadding: Math.round(14 * root.textScale)
+            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+            ScrollBar.vertical.policy: ScrollBar.AsNeeded
+
+            Column {
+                width: Math.max(communicationsSettingsScroll.availableWidth - Math.round(22 * root.textScale), 650)
+                spacing: 12
+
+                Rectangle {
+                    width: parent.width
+                    implicitHeight: communicationsIntro.implicitHeight + 22
+                    radius: 12
+                    color: root.panelAltColor
+                    border.color: root.borderColor
+                    border.width: 1
+                    Label {
+                        id: communicationsIntro
+                        anchors.fill: parent
+                        anchors.margins: 11
+                        text: t("communicationsSettingsIntro")
+                        color: root.textColor
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: 13
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+
+                Label { text: t("automaticConnections"); color: root.textColor; font.pixelSize: 16; font.bold: true }
+
+                RowLayout {
+                    width: parent.width
+                    spacing: 10
+                    Rectangle {
+                        Layout.fillWidth: true; Layout.preferredHeight: 88; radius: 12
+                        color: root.panelAltColor; border.color: root.borderColor; border.width: 1
+                        Column { anchors.fill: parent; anchors.margins: 11; spacing: 5
+                            Label { text: "\uD83C\uDFA4 " + t("microphone"); color: root.textColor; font.bold: true; font.pixelSize: 14 }
+                            Label { text: t("automaticMicrophoneInfo"); color: root.mutedText; wrapMode: Text.WordWrap; width: parent.width; font.pixelSize: 12 }
+                        }
+                    }
+                    Rectangle {
+                        Layout.fillWidth: true; Layout.preferredHeight: 88; radius: 12
+                        color: root.panelAltColor; border.color: root.borderColor; border.width: 1
+                        Column { anchors.fill: parent; anchors.margins: 11; spacing: 5
+                            Label { text: "\uD83D\uDCF1 " + t("mqttPhone"); color: root.textColor; font.bold: true; font.pixelSize: 14 }
+                            Label { text: t("automaticPhoneInfo"); color: root.mutedText; wrapMode: Text.WordWrap; width: parent.width; font.pixelSize: 12 }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    width: parent.width
+                    implicitHeight: automaticDetails.implicitHeight + 22
+                    radius: 12
+                    color: root.panelAltColor
+                    border.color: root.borderColor
+                    border.width: 1
+                    Column {
+                        id: automaticDetails
+                        anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 11
+                        spacing: 5
+                        Label { text: t("connectionGuidance"); color: root.textColor; font.bold: true; font.pixelSize: 14 }
+                        Label { text: t("connectionGuidanceInfo"); color: root.mutedText; wrapMode: Text.WordWrap; width: parent.width; font.pixelSize: 12 }
+                    }
+                }
+
+                Label { text: t("manualConnections"); color: root.textColor; font.pixelSize: 16; font.bold: true; topPadding: 4 }
+
+                Rectangle {
+                    width: parent.width
+                    implicitHeight: mqttSettingsColumn.implicitHeight + 22
+                    radius: 12
+                    color: root.panelAltColor
+                    opacity: communicationsSettingsPanel.mqttEditable ? 1 : 0.56
+                    border.color: communicationsSettingsPanel.mqttEditable ? root.warningColor : root.borderColor
+                    border.width: 1
+                    Column {
+                        id: mqttSettingsColumn
+                        anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 11
+                        spacing: 8
+                        RowLayout { width: parent.width
+                            Label { text: "\uD83D\uDCE1 " + t("mqttBrokerSettings"); color: root.textColor; font.bold: true; font.pixelSize: 14; Layout.fillWidth: true }
+                            MenuActionButton { text: communicationsSettingsPanel.mqttEditable ? "\u2713" : "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 28; Layout.preferredHeight: 26; accentColor: communicationsSettingsPanel.mqttEditable ? root.successColor : "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockCommunicationSetting"); onClicked: communicationsSettingsPanel.mqttEditable = !communicationsSettingsPanel.mqttEditable }
+                        }
+                        Label { text: t("mqttBrokerHelp"); color: root.mutedText; width: parent.width; wrapMode: Text.WordWrap; font.pixelSize: 12 }
+                        RowLayout { width: parent.width; spacing: 8
+                            TextField { id: mqttHostField; Layout.fillWidth: true; enabled: communicationsSettingsPanel.mqttEditable; placeholderText: t("mqttHost"); color: root.textColor; placeholderTextColor: root.mutedText; background: Rectangle { radius: 7; color: mqttHostField.enabled ? root.panelColor : root.panelAltColor; border.color: mqttHostField.enabled ? root.warningColor : root.borderColor; border.width: 1 } }
+                            TextField { id: mqttPortField; Layout.preferredWidth: 96; enabled: communicationsSettingsPanel.mqttEditable; inputMethodHints: Qt.ImhDigitsOnly; placeholderText: t("mqttPort"); color: root.textColor; placeholderTextColor: root.mutedText; background: Rectangle { radius: 7; color: mqttPortField.enabled ? root.panelColor : root.panelAltColor; border.color: mqttPortField.enabled ? root.warningColor : root.borderColor; border.width: 1 } }
+                            TextField { id: mqttPrefixField; Layout.preferredWidth: 130; enabled: communicationsSettingsPanel.mqttEditable; placeholderText: t("mqttPrefix"); color: root.textColor; placeholderTextColor: root.mutedText; background: Rectangle { radius: 7; color: mqttPrefixField.enabled ? root.panelColor : root.panelAltColor; border.color: mqttPrefixField.enabled ? root.warningColor : root.borderColor; border.width: 1 } }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    width: parent.width
+                    implicitHeight: opcuaSettingsColumn.implicitHeight + 22
+                    radius: 12
+                    color: root.panelAltColor
+                    opacity: communicationsSettingsPanel.opcuaEditable ? 1 : 0.56
+                    border.color: communicationsSettingsPanel.opcuaEditable ? root.warningColor : root.borderColor
+                    border.width: 1
+                    Column {
+                        id: opcuaSettingsColumn
+                        anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 11
+                        spacing: 8
+                        RowLayout { width: parent.width
+                            Label { text: "\uD83D\uDD17 " + t("opcuaSettings"); color: root.textColor; font.bold: true; font.pixelSize: 14; Layout.fillWidth: true }
+                            MenuActionButton { text: communicationsSettingsPanel.opcuaEditable ? "\u2713" : "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 28; Layout.preferredHeight: 26; accentColor: communicationsSettingsPanel.opcuaEditable ? root.successColor : "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockCommunicationSetting"); onClicked: communicationsSettingsPanel.opcuaEditable = !communicationsSettingsPanel.opcuaEditable }
+                        }
+                        Label { text: t("opcuaHelp"); color: root.mutedText; width: parent.width; wrapMode: Text.WordWrap; font.pixelSize: 12 }
+                        TextField { id: opcuaUrlField; width: parent.width; enabled: communicationsSettingsPanel.opcuaEditable; placeholderText: t("opcuaEndpoint"); color: root.textColor; placeholderTextColor: root.mutedText; background: Rectangle { radius: 7; color: opcuaUrlField.enabled ? root.panelColor : root.panelAltColor; border.color: opcuaUrlField.enabled ? root.warningColor : root.borderColor; border.width: 1 } }
+                    }
+                }
+
+                Rectangle {
+                    width: parent.width
+                    implicitHeight: openAiSettingsColumn.implicitHeight + 22
+                    radius: 12
+                    color: root.panelAltColor
+                    opacity: communicationsSettingsPanel.aiEditable ? 1 : 0.56
+                    border.color: communicationsSettingsPanel.aiEditable ? root.warningColor : root.borderColor
+                    border.width: 1
+                    Column {
+                        id: openAiSettingsColumn
+                        anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 11
+                        spacing: 8
+                        RowLayout { width: parent.width
+                            Label { text: "\u2728 " + t("openAiSettings"); color: root.textColor; font.bold: true; font.pixelSize: 14; Layout.fillWidth: true }
+                            Label { text: blanky.openAiKeyConfigured ? t("apiKeyConfigured") : t("apiKeyMissing"); color: blanky.openAiKeyConfigured ? root.successColor : root.warningColor; font.bold: true; font.pixelSize: 12 }
+                            MenuActionButton { text: communicationsSettingsPanel.aiEditable ? "\u2713" : "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 28; Layout.preferredHeight: 26; accentColor: communicationsSettingsPanel.aiEditable ? root.successColor : "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockCommunicationSetting"); onClicked: communicationsSettingsPanel.aiEditable = !communicationsSettingsPanel.aiEditable }
+                        }
+                        Label { text: t("openAiKeyHelp"); color: root.mutedText; width: parent.width; wrapMode: Text.WordWrap; font.pixelSize: 12 }
+                        RowLayout { width: parent.width; spacing: 8
+                            TextField { id: openAiKeyField; Layout.fillWidth: true; enabled: communicationsSettingsPanel.aiEditable; echoMode: TextInput.Password; placeholderText: t("openAiKeyPlaceholder"); color: root.textColor; placeholderTextColor: root.mutedText; background: Rectangle { radius: 7; color: openAiKeyField.enabled ? root.panelColor : root.panelAltColor; border.color: openAiKeyField.enabled ? root.warningColor : root.borderColor; border.width: 1 } }
+                            MenuActionButton { text: t("applyApiKey"); Layout.preferredWidth: 110; Layout.preferredHeight: 34; enabled: communicationsSettingsPanel.aiEditable && openAiKeyField.text.length > 0; accentColor: root.successColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; onClicked: { blanky.setOpenAiApiKey(openAiKeyField.text); openAiKeyField.text = ""; communicationsSettingsPanel.aiEditable = false } }
+                        }
+                    }
+                }
+
+                RowLayout {
+                    width: parent.width
+                    spacing: 10
+                    MenuActionButton { text: "\u21BA " + t("restoreCommunicationDefaults"); Layout.preferredWidth: 215; Layout.preferredHeight: 36; accentColor: root.warningColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; onClicked: { blanky.resetCommunicationSettings(); mqttHostField.text = blanky.mqttBrokerHost; mqttPortField.text = String(blanky.mqttBrokerPort); mqttPrefixField.text = blanky.mqttTopicPrefix; opcuaUrlField.text = blanky.opcuaUrl } }
+                    Item { Layout.fillWidth: true }
+                    MenuActionButton { text: "\u2713 " + t("applyCommunicationSettings"); Layout.preferredWidth: 170; Layout.preferredHeight: 36; accentColor: root.successColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; onClicked: { blanky.saveCommunicationSettings(mqttHostField.text, Number(mqttPortField.text), mqttPrefixField.text, opcuaUrlField.text); communicationsSettingsPanel.mqttEditable = false; communicationsSettingsPanel.opcuaEditable = false } }
                 }
             }
         }

@@ -23,9 +23,21 @@ from blanky.audio_service import (
     stop_playback,
     update_audio_input_settings,
 )
-from blanky.config import AUDIO_DIR, WAKEWORD_ENABLED
+from blanky.config import (
+    AUDIO_DIR,
+    MQTT_BROKER_HOST,
+    MQTT_BROKER_PORT,
+    MQTT_TOPIC_PREFIX,
+    OPCUA_URL,
+    WAKEWORD_ENABLED,
+)
 from blanky.mqtt_service import get_mqtt_bridge
-from blanky.speech_service import get_tts_voice_options, set_tts_voice, tts_speak_to_wav
+from blanky.speech_service import (
+    get_tts_voice_options,
+    set_openai_api_key,
+    set_tts_voice,
+    tts_speak_to_wav,
+)
 from blanky.voice_worker import VoiceWorker
 from blanky.wakeword_service import get_wakeword_service
 from blanky.command_parser import command_catalog_text, interpret_online_commands, parse_command
@@ -66,8 +78,11 @@ class BlankyController(QObject):
     audioSelectedProfileChanged = Signal()
     audioDiagnosticLogTextChanged = Signal()
     stateCompactChanged = Signal()
+    communicationSettingsChanged = Signal()
+    openAiKeyConfiguredChanged = Signal()
     textCommandsResolved = Signal(object, str)
-    textCommandsFailed = Signal()
+    textCommandsFailed = Signal(str)
+    textOnlineFallbackRequested = Signal()
 
     _SENSITIVITY_FACTOR_MIN = 1.20
     _SENSITIVITY_FACTOR_MAX = 2.60
@@ -94,9 +109,11 @@ class BlankyController(QObject):
             "language_status": "🇵🇹 Pronto — Português (PT)",
             "language_status_en": "🇬🇧 Pronto — Inglês (EN)",
             "text_status": "Comando por texto",
+            "text_offline_status": "Modo Offline",
             "text_online_interpreting": "A perceber...",
             "text_no_commands": "Não percebi",
             "text_online_error": "Não percebi",
+            "text_online_fallback": "Online indisponível. Foi usado o modo Offline.",
             "button_status": "Botão selecionado",
             "mqtt_status": "Comando pelo telemóvel",
             "voice_command_status": "Comando por voz",
@@ -152,9 +169,11 @@ class BlankyController(QObject):
             "language_status": "🇬🇧 Ready — English (EN)",
             "language_status_en": "🇵🇹 Ready — Portuguese (PT)",
             "text_status": "Text command",
+            "text_offline_status": "Offline mode",
             "text_online_interpreting": "Understanding...",
             "text_no_commands": "I did not understand",
             "text_online_error": "I did not understand",
+            "text_online_fallback": "Online is unavailable. Offline mode was used.",
             "button_status": "Button selected",
             "mqtt_status": "Command by phone",
             "voice_command_status": "Voice command",
@@ -217,6 +236,11 @@ class BlankyController(QObject):
         self._comm_details_compact = ""
         self._datetime_text = ""
         self._settings = QSettings("Blanky", "Blanky")
+        self._mqtt_broker_host = str(self._settings.value("mqttBrokerHost", MQTT_BROKER_HOST) or MQTT_BROKER_HOST)
+        self._mqtt_broker_port = self._saved_port_value("mqttBrokerPort", MQTT_BROKER_PORT)
+        self._mqtt_topic_prefix = str(self._settings.value("mqttTopicPrefix", MQTT_TOPIC_PREFIX) or MQTT_TOPIC_PREFIX).strip("/")
+        self._opcua_url = str(self._settings.value("opcuaUrl", OPCUA_URL) or OPCUA_URL)
+        self._openai_key_configured = bool(os.environ.get("OPENAI_API_KEY"))
         saved_appearance = str(self._settings.value("appearanceMode", "dark") or "dark").lower()
         legacy_large_readability = saved_appearance == "large_readability"
         self._appearance_mode = saved_appearance if saved_appearance in {
@@ -256,6 +280,10 @@ class BlankyController(QObject):
         self._audio_selected_profile = get_audio_input_preset()
 
         self._bridge = get_mqtt_bridge()
+        self._bridge.configure_connection(
+            self._mqtt_broker_host, self._mqtt_broker_port, self._mqtt_topic_prefix
+        )
+        self._bridge.configure_opcua_connection(self._opcua_url)
         self._bridge.set_ui_lang(self._language)
         self._wakeword = get_wakeword_service()
         self._wakeword.start()
@@ -282,6 +310,12 @@ class BlankyController(QObject):
     def _saved_appearance_value(self, key: str, default: float, minimum: float, maximum: float) -> float:
         try:
             return max(minimum, min(maximum, float(self._settings.value(key, default))))
+        except (TypeError, ValueError):
+            return default
+
+    def _saved_port_value(self, key: str, default: int) -> int:
+        try:
+            return max(1, min(65535, int(self._settings.value(key, default))))
         except (TypeError, ValueError):
             return default
 
@@ -447,6 +481,26 @@ class BlankyController(QObject):
     def audioSelectedProfile(self):
         return self._audio_selected_profile
 
+    @Property(str, notify=communicationSettingsChanged)
+    def mqttBrokerHost(self):
+        return self._mqtt_broker_host
+
+    @Property(int, notify=communicationSettingsChanged)
+    def mqttBrokerPort(self):
+        return self._mqtt_broker_port
+
+    @Property(str, notify=communicationSettingsChanged)
+    def mqttTopicPrefix(self):
+        return self._mqtt_topic_prefix
+
+    @Property(str, notify=communicationSettingsChanged)
+    def opcuaUrl(self):
+        return self._opcua_url
+
+    @Property(bool, notify=openAiKeyConfiguredChanged)
+    def openAiKeyConfigured(self):
+        return self._openai_key_configured
+
     @Property(str, notify=audioDiagnosticLogTextChanged)
     def audioDiagnosticLogText(self):
         if not self._audio_diagnostic_entries:
@@ -573,6 +627,44 @@ class BlankyController(QObject):
     @Slot(float)
     def setCustomContrast(self, value: float):
         self._set_custom_appearance_value("customContrast", value, 60.0, 100.0)
+
+    @Slot(str, int, str, str)
+    def saveCommunicationSettings(self, mqtt_host: str, mqtt_port: int, mqtt_prefix: str, opcua_url: str):
+        host = (mqtt_host or MQTT_BROKER_HOST).strip()
+        prefix = (mqtt_prefix or MQTT_TOPIC_PREFIX).strip().strip("/")
+        endpoint = (opcua_url or OPCUA_URL).strip()
+        try:
+            port = max(1, min(65535, int(mqtt_port)))
+        except (TypeError, ValueError):
+            port = MQTT_BROKER_PORT
+
+        self._mqtt_broker_host = host
+        self._mqtt_broker_port = port
+        self._mqtt_topic_prefix = prefix
+        self._opcua_url = endpoint
+        self._settings.setValue("mqttBrokerHost", host)
+        self._settings.setValue("mqttBrokerPort", port)
+        self._settings.setValue("mqttTopicPrefix", prefix)
+        self._settings.setValue("opcuaUrl", endpoint)
+        self._settings.sync()
+        self._bridge.configure_connection(host, port, prefix)
+        self._bridge.configure_opcua_connection(endpoint)
+        self.communicationSettingsChanged.emit()
+
+    @Slot()
+    def resetCommunicationSettings(self):
+        self.saveCommunicationSettings(MQTT_BROKER_HOST, MQTT_BROKER_PORT, MQTT_TOPIC_PREFIX, OPCUA_URL)
+
+    @Slot(str)
+    def setOpenAiApiKey(self, key: str):
+        key = (key or "").strip()
+        if not key:
+            return
+        os.environ["OPENAI_API_KEY"] = key
+        set_openai_api_key(key)
+        if not self._openai_key_configured:
+            self._openai_key_configured = True
+            self.openAiKeyConfiguredChanged.emit()
 
     @Slot(str)
     def setLanguage(self, lang: str):
@@ -807,14 +899,23 @@ class BlankyController(QObject):
         try:
             commands = interpret_online_commands(raw, self._language)
         except Exception:
-            self.textCommandsFailed.emit()
+            self.textCommandsFailed.emit(raw)
             return
         self.textCommandsResolved.emit(commands, raw)
 
     @Slot()
-    def _handle_text_online_error(self):
-        self._set_status(self._tr("text_online_error"))
-        self._set_recognized(self._tr("no_command_response"))
+    def _handle_text_online_error(self, raw: str):
+        commands = []
+        for phrase in re.split(r"[\n;]+", raw or ""):
+            phrase = phrase.strip()
+            if phrase:
+                command, _ = parse_command(phrase, self._language)
+                commands.append(command)
+        self._queue_text_commands(commands, raw)
+        # Keep the fallback explanation visible even after local commands are queued.
+        self._set_status(self._tr("text_offline_status"))
+        self._set_recognized(self._tr("text_online_fallback"))
+        self.textOnlineFallbackRequested.emit()
 
     @Slot(object, str)
     def _queue_text_commands(self, commands, raw: str):

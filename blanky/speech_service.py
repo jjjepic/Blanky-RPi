@@ -1,3 +1,5 @@
+import os
+
 from openai import OpenAI
 
 from blanky.config import (
@@ -9,8 +11,32 @@ from blanky.config import (
     TTS_VOICES_PT,
 )
 
-client = OpenAI()
+client = None
+_client_api_key = ""
 _ACTIVE_VOICE = TTS_VOICE_DEFAULT_PT
+
+
+def set_openai_api_key(api_key: str):
+    """Refresh the session client after the user changes the API key in settings."""
+    global client, _client_api_key
+    _client_api_key = (api_key or "").strip()
+    client = OpenAI(api_key=_client_api_key) if _client_api_key else None
+
+
+def is_openai_configured() -> bool:
+    return bool(_client_api_key or os.environ.get("OPENAI_API_KEY"))
+
+
+def _get_client():
+    """Create an OpenAI client only when an online speech feature is used."""
+    global client, _client_api_key
+    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY is not configured")
+    if client is None or api_key != _client_api_key:
+        client = OpenAI(api_key=api_key)
+        _client_api_key = api_key
+    return client
 
 
 def _looks_like_prompt_echo(text: str) -> bool:
@@ -69,7 +95,7 @@ def _transcribe_once(wav_path: str, lang: str, use_server_vad: bool):
 
     with open(wav_path, "rb") as f:
         kwargs["file"] = f
-        return client.audio.transcriptions.create(**kwargs)
+        return _get_client().audio.transcriptions.create(**kwargs)
 
 
 def stt_transcribe(wav_path: str, lang: str) -> str:
@@ -121,7 +147,7 @@ def tts_speak_to_wav(
             if lang == "pt"
             else "Speak at a natural, clear pace for industrial commands."
         )
-    speech = client.audio.speech.create(
+    speech = _get_client().audio.speech.create(
         model=TTS_MODEL,
         voice=voice or _ACTIVE_VOICE,
         input=text,
