@@ -1,4 +1,4 @@
-﻿import os
+import os
 import csv
 import queue
 import threading
@@ -40,14 +40,13 @@ from blanky.speech_service import (
 )
 from blanky.voice_worker import VoiceWorker
 from blanky.wakeword_service import get_wakeword_service
-from blanky.command_parser import command_catalog_text, interpret_online_commands, parse_command
+from blanky.command_parser import interpret_online_commands, parse_command
 from blanky.color_vision_profiles import get_profile_tokens
 
 
 class BlankyController(QObject):
     statusTextChanged = Signal()
     recognizedTextChanged = Signal()
-    commTextChanged = Signal()
     commStatusCompactChanged = Signal()
     commDetailsCompactChanged = Signal()
     dateTimeTextChanged = Signal()
@@ -56,7 +55,6 @@ class BlankyController(QObject):
     colorVisionProfileChanged = Signal()
     appearanceTextScaleChanged = Signal()
     customAppearanceChanged = Signal()
-    monitorLeftTextChanged = Signal()
     monitorEventsTextChanged = Signal()
     listeningChanged = Signal()
     languageChanged = Signal()
@@ -64,7 +62,6 @@ class BlankyController(QObject):
     ttsVoiceOptionsChanged = Signal()
     ttsSpeedChanged = Signal()
     canRepeatTtsChanged = Signal()
-    commandCatalogChanged = Signal()
     soundEnabledChanged = Signal()
     soundVolumeChanged = Signal()
     audioInputPresetChanged = Signal()
@@ -233,7 +230,6 @@ class BlankyController(QObject):
         super().__init__()
         self._status_text = self._language_status("pt")
         self._recognized_text = self._tr("awaiting_interaction", lang="pt")
-        self._comm_text = ""
         self._comm_status_compact = ""
         self._comm_details_compact = ""
         self._datetime_text = ""
@@ -261,8 +257,6 @@ class BlankyController(QObject):
         self._custom_brightness = self._saved_appearance_value("customBrightness", 46.0, 20.0, 80.0)
         self._custom_contrast = self._saved_appearance_value("customContrast", 88.0, 60.0, 100.0)
         self._dark_mode = self._appearance_mode != "light"
-        self._monitor_left_text = ""
-        self._monitor_events_text = ""
         self._monitor_events_rich_text = ""
         self._language = "pt"
         self._tts_voice = set_tts_voice("", self._language)
@@ -350,10 +344,6 @@ class BlankyController(QObject):
     def recognizedText(self):
         return self._recognized_text
 
-    @Property(str, notify=commTextChanged)
-    def commText(self):
-        return self._comm_text
-
     @Property(str, notify=commStatusCompactChanged)
     def commStatusCompact(self):
         return self._comm_status_compact
@@ -394,14 +384,6 @@ class BlankyController(QObject):
     def customContrast(self):
         return self._custom_contrast
 
-    @Property(str, notify=monitorLeftTextChanged)
-    def monitorLeftText(self):
-        return self._monitor_left_text
-
-    @Property(str, notify=monitorEventsTextChanged)
-    def monitorEventsText(self):
-        return self._monitor_events_text
-
     @Property(str, notify=monitorEventsTextChanged)
     def monitorEventsRichText(self):
         return self._monitor_events_rich_text
@@ -429,10 +411,6 @@ class BlankyController(QObject):
     @Property(bool, notify=canRepeatTtsChanged)
     def canRepeatTts(self):
         return bool(self._last_tts_text)
-
-    @Property(str, notify=commandCatalogChanged)
-    def commandCatalogText(self):
-        return command_catalog_text(self._language)
 
     @Property(QUrl, constant=True)
     def defaultExportFolder(self):
@@ -1079,11 +1057,6 @@ class BlankyController(QObject):
             self._recognized_text = text
             self.recognizedTextChanged.emit()
 
-    def _set_comm(self, text: str):
-        if self._comm_text != text:
-            self._comm_text = text
-            self.commTextChanged.emit()
-
     def _set_comm_status_compact(self, text: str):
         if self._comm_status_compact != text:
             self._comm_status_compact = text
@@ -1099,14 +1072,8 @@ class BlankyController(QObject):
             self._datetime_text = text
             self.dateTimeTextChanged.emit()
 
-    def _set_monitor_left_text(self, text: str):
-        if self._monitor_left_text != text:
-            self._monitor_left_text = text
-            self.monitorLeftTextChanged.emit()
-
-    def _set_monitor_events_text(self, text: str, rich_text: str):
-        if self._monitor_events_text != text or self._monitor_events_rich_text != rich_text:
-            self._monitor_events_text = text
+    def _set_monitor_events_rich_text(self, rich_text: str):
+        if self._monitor_events_rich_text != rich_text:
             self._monitor_events_rich_text = rich_text
             self.monitorEventsTextChanged.emit()
 
@@ -1263,45 +1230,6 @@ class BlankyController(QObject):
             f"<span><b>{html.escape(label)}</b> {html.escape(text)}</span>"
         )
 
-    def _preset_label(self, preset: str) -> str:
-        mapping = {
-            "simple": self._tr("simple"),
-            "balanced": self._tr("balanced"),
-            "noisy": self._tr("noisy"),
-            "custom": self._tr("custom"),
-        }
-        return mapping.get((preset or "").strip().lower(), preset or "--")
-
-    def _filter_status(self, enabled: bool) -> str:
-        return (
-            "<span style='color:#48d66b; font-weight:700;'>ON</span>"
-            if enabled
-            else "<span style='color:#8fa8b8;'>OFF</span>"
-        )
-
-    def _build_comm_line(self, health: dict) -> str:
-        wake = self._wakeword.health()
-        alerts = []
-        if health.get("opcua_last_error"):
-            alerts.append(
-                f"OPC UA · {self._communication_error_text(str(health.get('opcua_last_error')))}"
-            )
-        if WAKEWORD_ENABLED and wake.get("last_error"):
-            alerts.append(
-                f"Wake Word · {self._communication_error_text(str(wake.get('last_error')))}"
-            )
-        return "   |   ".join(alerts)
-
-    def _communication_error_text(self, raw_error: str) -> str:
-        normalized = (raw_error or "").strip().lower()
-        if "timed out" in normalized or "timeout" in normalized:
-            return (
-                "Tempo limite de comunicação excedido."
-                if self._language == "pt"
-                else "Communication timeout exceeded."
-            )
-        return (raw_error or "").strip()
-
     def _build_comm_status_compact(self, health: dict) -> str:
         wake = self._wakeword.health()
         states = {
@@ -1339,115 +1267,6 @@ class BlankyController(QObject):
             ),
         }
         return "|".join(f"{key}={value}" for key, value in details.items())
-
-    def _state_icon(self, key: str, value: int) -> str:
-        base_color = "#8fa8b8" if not value else "#63cbff"
-        labels = {
-            "start": "▶" if value else "⏸",
-            "mode_fast": "⚡",
-            "mode_ideal": "🎯",
-            "mode_manual": "🕹",
-            "mode_change": "🔁",
-            "motor_1": "⚙",
-            "motor_2": "⚙",
-            "motor_3": "⚙",
-            "cyl_a": "▰",
-            "cyl_b": "▰",
-            "cyl_c": "▰",
-            "cyl_d": "▰",
-            "light_green": "●",
-            "light_red": "●",
-            "robot_metal": "🤖",
-            "robot_nonmetal": "🤖",
-        }
-        color_overrides = {
-            "light_green": "#48d66b" if value else "#4e6f58",
-            "light_red": "#ff5c5c" if value else "#7d5151",
-            "start": "#3bd67f" if value else "#8fa8b8",
-        }
-        color = color_overrides.get(key, base_color)
-        label = labels.get(key, "ST")
-        return (
-            f"<span style='display:inline-block; min-width:22px; text-align:center; "
-            f"color:{color}; font-weight:700;'>{html.escape(label)}</span>"
-        )
-
-    def _build_monitor_left_text(self, snapshot: dict, health: dict) -> str:
-        state = snapshot.get("state", {})
-        mic = audio_info()
-        diag = mic.get("last_record_diag", {}) or {}
-        lines = ["<div style='font-family:Segoe UI, Noto Sans, sans-serif; font-size:13px; line-height:1.45;'>"]
-        lines.append("<div style='color:#63cbff; font-size:15px; font-weight:700;'>Áudio Diagnóstico</div>")
-        lines.append(
-            f"<div style='margin-top:6px;'><b>Dispositivo:</b> {html.escape(str(mic.get('input_device')))}"
-            f" &nbsp; <b>Sample rate:</b> {html.escape(str(mic.get('sample_rate')))} Hz</div>"
-        )
-        if diag:
-            settings = diag.get("audio_input_settings", {}) or {}
-            lines.append(
-                f"<div style='margin-top:8px;'><b>Preset ativo:</b> {html.escape(self._preset_label(str(diag.get('audio_input_preset', mic.get('input_preset')))))}"
-                f" &nbsp; <b>Fim da captação:</b> {html.escape(str(diag.get('end_reason') or '--'))}</div>"
-            )
-            lines.append(
-                "<div style='margin-top:6px;'><b>Duração</b> "
-                "total={:.2f}s | fala={:.2f}s | espera={:.2f}s | pre-roll={}ms</div>".format(
-                    float(diag.get("total_duration_s") or 0.0),
-                    float(diag.get("speech_duration_s") or 0.0),
-                    float(diag.get("waited_for_speech_s") or 0.0),
-                    int(diag.get("pre_roll_ms") or 0),
-                )
-            )
-            lines.append(
-                "<div style='margin-top:4px;'><b>Níveis RMS</b> "
-                "ruído={:.5f} | desvio={:.5f} | trigger={:.5f} | release={:.5f}</div>".format(
-                    float(diag.get("noise_floor_rms") or 0.0),
-                    float(diag.get("noise_std_rms") or 0.0),
-                    float(diag.get("trigger_rms") or 0.0),
-                    float(diag.get("release_rms") or 0.0),
-                )
-            )
-            lines.append(
-                "<div style='margin-top:4px;'><b>Captação</b> "
-                "fallback={} | pico={:.5f} | ganho aplicado={:.2f}x</div>".format(
-                    "sim" if bool(diag.get("fallback_started")) else "não",
-                    float(diag.get("captured_peak") or 0.0),
-                    float(diag.get("applied_gain") or 1.0),
-                )
-            )
-            lines.append(
-                "<div style='margin-top:8px;'><b>Ajuste do microfone</b> "
-                "sensibilidade={:.0f} | espera={:.2f}s | mínimo={:.2f}s | silêncio={:.2f}s | ganho máx={:.2f}x</div>".format(
-                    self._trigger_factor_to_sensitivity(float(settings.get("trigger_factor", 1.65))),
-                    float(settings.get("wait_for_speech_seconds") or 0.0),
-                    float(settings.get("min_record_seconds") or 0.0),
-                    float(settings.get("silence_hold_seconds") or 0.0),
-                    float(settings.get("max_gain") or 0.0),
-                )
-            )
-            lines.append(
-                "<div style='margin-top:4px;'><b>Filtros</b> "
-                f"corta-graves={self._filter_status(bool(diag.get('highpass_enabled')))} | "
-                f"noise gate={self._filter_status(bool(diag.get('noise_gate_enabled')))} | "
-                f"redução de ruído={self._filter_status(bool(diag.get('noise_reduction_enabled')))} | "
-                "fator={:.2f}</div>".format(float(diag.get("noise_subtract_factor") or 0.0))
-            )
-        else:
-            lines.append(
-                "<div style='margin-top:8px; color:#8fa8b8;'>Ainda não existe amostra gravada nesta sessão.</div>"
-            )
-
-        lines.append("<div style='margin-top:16px; color:#63cbff; font-size:15px; font-weight:700;'>Estado dos Componentes</div>")
-        for key in self._STATE_ORDER:
-            if key not in state:
-                continue
-            icon = self._state_icon(key, int(state[key]))
-            value_color = "#48d66b" if int(state[key]) else "#8fa8b8"
-            lines.append(
-                f"<div style='margin-top:4px;'>{icon} <b>{html.escape(str(key))}</b>: "
-                f"<span style='color:{value_color}; font-weight:700;'>{int(state[key])}</span></div>"
-            )
-        lines.append("</div>")
-        return "".join(lines)
 
     def _event_visual_color(self, command: str, accepted: bool) -> str:
         if self._appearance_mode == "high_contrast":
@@ -1516,30 +1335,6 @@ class BlankyController(QObject):
         if command == "ROBOT_TO_NONMETAL":
             return colors["robot"]
         return colors["normal"]
-
-    def _build_monitor_event_lines(self, snapshot: dict) -> list[tuple[str, str]]:
-        events = snapshot.get("events", [])
-        id_w = 5
-        time_w = 8
-        source_w = 10
-        command_w = 18
-        status_w = 9
-        lines: list[tuple[str, str]] = []
-        for ev in events:
-            status = "✓ OK" if ev.get("accepted") else "✕ REJECT"
-            source = self._source_label(str(ev.get("source") or ""))
-            event_id = int(ev.get("id", 0) or 0)
-            command = str(ev.get("command") or "")
-            detail = self._localized_event_detail(ev)
-            line = (
-                f"{f'[{event_id:03d}]':<{id_w}} | {str(ev.get('time') or ''):<{time_w}} | "
-                f"{source:<{source_w}} | {command:<{command_w}} | {status:<{status_w}} | {detail}"
-            )
-            lines.append((line, self._event_visual_color(command, bool(ev.get("accepted")))))
-        return lines
-
-    def _build_monitor_events_text(self, snapshot: dict) -> str:
-        return "\n".join(line for line, _ in self._build_monitor_event_lines(snapshot))
 
     def _build_monitor_events_rich_text(self, snapshot: dict) -> str:
         id_w = 5
@@ -1886,14 +1681,9 @@ class BlankyController(QObject):
         health["microphone_ready"] = bool(mic.get("ready"))
         self._update_state_compact(snapshot.get("state", {}))
 
-        self._set_comm(self._build_comm_line(health))
         self._set_comm_status_compact(self._build_comm_status_compact(health))
         self._set_comm_details_compact(self._build_comm_details_compact(health))
-        self._set_monitor_left_text(self._build_monitor_left_text(snapshot, health))
-        self._set_monitor_events_text(
-            self._build_monitor_events_text(snapshot),
-            self._build_monitor_events_rich_text(snapshot),
-        )
+        self._set_monitor_events_rich_text(self._build_monitor_events_rich_text(snapshot))
 
         if not self._listening:
             for ev in self._wakeword.get_events():
