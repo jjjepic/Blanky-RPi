@@ -181,16 +181,17 @@ FloatingPanel {
                             required property var modelData
                             readonly property color cardColor: dialog.semanticColor(modelData.tone)
                             readonly property bool hovered: hoverArea.containsMouse
+                            readonly property bool strongHover: hovered && (typeof blanky === "undefined" || blanky.hoverAnimationsEnabled)
                             readonly property real cardLuminance: 0.2126 * cardColor.r + 0.7152 * cardColor.g + 0.0722 * cardColor.b
                             readonly property color hoverTextColor: cardLuminance > 0.62 ? "#07111a" : "#f7fbff"
                             Layout.preferredWidth: (parent.width - parent.columnSpacing) / 2
                             Layout.preferredHeight: Math.round(104 * dialog.textScale)
                             radius: Math.round(12 * dialog.textScale)
-                            color: hovered ? cardColor : dialog.panelAltColor
+                            color: strongHover ? cardColor : (hovered ? Qt.lighter(dialog.panelAltColor, 1.16) : dialog.panelAltColor)
                             border.color: cardColor
-                            border.width: hovered ? 2 : 1
-                            scale: hovered ? 1.012 : 1.0
-                            z: hovered ? 1 : 0
+                            border.width: strongHover ? 2 : 1
+                            scale: strongHover ? 1.012 : 1.0
+                            z: strongHover ? 1 : 0
 
                             Behavior on color { ColorAnimation { duration: 140 } }
                             Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
@@ -198,14 +199,14 @@ FloatingPanel {
                                 anchors.fill: parent
                                 anchors.margins: Math.round(11 * dialog.textScale)
                                 spacing: Math.round(11 * dialog.textScale)
-                                Rectangle { Layout.preferredWidth: 4; Layout.fillHeight: true; radius: 2; color: hovered ? hoverTextColor : cardColor }
-                                Label { text: modelData.icon; color: hovered ? hoverTextColor : cardColor; font.pixelSize: Math.round(24 * dialog.textScale); font.bold: true }
+                                Rectangle { Layout.preferredWidth: 4; Layout.fillHeight: true; radius: 2; color: strongHover ? hoverTextColor : cardColor }
+                                Label { text: modelData.icon; color: strongHover ? hoverTextColor : cardColor; font.pixelSize: Math.round(24 * dialog.textScale); font.bold: true }
                                 ColumnLayout {
                                     Layout.fillWidth: true
                                     Layout.alignment: Qt.AlignVCenter
                                     spacing: 3
-                                    Label { text: modelData.title; color: hovered ? hoverTextColor : dialog.titleColor; font.bold: true; font.pixelSize: Math.round(15 * dialog.textScale); Layout.fillWidth: true; elide: Text.ElideRight }
-                                    Label { text: modelData.summary; color: hovered ? hoverTextColor : dialog.mutedText; font.pixelSize: Math.round(11 * dialog.textScale); Layout.fillWidth: true; wrapMode: Text.WordWrap; maximumLineCount: 2; elide: Text.ElideRight }
+                                    Label { text: modelData.title; color: strongHover ? hoverTextColor : dialog.titleColor; font.bold: true; font.pixelSize: Math.round(15 * dialog.textScale); Layout.fillWidth: true; elide: Text.ElideRight }
+                                    Label { text: modelData.summary; color: strongHover ? hoverTextColor : dialog.mutedText; font.pixelSize: Math.round(11 * dialog.textScale); Layout.fillWidth: true; wrapMode: Text.WordWrap; maximumLineCount: 2; elide: Text.ElideRight }
                                 }
                             }
                             MouseArea { id: hoverArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: dialog.showSection(modelData.id) }

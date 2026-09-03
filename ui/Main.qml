@@ -799,7 +799,7 @@ ApplicationWindow {
                                 MenuActionButton {
                                     text: t("exportReport")
                                     toolTip: t("tooltipExportReport")
-                                    Layout.preferredWidth: 130
+                                    Layout.preferredWidth: Math.round(160 * root.controlScale)
                                     Layout.preferredHeight: Math.round(38 * root.controlScale)
                                     accentColor: root.accentColor
                                     textColor: root.textColor
@@ -1381,16 +1381,17 @@ ApplicationWindow {
                                     Rectangle {
                                         readonly property color commandColor: modelData.color
                                         readonly property bool hovered: commandHelpCardMouse.containsMouse
+                                        readonly property bool strongHover: hovered && blanky.hoverAnimationsEnabled
                                         readonly property real commandLuminance: 0.2126 * commandColor.r + 0.7152 * commandColor.g + 0.0722 * commandColor.b
                                         readonly property color hoverTextColor: commandLuminance > 0.62 ? "#07111a" : "#f7fbff"
                                         Layout.preferredWidth: (parent.width - parent.columnSpacing) / 2
                                         Layout.preferredHeight: 122
                                         radius: 11
-                                        color: hovered ? commandColor : root.panelAltColor
-                                        border.color: hovered ? Qt.lighter(commandColor, 1.12) : root.borderColor
-                                        border.width: hovered ? 2 : 1
-                                        scale: hovered ? 1.012 : 1.0
-                                        z: hovered ? 1 : 0
+                                        color: strongHover ? commandColor : (hovered ? Qt.lighter(root.panelAltColor, 1.16) : root.panelAltColor)
+                                        border.color: strongHover ? Qt.lighter(commandColor, 1.12) : root.borderColor
+                                        border.width: strongHover ? 2 : 1
+                                        scale: strongHover ? 1.012 : 1.0
+                                        z: strongHover ? 1 : 0
 
                                         Behavior on color { ColorAnimation { duration: 140 } }
                                         Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
@@ -1403,14 +1404,14 @@ ApplicationWindow {
                                             RowLayout {
                                                 Layout.fillWidth: true
                                                 spacing: 7
-                                                Label { text: modelData.icon; color: hovered ? hoverTextColor : commandColor; font.pixelSize: 18; font.bold: true }
-                                                Label { text: modelData.title; color: hovered ? hoverTextColor : root.textColor; font.pixelSize: 14; font.bold: true; Layout.fillWidth: true }
-                                                Label { text: modelData.code; color: hovered ? hoverTextColor : root.mutedText; font.pixelSize: 9; font.bold: true; elide: Text.ElideLeft }
+                                                Label { text: modelData.icon; color: strongHover ? hoverTextColor : commandColor; font.pixelSize: 18; font.bold: true }
+                                                Label { text: modelData.title; color: strongHover ? hoverTextColor : root.textColor; font.pixelSize: 14; font.bold: true; Layout.fillWidth: true }
+                                                Label { text: modelData.code; color: strongHover ? hoverTextColor : root.mutedText; font.pixelSize: 9; font.bold: true; elide: Text.ElideLeft }
                                             }
                                             Label {
                                                 Layout.fillWidth: true
                                                 text: modelData.description
-                                                color: hovered ? hoverTextColor : root.textColor
+                                                color: strongHover ? hoverTextColor : root.textColor
                                                 font.pixelSize: 12
                                                 wrapMode: Text.WordWrap
                                             }
@@ -1418,7 +1419,7 @@ ApplicationWindow {
                                                 Layout.fillWidth: true
                                                 Layout.fillHeight: true
                                                 text: (blanky.language === "pt" ? "Exemplos: " : "Examples: ") + modelData.examples
-                                                color: hovered ? hoverTextColor : root.mutedText
+                                                color: strongHover ? hoverTextColor : root.mutedText
                                                 font.pixelSize: 11
                                                 wrapMode: Text.WordWrap
                                             }
@@ -1463,8 +1464,9 @@ ApplicationWindow {
 
     FloatingPanel {
         id: appearancePanel
-        width: Math.min(Math.round(680 * root.controlScale), Math.max(360, root.width - 24))
-        height: Math.min(Math.round(560 * root.controlScale), Math.max(360, root.height - 24))
+        // Reserve the maximum readability size from the start to prevent panel jumps.
+        width: Math.min(Math.round(680 * 1.14), Math.max(360, root.width - 24))
+        height: Math.min(Math.round(615 * 1.14), Math.max(360, root.height - 24))
         panelTitle: t("appearanceAccessibility")
         panelColor: root.panelColor
         borderColor: root.borderColor
@@ -1511,16 +1513,17 @@ ApplicationWindow {
                             readonly property bool selected: blanky.appearanceMode === modelData.id
                             readonly property color modeColor: modelData.tone
                             readonly property bool hovered: appearanceModeMouse.containsMouse
+                            readonly property bool strongHover: hovered && blanky.hoverAnimationsEnabled
                             readonly property real modeLuminance: 0.2126 * modeColor.r + 0.7152 * modeColor.g + 0.0722 * modeColor.b
                             readonly property color hoverTextColor: modeLuminance > 0.62 ? "#07111a" : "#f7fbff"
                             Layout.fillWidth: true
                             Layout.preferredHeight: Math.round(74 * root.controlScale)
                             radius: 10
-                            color: hovered ? modeColor : (selected ? Qt.lighter(root.panelAltColor, root.dark ? 1.16 : 1.03) : root.panelAltColor)
-                            border.color: selected || hovered ? modeColor : Qt.darker(modeColor, root.dark ? 1.65 : 1.18)
-                            border.width: selected || hovered ? 2 : 1
-                            scale: hovered ? 1.012 : 1.0
-                            z: hovered ? 1 : 0
+                            color: strongHover ? modeColor : (hovered ? Qt.lighter(root.panelAltColor, 1.16) : (selected ? Qt.lighter(root.panelAltColor, root.dark ? 1.16 : 1.03) : root.panelAltColor))
+                            border.color: selected || strongHover ? modeColor : Qt.darker(modeColor, root.dark ? 1.65 : 1.18)
+                            border.width: selected || strongHover ? 2 : 1
+                            scale: strongHover ? 1.012 : 1.0
+                            z: strongHover ? 1 : 0
 
                             Behavior on color { ColorAnimation { duration: 140 } }
                             Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
@@ -1534,16 +1537,16 @@ ApplicationWindow {
                                     Layout.preferredWidth: 4
                                     Layout.fillHeight: true
                                     radius: 2
-                                    color: hovered ? hoverTextColor : modeColor
+                                    color: strongHover ? hoverTextColor : modeColor
                                 }
-                                Label { text: modelData.icon; color: hovered ? hoverTextColor : modeColor; font.pixelSize: Math.round(23 * root.textScale) }
+                                Label { text: modelData.icon; color: strongHover ? hoverTextColor : modeColor; font.pixelSize: Math.round(23 * root.textScale) }
                                 ColumnLayout {
                                     Layout.fillWidth: true
                                     spacing: 3
-                                    Label { text: modelData.title; color: hovered ? hoverTextColor : (selected ? modeColor : root.textColor); font.bold: true; font.pixelSize: Math.round(14 * root.textScale); Layout.fillWidth: true }
-                                    Label { text: modelData.description; color: hovered ? hoverTextColor : root.mutedText; font.pixelSize: Math.round(10 * root.textScale); Layout.fillWidth: true; elide: Text.ElideRight }
+                                    Label { text: modelData.title; color: strongHover ? hoverTextColor : (selected ? modeColor : root.textColor); font.bold: true; font.pixelSize: Math.round(14 * root.textScale); Layout.fillWidth: true }
+                                    Label { text: modelData.description; color: strongHover ? hoverTextColor : root.mutedText; font.pixelSize: Math.round(10 * root.textScale); Layout.fillWidth: true; elide: Text.ElideRight }
                                 }
-                                Label { text: selected ? "✓" : "○"; color: hovered ? hoverTextColor : (selected ? modeColor : root.inactiveColor); font.pixelSize: Math.round(18 * root.textScale); font.bold: true }
+                                Label { text: selected ? "✓" : "○"; color: strongHover ? hoverTextColor : (selected ? modeColor : root.inactiveColor); font.pixelSize: Math.round(18 * root.textScale); font.bold: true }
                             }
 
                             MouseArea {
@@ -1587,7 +1590,7 @@ ApplicationWindow {
                         Label { text: Math.round(blanky.appearanceTextScale * 100) + "%"; color: root.accentColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
                         MenuActionButton {
                             text: t("resetSize")
-                            Layout.preferredWidth: 58
+                            Layout.preferredWidth: Math.round(68 * root.controlScale)
                             Layout.preferredHeight: 24
                             accentColor: root.inactiveColor
                             textColor: root.textColor
@@ -1609,6 +1612,34 @@ ApplicationWindow {
                         onMoved: blanky.setAppearanceTextScale(value)
                     }
                 }
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Math.round(60 * root.controlScale)
+                    radius: 9
+                    color: root.panelAltColor
+                    border.color: root.borderColor
+                    border.width: 1
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 12
+                        spacing: 10
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 2
+                            Label { text: t("hoverAnimations"); color: root.textColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale); Layout.fillWidth: true }
+                            Label { text: t("hoverAnimationsDescription"); color: root.mutedText; font.pixelSize: Math.round(10 * root.textScale); Layout.fillWidth: true; elide: Text.ElideRight }
+                        }
+
+                        Switch {
+                            checked: blanky.hoverAnimationsEnabled
+                            onToggled: blanky.setHoverAnimationsEnabled(checked)
+                        }
+                    }
                 }
 
                 Rectangle {
@@ -1681,17 +1712,18 @@ ApplicationWindow {
                         required property var modelData
                         readonly property bool selected: blanky.colorVisionProfile === modelData.id
                         readonly property bool hovered: colorVisionProfileMouse.containsMouse
+                        readonly property bool strongHover: hovered && blanky.hoverAnimationsEnabled
                         readonly property real profileLuminance: 0.2126 * modelData.tone.r + 0.7152 * modelData.tone.g + 0.0722 * modelData.tone.b
                         readonly property color hoverTextColor: profileLuminance > 0.62 ? "#07111a" : "#f7fbff"
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         Layout.minimumHeight: 102
                         radius: 10
-                        color: hovered ? modelData.tone : (selected ? Qt.lighter(root.panelAltColor, root.dark ? 1.18 : 1.04) : root.panelAltColor)
-                        border.color: selected || hovered ? modelData.tone : Qt.darker(modelData.tone, root.dark ? 1.55 : 1.12)
-                        border.width: selected || hovered ? 2 : 1
-                        scale: hovered ? 1.012 : 1.0
-                        z: hovered ? 1 : 0
+                        color: strongHover ? modelData.tone : (hovered ? Qt.lighter(root.panelAltColor, 1.16) : (selected ? Qt.lighter(root.panelAltColor, root.dark ? 1.18 : 1.04) : root.panelAltColor))
+                        border.color: selected || strongHover ? modelData.tone : Qt.darker(modelData.tone, root.dark ? 1.55 : 1.12)
+                        border.width: selected || strongHover ? 2 : 1
+                        scale: strongHover ? 1.012 : 1.0
+                        z: strongHover ? 1 : 0
 
                         Behavior on color { ColorAnimation { duration: 140 } }
                         Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
@@ -1705,8 +1737,8 @@ ApplicationWindow {
                                 Layout.preferredWidth: 36
                                 Layout.preferredHeight: 36
                                 radius: 18
-                                color: hovered ? hoverTextColor : Qt.darker(modelData.tone, root.dark ? 2.8 : 1.18)
-                                border.color: hovered ? hoverTextColor : modelData.tone
+                                color: strongHover ? hoverTextColor : Qt.darker(modelData.tone, root.dark ? 2.8 : 1.18)
+                                border.color: strongHover ? hoverTextColor : modelData.tone
                                 border.width: 1
                                 Label { anchors.centerIn: parent; text: modelData.icon; color: modelData.tone; font.bold: true; font.pixelSize: Math.round(17 * root.textScale) }
                             }
@@ -1716,11 +1748,11 @@ ApplicationWindow {
                                 spacing: 4
                                 RowLayout {
                                     Layout.fillWidth: true
-                                    Label { text: modelData.title; color: hovered ? hoverTextColor : (selected ? modelData.tone : root.textColor); font.bold: true; font.pixelSize: Math.round(14 * root.textScale); Layout.fillWidth: true }
-                                    Label { visible: modelData.recommended; text: t("recommended"); color: hovered ? hoverTextColor : root.warningColor; font.bold: true; font.pixelSize: Math.round(9 * root.textScale) }
+                                    Label { text: modelData.title; color: strongHover ? hoverTextColor : (selected ? modelData.tone : root.textColor); font.bold: true; font.pixelSize: Math.round(14 * root.textScale); Layout.fillWidth: true }
+                                    Label { visible: modelData.recommended; text: t("recommended"); color: strongHover ? hoverTextColor : root.warningColor; font.bold: true; font.pixelSize: Math.round(9 * root.textScale) }
                                 }
-                                Label { text: modelData.description; color: hovered ? hoverTextColor : root.mutedText; font.pixelSize: Math.round(10 * root.textScale); Layout.fillWidth: true; wrapMode: Text.WordWrap; maximumLineCount: 2; elide: Text.ElideRight }
-                                Label { text: selected ? "✓ " + t("active") : "○ " + t("inactive"); color: hovered ? hoverTextColor : (selected ? modelData.tone : root.inactiveColor); font.bold: true; font.pixelSize: Math.round(10 * root.textScale) }
+                                Label { text: modelData.description; color: strongHover ? hoverTextColor : root.mutedText; font.pixelSize: Math.round(10 * root.textScale); Layout.fillWidth: true; wrapMode: Text.WordWrap; maximumLineCount: 2; elide: Text.ElideRight }
+                                Label { text: selected ? "✓ " + t("active") : "○ " + t("inactive"); color: strongHover ? hoverTextColor : (selected ? modelData.tone : root.inactiveColor); font.bold: true; font.pixelSize: Math.round(10 * root.textScale) }
                             }
                         }
 
@@ -1926,13 +1958,14 @@ ApplicationWindow {
                         radius: 14
                         readonly property bool selectedVoice: modelData === blanky.ttsVoice
                         readonly property bool hovered: voiceCardMouse.containsMouse
+                        readonly property bool strongHover: hovered && blanky.hoverAnimationsEnabled
                         readonly property real successLuminance: 0.2126 * root.successColor.r + 0.7152 * root.successColor.g + 0.0722 * root.successColor.b
                         readonly property color hoverTextColor: successLuminance > 0.62 ? "#07111a" : "#f7fbff"
-                        color: hovered ? root.successColor : (selectedVoice ? Qt.lighter(root.panelAltColor, 1.35) : root.panelAltColor)
-                        border.color: selectedVoice || hovered ? root.successColor : root.borderColor
-                        border.width: selectedVoice || hovered ? 2 : 1
-                        scale: hovered ? 1.012 : 1.0
-                        z: hovered ? 1 : 0
+                        color: strongHover ? root.successColor : (hovered ? Qt.lighter(root.panelAltColor, 1.16) : (selectedVoice ? Qt.lighter(root.panelAltColor, 1.35) : root.panelAltColor))
+                        border.color: selectedVoice || strongHover ? root.successColor : root.borderColor
+                        border.width: selectedVoice || strongHover ? 2 : 1
+                        scale: strongHover ? 1.012 : 1.0
+                        z: strongHover ? 1 : 0
 
                         Behavior on color { ColorAnimation { duration: 140 } }
                         Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
@@ -1958,14 +1991,14 @@ ApplicationWindow {
 
                                 Label {
                                     text: selectedVoice ? "●" : "○"
-                                    color: hovered ? hoverTextColor : (selectedVoice ? root.successColor : root.mutedText)
+                                    color: strongHover ? hoverTextColor : (selectedVoice ? root.successColor : root.mutedText)
                                     font.pixelSize: 18
                                     font.bold: true
                                 }
 
                                 Label {
                                     text: root.voiceName(modelData)
-                                    color: hovered ? hoverTextColor : root.textColor
+                                    color: strongHover ? hoverTextColor : root.textColor
                                     font.pixelSize: 17
                                     font.bold: true
                                     Layout.fillWidth: true
@@ -1974,7 +2007,7 @@ ApplicationWindow {
                                 Label {
                                     visible: selectedVoice
                                     text: t("selected")
-                                    color: hovered ? hoverTextColor : root.successColor
+                                    color: strongHover ? hoverTextColor : root.successColor
                                     font.pixelSize: 10
                                     font.bold: true
                                 }
@@ -1983,7 +2016,7 @@ ApplicationWindow {
                             Label {
                                 Layout.fillWidth: true
                                 text: root.voiceMood(modelData)
-                                color: hovered ? hoverTextColor : root.mutedText
+                                color: strongHover ? hoverTextColor : root.mutedText
                                 font.pixelSize: 11
                                 font.bold: true
                                 elide: Text.ElideRight
@@ -1994,7 +2027,7 @@ ApplicationWindow {
                                 Layout.fillHeight: true
                                 wrapMode: Text.WordWrap
                                 text: root.voiceDescription(modelData)
-                                color: hovered ? hoverTextColor : root.textColor
+                                color: strongHover ? hoverTextColor : root.textColor
                                 font.pixelSize: 12
                             }
 
