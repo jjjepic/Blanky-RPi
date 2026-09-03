@@ -1464,9 +1464,12 @@ ApplicationWindow {
 
     FloatingPanel {
         id: appearancePanel
-        // Reserve the maximum readability size from the start to prevent panel jumps.
+        // Grow with the reading scale while keeping the panel compact at normal size.
         width: Math.min(Math.round(680 * 1.14), Math.max(360, root.width - 24))
-        height: Math.min(Math.round(615 * 1.14), Math.max(360, root.height - 24))
+        height: Math.min(
+            Math.round(610 + (blanky.appearanceTextScale - 1.0) * 360),
+            Math.max(360, root.height - 24)
+        )
         panelTitle: t("appearanceAccessibility")
         panelColor: root.panelColor
         borderColor: root.borderColor
@@ -1690,14 +1693,6 @@ ApplicationWindow {
             anchors.fill: parent
             spacing: 12
 
-            Label {
-                Layout.fillWidth: true
-                text: t("colorVisionProfileIntro")
-                color: root.mutedText
-                font.pixelSize: Math.round(12 * root.textScale)
-                wrapMode: Text.WordWrap
-            }
-
             GridLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
@@ -1771,29 +1766,34 @@ ApplicationWindow {
 
             Rectangle {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 86
-                radius: 8
+                Layout.preferredHeight: Math.round(74 * root.controlScale)
+                radius: 9
                 color: root.panelAltColor
                 border.color: root.borderColor
                 border.width: 1
+
                 ColumnLayout {
                     anchors.fill: parent
-                    anchors.margins: 10
+                    anchors.leftMargin: 12
+                    anchors.rightMargin: 12
                     spacing: 4
-                    Label { text: t("colorVisionStateMatrix"); color: root.textColor; font.bold: true; font.pixelSize: Math.round(11 * root.textScale) }
-                    GridLayout {
+                    Label {
+                        text: t("appearancePreview")
+                        color: root.textColor
+                        font.bold: true
+                        font.pixelSize: Math.round(12 * root.textScale)
                         Layout.fillWidth: true
-                        columns: 3
-                        columnSpacing: 10
-                        rowSpacing: 3
-                        Label { text: "✓ ON"; color: root.successColor; font.bold: true; font.pixelSize: Math.round(11 * root.textScale) }
-                        Label { text: "! " + t("warning"); color: root.warningColor; font.bold: true; font.pixelSize: Math.round(11 * root.textScale) }
-                        Label { text: "✕ " + t("error"); color: root.errorColor; font.bold: true; font.pixelSize: Math.round(11 * root.textScale) }
-                        Label { text: "○ OFF"; color: root.inactiveColor; font.bold: true; font.pixelSize: Math.round(11 * root.textScale) }
-                        Label { text: "✓ " + t("eventOk"); color: root.successColor; font.bold: true; font.pixelSize: Math.round(11 * root.textScale) }
-                        Label { text: "✕ " + t("eventReject"); color: root.errorColor; font.bold: true; font.pixelSize: Math.round(11 * root.textScale) }
                     }
-                    Label { text: t("colorVisionDisclaimer"); color: root.mutedText; font.pixelSize: Math.round(9 * root.textScale); Layout.fillWidth: true; wrapMode: Text.WordWrap; horizontalAlignment: Text.AlignRight }
+                    Flow {
+                        Layout.fillWidth: true
+                        spacing: 14
+                        Label { text: "✓ " + t("connected"); color: root.successColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
+                        Label { text: "! " + t("warning"); color: root.warningColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
+                        Label { text: "✕ " + t("error"); color: root.errorColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
+                        Label { text: "○ " + t("inactive"); color: root.inactiveColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
+                        Label { text: "✓ ON"; color: root.successColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
+                        Label { text: "○ OFF"; color: root.inactiveColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
+                    }
                 }
             }
         }

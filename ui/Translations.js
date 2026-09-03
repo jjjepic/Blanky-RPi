@@ -38,7 +38,7 @@ var TEXT = {
         monochrome: "Monocromático",
         enhancedReadability: "Legibilidade ampliada",
         enhancedReadabilityDescription: "Textos e controlos maiores para facilitar a leitura.",
-        customAppearance: "Personalizada",
+        customAppearance: "Personalizado",
         customAppearanceDescription: "Ajuste as cores da interface ao seu gosto.",
         readabilitySize: "Tamanho da leitura",
         resetSize: "Repor",
