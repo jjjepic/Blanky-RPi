@@ -54,6 +54,7 @@ class BlankyController(QObject):
     appearanceModeChanged = Signal()
     colorVisionProfileChanged = Signal()
     appearanceTextScaleChanged = Signal()
+    hoverAnimationsEnabledChanged = Signal()
     customAppearanceChanged = Signal()
     monitorEventsTextChanged = Signal()
     listeningChanged = Signal()
@@ -253,6 +254,9 @@ class BlankyController(QObject):
         self._appearance_text_scale = self._saved_appearance_value(
             "appearanceTextScale", 1.18 if legacy_large_readability else 1.0, 1.0, 1.25
         )
+        self._hover_animations_enabled = bool(
+            self._settings.value("hoverAnimationsEnabled", True, type=bool)
+        )
         self._custom_hue = self._saved_appearance_value("customHue", 205.0, 0.0, 360.0)
         self._custom_brightness = self._saved_appearance_value("customBrightness", 46.0, 20.0, 80.0)
         self._custom_contrast = self._saved_appearance_value("customContrast", 88.0, 60.0, 100.0)
@@ -371,6 +375,10 @@ class BlankyController(QObject):
     @Property(float, notify=appearanceTextScaleChanged)
     def appearanceTextScale(self):
         return self._appearance_text_scale
+
+    @Property(bool, notify=hoverAnimationsEnabledChanged)
+    def hoverAnimationsEnabled(self):
+        return self._hover_animations_enabled
 
     @Property(float, notify=customAppearanceChanged)
     def customHue(self):
@@ -623,6 +631,16 @@ class BlankyController(QObject):
         self._settings.sync()
         self.appearanceTextScaleChanged.emit()
         self.monitorEventsTextChanged.emit()
+
+    @Slot(bool)
+    def setHoverAnimationsEnabled(self, enabled: bool):
+        enabled = bool(enabled)
+        if self._hover_animations_enabled == enabled:
+            return
+        self._hover_animations_enabled = enabled
+        self._settings.setValue("hoverAnimationsEnabled", enabled)
+        self._settings.sync()
+        self.hoverAnimationsEnabledChanged.emit()
 
     @Slot(float)
     def setCustomHue(self, value: float):
