@@ -1091,12 +1091,12 @@ ApplicationWindow {
         Item {
             anchors.fill: parent
             clip: true
-            opacity: root.dark ? 0.16 : 0.08
+            opacity: root.dark ? 0.13 : 0.07
 
-            Rectangle { width: parent.width * 0.62; height: 2; x: -parent.width * 0.09; y: parent.height * 0.23; rotation: 0; color: root.accentColor }
-            Rectangle { width: parent.width * 0.34; height: parent.height * 0.8; x: -parent.width * 0.22; y: parent.height * 0.3; rotation: -34; color: root.accentColor; opacity: 0.16 }
-            Rectangle { width: parent.width * 0.28; height: parent.height * 0.72; x: parent.width * 0.94; y: parent.height * 0.18; rotation: 34; color: root.accentColor; opacity: 0.14 }
-            Rectangle { width: parent.width * 0.32; height: 2; x: parent.width * 0.72; y: parent.height * 0.73; color: root.accentColor }
+            Rectangle { width: parent.width * 0.44; height: 1; x: 0; y: parent.height * 0.26; color: root.accentColor }
+            Rectangle { width: parent.width * 0.25; height: 1; x: -parent.width * 0.03; y: parent.height * 0.62; rotation: 28; color: root.accentColor }
+            Rectangle { width: parent.width * 0.25; height: 1; x: parent.width * 0.78; y: parent.height * 0.62; rotation: -28; color: root.accentColor }
+            Rectangle { width: parent.width * 0.28; height: 1; x: parent.width * 0.72; y: parent.height * 0.76; color: root.accentColor }
         }
 
         ColumnLayout {
@@ -1137,7 +1137,7 @@ ApplicationWindow {
                     id: menuContent
                     width: Math.min(homeMenuFlickable.width - 20, 1040)
                     anchors.horizontalCenter: parent.horizontalCenter
-                    y: Math.max(12, (homeMenuFlickable.height - implicitHeight) / 2)
+                    y: 12
                     spacing: 14
 
                     RowLayout {
@@ -1154,7 +1154,7 @@ ApplicationWindow {
 
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: generalCard.implicitHeight + viewChoices.anchors.margins * 2 + 68
+                        Layout.preferredHeight: viewChoices.implicitHeight + viewChoices.anchors.margins * 2
                         radius: 22
                         color: root.panelAltColor
                         border.color: root.accentColor
@@ -1212,14 +1212,18 @@ ApplicationWindow {
 
                                     GridLayout {
                                         Layout.preferredWidth: Math.round(82 * root.controlScale)
+                                        Layout.minimumWidth: Math.round(82 * root.controlScale)
+                                        Layout.maximumWidth: Math.round(82 * root.controlScale)
                                         Layout.preferredHeight: Math.round(70 * root.controlScale)
+                                        Layout.minimumHeight: Math.round(70 * root.controlScale)
+                                        Layout.maximumHeight: Math.round(70 * root.controlScale)
                                         columns: 2
                                         columnSpacing: 8
                                         rowSpacing: 8
-                                        Rectangle { Layout.fillWidth: true; Layout.fillHeight: true; radius: 5; color: root.accentColor }
-                                        Rectangle { Layout.fillWidth: true; Layout.fillHeight: true; radius: 5; color: root.accentColor }
-                                        Rectangle { Layout.fillWidth: true; Layout.fillHeight: true; radius: 5; color: root.accentColor }
-                                        Rectangle { Layout.fillWidth: true; Layout.fillHeight: true; radius: 5; color: root.accentColor }
+                                        Rectangle { Layout.preferredWidth: Math.round(35 * root.controlScale); Layout.preferredHeight: Math.round(29 * root.controlScale); radius: 5; color: "transparent"; border.color: root.accentColor; border.width: 4 }
+                                        Rectangle { Layout.preferredWidth: Math.round(35 * root.controlScale); Layout.preferredHeight: Math.round(29 * root.controlScale); radius: 5; color: "transparent"; border.color: root.accentColor; border.width: 4 }
+                                        Rectangle { Layout.preferredWidth: Math.round(35 * root.controlScale); Layout.preferredHeight: Math.round(29 * root.controlScale); radius: 5; color: "transparent"; border.color: root.accentColor; border.width: 4 }
+                                        Rectangle { Layout.preferredWidth: Math.round(35 * root.controlScale); Layout.preferredHeight: Math.round(29 * root.controlScale); radius: 5; color: "transparent"; border.color: root.accentColor; border.width: 4 }
                                     }
 
                                     Rectangle { Layout.preferredWidth: 2; Layout.fillHeight: true; Layout.topMargin: 18; Layout.bottomMargin: 18; color: root.accentColor; opacity: 0.85 }
@@ -1265,7 +1269,7 @@ ApplicationWindow {
                                     }
                                     contentItem: RowLayout {
                                         anchors.fill: parent; anchors.margins: 19; spacing: 15
-                                        Label { text: "🎙"; color: root.successColor; font.pixelSize: Math.round(42 * root.textScale) }
+                                        Label { Layout.preferredWidth: 52; text: "🎙"; color: root.successColor; font.pixelSize: Math.round(42 * root.textScale); horizontalAlignment: Text.AlignHCenter }
                                         ColumnLayout {
                                             Layout.fillWidth: true
                                             spacing: 3
@@ -1301,7 +1305,27 @@ ApplicationWindow {
                                     }
                                     contentItem: RowLayout {
                                         anchors.fill: parent; anchors.margins: 19; spacing: 15
-                                        Label { text: "▤"; color: root.warningColor; font.pixelSize: Math.round(46 * root.textScale) }
+                                        Item {
+                                            Layout.preferredWidth: 52
+                                            Layout.preferredHeight: 52
+                                            Rectangle {
+                                                width: 42; height: 32
+                                                anchors.horizontalCenter: parent.horizontalCenter
+                                                y: 5
+                                                radius: 5
+                                                color: "transparent"
+                                                border.color: root.warningColor
+                                                border.width: 3
+                                                Column {
+                                                    anchors.centerIn: parent
+                                                    spacing: 4
+                                                    Rectangle { width: 25; height: 2; color: root.warningColor }
+                                                    Rectangle { width: 25; height: 2; color: root.warningColor }
+                                                    Rectangle { width: 18; height: 2; color: root.warningColor }
+                                                }
+                                            }
+                                            Rectangle { width: 14; height: 3; x: 7; y: 38; rotation: -32; color: root.warningColor }
+                                        }
                                         ColumnLayout {
                                             Layout.fillWidth: true
                                             spacing: 3
@@ -1337,7 +1361,16 @@ ApplicationWindow {
                                     }
                                     contentItem: RowLayout {
                                         anchors.fill: parent; anchors.margins: 19; spacing: 15
-                                        Label { text: "☷"; color: "#cf8cff"; font.pixelSize: Math.round(45 * root.textScale) }
+                                        Item {
+                                            Layout.preferredWidth: 52
+                                            Layout.preferredHeight: 52
+                                            Rectangle { width: 3; height: 43; x: 8; y: 4; radius: 2; color: "#cf8cff" }
+                                            Rectangle { width: 3; height: 43; x: 25; y: 4; radius: 2; color: "#cf8cff" }
+                                            Rectangle { width: 3; height: 43; x: 42; y: 4; radius: 2; color: "#cf8cff" }
+                                            Rectangle { width: 12; height: 12; x: 3; y: 12; radius: 6; color: root.panelColor; border.color: "#cf8cff"; border.width: 3 }
+                                            Rectangle { width: 12; height: 12; x: 20; y: 29; radius: 6; color: root.panelColor; border.color: "#cf8cff"; border.width: 3 }
+                                            Rectangle { width: 12; height: 12; x: 37; y: 18; radius: 6; color: root.panelColor; border.color: "#cf8cff"; border.width: 3 }
+                                        }
                                         ColumnLayout {
                                             Layout.fillWidth: true
                                             spacing: 3
@@ -1373,7 +1406,20 @@ ApplicationWindow {
                                     }
                                     contentItem: RowLayout {
                                         anchors.fill: parent; anchors.margins: 19; spacing: 15
-                                        Label { text: "▯"; color: root.accentColor; font.pixelSize: Math.round(49 * root.textScale) }
+                                        Item {
+                                            Layout.preferredWidth: 52
+                                            Layout.preferredHeight: 52
+                                            Rectangle {
+                                                width: 27; height: 47
+                                                anchors.centerIn: parent
+                                                radius: 5
+                                                color: "transparent"
+                                                border.color: root.accentColor
+                                                border.width: 3
+                                                Rectangle { width: 9; height: 2; anchors.horizontalCenter: parent.horizontalCenter; y: 5; color: root.accentColor }
+                                                Rectangle { width: 4; height: 4; radius: 2; anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 4; color: root.accentColor }
+                                            }
+                                        }
                                         ColumnLayout {
                                             Layout.fillWidth: true
                                             spacing: 3
