@@ -53,6 +53,15 @@ ApplicationWindow {
     property bool transitionToMenu: false
     property var audioManualOverrides: ({})
     readonly property int rightPanelWidth: 660
+    readonly property int homeGeneralCardHeight: Math.round(134 * controlScale + (textScale - 1.0) * 44)
+    readonly property int homeSecondaryCardHeight: Math.round(112 * controlScale + (textScale - 1.0) * 44)
+    readonly property int homeViewPanelHeight: Math.round(
+        48 * spacingScale
+        + 51 * textScale
+        + homeGeneralCardHeight
+        + 2 * homeSecondaryCardHeight
+        + 50 * spacingScale
+    )
 
     function formatPercent(value) {
         return Math.round(Number(value) * 100) + "%"
@@ -415,6 +424,24 @@ ApplicationWindow {
         onTriggered: {
             root.homeMenuVisible = root.transitionToMenu
             root.viewTransitionActive = false
+        }
+    }
+
+    Timer {
+        id: homeMenuRelayoutTimer
+        interval: 0
+        repeat: false
+        onTriggered: {
+            homeMenuFlickable.contentY = 0
+        }
+    }
+
+    Connections {
+        target: blanky
+        function onAppearanceTextScaleChanged() {
+            homeMenuRelayoutTimer.restart()
+            if (root.popupBackdropVisible)
+                modalBackdrop.scheduleSnapshot(false)
         }
     }
 
@@ -1135,12 +1162,13 @@ ApplicationWindow {
                 Layout.fillHeight: true
                 clip: true
                 contentWidth: width
-                contentHeight: menuContent.implicitHeight + 24
+                contentHeight: menuContent.height + 24
                 boundsBehavior: Flickable.StopAtBounds
 
                 ColumnLayout {
                     id: menuContent
                     width: Math.min(homeMenuFlickable.width - 20, 1040)
+                    height: implicitHeight
                     anchors.horizontalCenter: parent.horizontalCenter
                     y: 12
                     spacing: 14
@@ -1159,7 +1187,7 @@ ApplicationWindow {
 
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: viewChoices.implicitHeight + viewChoices.anchors.margins * 2
+                        Layout.preferredHeight: root.homeViewPanelHeight
                         radius: 22
                         color: root.panelAltColor
                         border.color: root.accentColor
@@ -1194,7 +1222,7 @@ ApplicationWindow {
                                 readonly property bool strongHover: hovered && blanky.hoverAnimationsEnabled
                                 readonly property color hoverTextColor: root.hoverForeground(cardAccent)
                                 Layout.fillWidth: true
-                                Layout.preferredHeight: Math.round(134 * root.controlScale + (root.textScale - 1.0) * 44)
+                                Layout.preferredHeight: root.homeGeneralCardHeight
                                 hoverEnabled: true
                                 focusPolicy: Qt.StrongFocus
                                 focus: homeMenu.visible
@@ -1274,7 +1302,7 @@ ApplicationWindow {
                                     readonly property bool strongHover: hovered && blanky.hoverAnimationsEnabled
                                     readonly property color hoverTextColor: root.hoverForeground(cardAccent)
                                     Layout.fillWidth: true
-                                    Layout.preferredHeight: Math.round(112 * root.controlScale + (root.textScale - 1.0) * 44)
+                                    Layout.preferredHeight: root.homeSecondaryCardHeight
                                     hoverEnabled: true; focusPolicy: Qt.StrongFocus; padding: 0
                                     scale: strongHover ? 1.015 : 1.0
                                     z: hovered ? 1 : 0
@@ -1321,7 +1349,7 @@ ApplicationWindow {
                                     readonly property bool strongHover: hovered && blanky.hoverAnimationsEnabled
                                     readonly property color hoverTextColor: root.hoverForeground(cardAccent)
                                     Layout.fillWidth: true
-                                    Layout.preferredHeight: Math.round(112 * root.controlScale + (root.textScale - 1.0) * 44)
+                                    Layout.preferredHeight: root.homeSecondaryCardHeight
                                     hoverEnabled: true; focusPolicy: Qt.StrongFocus; padding: 0
                                     scale: strongHover ? 1.015 : 1.0
                                     z: hovered ? 1 : 0
@@ -1389,7 +1417,7 @@ ApplicationWindow {
                                     readonly property bool strongHover: hovered && blanky.hoverAnimationsEnabled
                                     readonly property color hoverTextColor: root.hoverForeground(cardAccent)
                                     Layout.fillWidth: true
-                                    Layout.preferredHeight: Math.round(112 * root.controlScale + (root.textScale - 1.0) * 44)
+                                    Layout.preferredHeight: root.homeSecondaryCardHeight
                                     hoverEnabled: true; focusPolicy: Qt.StrongFocus; padding: 0
                                     scale: strongHover ? 1.015 : 1.0
                                     z: hovered ? 1 : 0
@@ -1446,7 +1474,7 @@ ApplicationWindow {
                                     readonly property bool strongHover: hovered && blanky.hoverAnimationsEnabled
                                     readonly property color hoverTextColor: root.hoverForeground(cardAccent)
                                     Layout.fillWidth: true
-                                    Layout.preferredHeight: Math.round(112 * root.controlScale + (root.textScale - 1.0) * 44)
+                                    Layout.preferredHeight: root.homeSecondaryCardHeight
                                     hoverEnabled: true; focusPolicy: Qt.StrongFocus; padding: 0
                                     scale: strongHover ? 1.015 : 1.0
                                     z: hovered ? 1 : 0
@@ -1646,8 +1674,9 @@ ApplicationWindow {
             }, Qt.size(Math.max(1, Math.round(width / 5)), Math.max(1, Math.round(height / 5))))
         }
 
-        function scheduleSnapshot() {
-            modalBackdrop.snapshotUrl = ""
+        function scheduleSnapshot(clearExisting) {
+            if (clearExisting !== false)
+                modalBackdrop.snapshotUrl = ""
             snapshotTimer.restart()
         }
 
