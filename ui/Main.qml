@@ -48,6 +48,7 @@ ApplicationWindow {
     property double systemTransitionStartedAt: 0
     property string textBotMode: "online"
     property bool homeMenuVisible: true
+    property string activeView: "general"
     property var audioManualOverrides: ({})
     readonly property int rightPanelWidth: 660
 
@@ -159,7 +160,8 @@ ApplicationWindow {
             volumePopover.open()
     }
 
-    function openGeneralView() {
+    function openView(view) {
+        root.activeView = view
         root.homeMenuVisible = false
     }
 
@@ -632,6 +634,7 @@ ApplicationWindow {
             id: primaryControlsPanel
             Layout.fillWidth: true
             Layout.rightMargin: root.rightPanelWidth + 12
+            visible: root.activeView === "general" || root.activeView === "voice"
             color: root.panelColor
             border.color: root.borderColor
             border.width: 1
@@ -856,7 +859,7 @@ ApplicationWindow {
                         }
 
                         Rectangle {
-                            visible: !root.systemTransitionActive
+                            visible: !root.systemTransitionActive && (root.activeView === "general" || root.activeView === "text")
                             Layout.fillWidth: true
                             Layout.preferredHeight: Math.round(88 * root.controlScale + (root.textScale - 1.0) * 34)
                             Layout.minimumHeight: Layout.preferredHeight
@@ -958,6 +961,7 @@ ApplicationWindow {
 
                 DirectControlPanel {
                     id: directControlPanel
+                    visible: root.activeView === "general"
                     Layout.alignment: Qt.AlignTop
                     Layout.fillHeight: true
                     Layout.topMargin: 0
@@ -1069,7 +1073,7 @@ ApplicationWindow {
             Rectangle {
                 Layout.alignment: Qt.AlignHCenter
                 Layout.preferredWidth: 540
-                Layout.preferredHeight: 180
+                Layout.preferredHeight: 260
                 radius: 16
                 color: root.panelAltColor
                 border.color: root.accentColor
@@ -1079,13 +1083,20 @@ ApplicationWindow {
                     anchors.fill: parent
                     anchors.margins: 22
                     spacing: 9
-                    Label { text: "◈  " + (blanky.language === "pt" ? "Geral" : "General"); color: root.textColor; font.pixelSize: 25; font.bold: true; Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter }
-                    Label { text: blanky.language === "pt" ? "Aceda à visão completa com voz, Text-Bot, comunicações, eventos e painel de operação." : "Open the complete view with voice, Text-Bot, communications, events and operation panel."; color: root.mutedText; font.pixelSize: 14; wrapMode: Text.WordWrap; Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter }
-                    MenuActionButton { text: blanky.language === "pt" ? "Abrir modo Geral  ›" : "Open General mode  ›"; Layout.alignment: Qt.AlignHCenter; Layout.preferredWidth: 240; Layout.preferredHeight: 42; accentColor: root.accentColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; onClicked: root.openGeneralView() }
+                    Label { text: blanky.language === "pt" ? "Escolha uma vista" : "Choose a view"; color: root.textColor; font.pixelSize: 25; font.bold: true; Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter }
+                    Label { text: blanky.language === "pt" ? "Todas usam o mesmo sistema, eventos e comunicações." : "All views use the same system, events and communications."; color: root.mutedText; font.pixelSize: 14; wrapMode: Text.WordWrap; Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 10
+                        MenuActionButton { text: "◈  " + (blanky.language === "pt" ? "Geral" : "General"); Layout.fillWidth: true; Layout.preferredHeight: 48; accentColor: root.accentColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; onClicked: root.openView("general") }
+                        MenuActionButton { text: "🎙  " + (blanky.language === "pt" ? "Voz" : "Voice"); Layout.fillWidth: true; Layout.preferredHeight: 48; accentColor: root.successColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; onClicked: root.openView("voice") }
+                        MenuActionButton { text: "⌨  Text-Bot"; Layout.fillWidth: true; Layout.preferredHeight: 48; accentColor: root.warningColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; onClicked: root.openView("text") }
+                    }
+                    Label { text: blanky.language === "pt" ? "Voz destaca o reconhecimento e os controlos de resposta. Text-Bot destaca a introdução de comandos." : "Voice highlights recognition and response controls. Text-Bot highlights command input."; color: root.mutedText; font.pixelSize: 13; wrapMode: Text.WordWrap; Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter }
                 }
             }
 
-            Label { Layout.fillWidth: true; text: blanky.language === "pt" ? "As vistas focadas de Voz, Text-Bot, Painel de Operação e Telemóvel serão acrescentadas depois de validar este menu no Raspberry Pi." : "The focused Voice, Text-Bot, Operation Panel and Phone views will be added after this menu is validated on the Raspberry Pi."; color: root.mutedText; font.pixelSize: 13; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap }
+            Label { Layout.fillWidth: true; text: blanky.language === "pt" ? "Painel de Operação e Telemóvel serão acrescentados na etapa seguinte." : "Operation Panel and Phone will be added in the next stage."; color: root.mutedText; font.pixelSize: 13; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap }
 
             Item { Layout.fillHeight: true }
         }
