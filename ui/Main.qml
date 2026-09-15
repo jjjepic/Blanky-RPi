@@ -35,6 +35,10 @@ ApplicationWindow {
     readonly property color warningColor: theme.warning
     readonly property color errorColor: theme.error
     readonly property color inactiveColor: theme.inactive
+    readonly property color phoneCardColor: blanky.appearanceMode === "monochrome" ? root.textColor
+        : blanky.appearanceMode === "high_contrast" ? root.warningColor
+        : blanky.appearanceMode === "colorblind" || blanky.appearanceMode === "custom" ? root.warningColor
+        : blanky.appearanceMode === "light" ? "#a84632" : "#ff8a65"
     readonly property real textScale: theme.textScale
     readonly property real controlScale: theme.controlScale
     readonly property real spacingScale: theme.spacingScale
@@ -583,6 +587,8 @@ ApplicationWindow {
                     width: 50
                     height: 44
                     textPixelSize: 22
+                    textHorizontalOffset: 1
+                    textVerticalOffset: 1
                     accentColor: blanky.soundEnabled ? root.accentColor : root.inactiveColor
                     textColor: root.textColor
                     mutedText: root.mutedText
@@ -625,6 +631,7 @@ ApplicationWindow {
                     width: 50
                     height: 44
                     textPixelSize: 21
+                    textVerticalOffset: 1
                     accentColor: root.errorColor
                     textColor: root.textColor
                     mutedText: root.mutedText
@@ -823,6 +830,14 @@ ApplicationWindow {
             }
         }
 
+        Item {
+            id: featuredTextBotSlot
+            visible: !root.systemTransitionActive && root.activeView === "text"
+            Layout.fillWidth: true
+            Layout.preferredHeight: Math.round(132 * root.controlScale + (root.textScale - 1.0) * 42)
+            Layout.minimumHeight: Layout.preferredHeight
+        }
+
         Rectangle {
             id: workspacePanel
             Layout.fillWidth: true
@@ -944,20 +959,28 @@ ApplicationWindow {
                             }
                         }
 
-                        Rectangle {
-                            visible: !root.systemTransitionActive && (root.activeView === "general" || root.activeView === "text")
+                        Item {
+                            id: generalTextBotSlot
+                            visible: !root.systemTransitionActive && root.activeView === "general"
                             Layout.fillWidth: true
                             Layout.preferredHeight: Math.round(88 * root.controlScale + (root.textScale - 1.0) * 34)
                             Layout.minimumHeight: Layout.preferredHeight
+                        }
+
+                        Rectangle {
+                            id: textBotPanel
+                            parent: root.activeView === "text" ? featuredTextBotSlot : generalTextBotSlot
+                            anchors.fill: parent
+                            visible: !root.systemTransitionActive && (root.activeView === "general" || root.activeView === "text")
                             color: root.panelAltColor
-                            border.color: root.borderColor
-                            border.width: 1
-                            radius: 10
+                            border.color: root.activeView === "text" ? root.accentColor : root.borderColor
+                            border.width: root.activeView === "text" ? 2 : 1
+                            radius: root.activeView === "text" ? 14 : 10
 
                             ColumnLayout {
                                 anchors.fill: parent
-                                anchors.margins: 8
-                                spacing: 6
+                                anchors.margins: root.activeView === "text" ? 14 : 8
+                                spacing: root.activeView === "text" ? 10 : 6
 
                                 RowLayout {
                                     Layout.fillWidth: true
@@ -968,19 +991,19 @@ ApplicationWindow {
                                         text: t("textBot").toUpperCase()
                                         color: root.accentColor
                                         font.bold: true
-                                        font.pixelSize: Math.round(14 * root.textScale)
+                                        font.pixelSize: Math.round((root.activeView === "text" ? 17 : 14) * root.textScale)
                                     }
                                     Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: root.borderColor }
                                     MenuActionButton {
                                         text: t("textBotOffline")
-                                        Layout.preferredWidth: 82; Layout.preferredHeight: Math.round(28 * root.controlScale)
+                                        Layout.preferredWidth: root.activeView === "text" ? 100 : 82; Layout.preferredHeight: Math.round((root.activeView === "text" ? 34 : 28) * root.controlScale)
                                         accentColor: root.textBotMode === "offline" ? root.successColor : root.inactiveColor
                                         textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor
                                         onClicked: root.textBotMode = "offline"
                                     }
                                     MenuActionButton {
                                         text: t("textBotOnline")
-                                        Layout.preferredWidth: 82; Layout.preferredHeight: Math.round(28 * root.controlScale)
+                                        Layout.preferredWidth: root.activeView === "text" ? 100 : 82; Layout.preferredHeight: Math.round((root.activeView === "text" ? 34 : 28) * root.controlScale)
                                         accentColor: root.textBotMode === "online" ? root.accentColor : root.inactiveColor
                                         textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor
                                         onClicked: root.textBotMode = "online"
@@ -1007,7 +1030,7 @@ ApplicationWindow {
                                             placeholderText: t("textBotPlaceholder")
                                             placeholderTextColor: root.mutedText
                                             color: root.textColor
-                                            font.pixelSize: Math.round(12 * root.textScale)
+                                            font.pixelSize: Math.round((root.activeView === "text" ? 15 : 12) * root.textScale)
                                             background: Rectangle {
                                                 color: root.panelColor
                                                 border.color: root.borderColor
@@ -1141,18 +1164,18 @@ ApplicationWindow {
 
                 Row {
                     spacing: 7
+                    MenuActionButton { id: appearanceMenuButton; iconText: root.appearanceIcon(); width: 48; height: 42; textPixelSize: 20; accentColor: root.accentColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; toolTip: t("tooltipAppearance"); KeyNavigation.tab: portugueseMenuButton; onClicked: appearancePanel.open() }
                     MenuActionButton { id: portugueseMenuButton; text: "🇵🇹"; width: 50; height: 42; textPixelSize: 18; accentColor: blanky.language === "pt" ? root.successColor : root.inactiveColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; KeyNavigation.tab: englishMenuButton; onClicked: blanky.setLanguage("pt") }
-                    MenuActionButton { id: englishMenuButton; text: "🇬🇧"; width: 50; height: 42; textPixelSize: 18; accentColor: blanky.language === "en" ? root.successColor : root.inactiveColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; KeyNavigation.tab: appearanceMenuButton; onClicked: blanky.setLanguage("en") }
+                    MenuActionButton { id: englishMenuButton; text: "🇬🇧"; width: 50; height: 42; textPixelSize: 18; accentColor: blanky.language === "en" ? root.successColor : root.inactiveColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; KeyNavigation.tab: helpMenuButton; onClicked: blanky.setLanguage("en") }
                 }
 
                 Item { Layout.fillWidth: true }
 
                 Row {
                     spacing: 7
-                    MenuActionButton { id: appearanceMenuButton; iconText: root.appearanceIcon(); width: 48; height: 42; textPixelSize: 20; accentColor: root.accentColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; toolTip: t("tooltipAppearance"); KeyNavigation.tab: helpMenuButton; onClicked: appearancePanel.open() }
                     MenuActionButton { id: helpMenuButton; text: "?"; width: 48; height: 42; textPixelSize: 20; accentColor: root.accentColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; toolTip: blanky.language === "pt" ? "Ajuda / Tutorial" : "Help / Tutorial"; KeyNavigation.tab: settingsMenuButton; onClicked: { helpPanel.showHome(); helpPanel.open() } }
                     MenuActionButton { id: settingsMenuButton; iconText: "⚙"; width: 48; height: 42; textPixelSize: 20; accentColor: root.accentColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; toolTip: t("tooltipSettings"); KeyNavigation.tab: shutdownMenuButton; onClicked: settingsPanel.open() }
-                    MenuActionButton { id: shutdownMenuButton; iconText: "⏻"; width: 48; height: 42; textPixelSize: 20; accentColor: root.errorColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; toolTip: t("tooltipShutdown"); KeyNavigation.tab: generalCard; onClicked: root.beginSystemTransition("shutdown") }
+                    MenuActionButton { id: shutdownMenuButton; iconText: "⏻"; width: 48; height: 42; textPixelSize: 20; textVerticalOffset: 1; accentColor: root.errorColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; toolTip: t("tooltipShutdown"); KeyNavigation.tab: generalCard; onClicked: root.beginSystemTransition("shutdown") }
                 }
             }
 
@@ -1556,7 +1579,7 @@ ApplicationWindow {
 
                                 Button {
                                     id: phoneCard
-                                    readonly property color cardAccent: root.accentColor
+                                    readonly property color cardAccent: root.phoneCardColor
                                     readonly property bool strongHover: hovered && blanky.hoverAnimationsEnabled
                                     readonly property color hoverTextColor: root.hoverForeground(cardAccent)
                                     Layout.fillWidth: true
@@ -1940,6 +1963,8 @@ ApplicationWindow {
                     text: root.volumeGlyph()
                     iconOnly: true
                     textPixelSize: 15
+                    textHorizontalOffset: 1
+                    textVerticalOffset: 1
                     Layout.preferredWidth: 34
                     Layout.preferredHeight: 34
                     accentColor: blanky.soundEnabled ? "#63cbff" : "#ff6b6b"
