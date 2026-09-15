@@ -47,6 +47,7 @@ ApplicationWindow {
     property int systemTransitionProgress: 0
     property double systemTransitionStartedAt: 0
     property string textBotMode: "online"
+    property bool homeMenuVisible: true
     property var audioManualOverrides: ({})
     readonly property int rightPanelWidth: 660
 
@@ -156,6 +157,10 @@ ApplicationWindow {
             volumePopover.close()
         else
             volumePopover.open()
+    }
+
+    function openGeneralView() {
+        root.homeMenuVisible = false
     }
 
     function beginSystemTransition(action) {
@@ -363,6 +368,7 @@ ApplicationWindow {
     Item {
         id: dashboardLayer
         anchors.fill: parent
+        visible: !root.homeMenuVisible
 
         Rectangle {
             anchors.fill: parent
@@ -386,6 +392,20 @@ ApplicationWindow {
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 7
+
+                MenuActionButton {
+                    iconText: "⌂"
+                    width: 50
+                    height: 44
+                    textPixelSize: 22
+                    accentColor: root.accentColor
+                    textColor: root.textColor
+                    mutedText: root.mutedText
+                    borderColor: root.borderColor
+                    panelColor: root.panelAltColor
+                    toolTip: blanky.language === "pt" ? "Menu Inicial" : "Main Menu"
+                    onClicked: root.homeMenuVisible = true
+                }
 
                 MenuActionButton {
                     iconText: root.appearanceIcon()
@@ -993,6 +1013,82 @@ ApplicationWindow {
         stateMap: root.commStateMap
     }
 
+    }
+
+    Rectangle {
+        id: homeMenu
+        anchors.fill: parent
+        visible: root.homeMenuVisible
+        color: root.bgColor
+        z: 20
+
+        gradient: Gradient {
+            GradientStop { position: 0.0; color: theme.backgroundTop }
+            GradientStop { position: 1.0; color: root.bgColor }
+        }
+
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 28
+            spacing: 20
+
+            RowLayout {
+                Layout.fillWidth: true
+
+                Row {
+                    spacing: 7
+                    MenuActionButton { text: "🇵🇹"; width: 50; height: 42; textPixelSize: 18; accentColor: blanky.language === "pt" ? root.successColor : root.inactiveColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; onClicked: blanky.setLanguage("pt") }
+                    MenuActionButton { text: "🇬🇧"; width: 50; height: 42; textPixelSize: 18; accentColor: blanky.language === "en" ? root.successColor : root.inactiveColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; onClicked: blanky.setLanguage("en") }
+                }
+
+                Item { Layout.fillWidth: true }
+
+                Row {
+                    spacing: 7
+                    MenuActionButton { iconText: root.appearanceIcon(); width: 48; height: 42; textPixelSize: 20; accentColor: root.accentColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; toolTip: t("tooltipAppearance"); onClicked: appearancePanel.open() }
+                    MenuActionButton { text: "?"; width: 48; height: 42; textPixelSize: 20; accentColor: root.accentColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; toolTip: blanky.language === "pt" ? "Ajuda / Tutorial" : "Help / Tutorial"; onClicked: { helpPanel.showHome(); helpPanel.open() } }
+                    MenuActionButton { iconText: "⚙"; width: 48; height: 42; textPixelSize: 20; accentColor: root.accentColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; toolTip: t("tooltipSettings"); onClicked: settingsPanel.open() }
+                    MenuActionButton { iconText: "⏻"; width: 48; height: 42; textPixelSize: 20; accentColor: root.errorColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; toolTip: t("tooltipShutdown"); onClicked: root.beginSystemTransition("shutdown") }
+                }
+            }
+
+            Item { Layout.fillHeight: true }
+
+            RowLayout {
+                Layout.alignment: Qt.AlignHCenter
+                spacing: 14
+
+                Image { source: root.logoSource(); Layout.preferredWidth: 86; Layout.preferredHeight: 86; fillMode: Image.PreserveAspectFit; smooth: true }
+                ColumnLayout {
+                    spacing: 3
+                    Label { text: "Blanky"; color: root.accentColor; font.pixelSize: 46; font.bold: true }
+                    Label { text: blanky.language === "pt" ? "Escolha a forma de interação" : "Choose an interaction method"; color: root.mutedText; font.pixelSize: 17 }
+                }
+            }
+
+            Rectangle {
+                Layout.alignment: Qt.AlignHCenter
+                Layout.preferredWidth: 540
+                Layout.preferredHeight: 180
+                radius: 16
+                color: root.panelAltColor
+                border.color: root.accentColor
+                border.width: 2
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 22
+                    spacing: 9
+                    Label { text: "◈  " + (blanky.language === "pt" ? "Geral" : "General"); color: root.textColor; font.pixelSize: 25; font.bold: true; Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter }
+                    Label { text: blanky.language === "pt" ? "Aceda à visão completa com voz, Text-Bot, comunicações, eventos e painel de operação." : "Open the complete view with voice, Text-Bot, communications, events and operation panel."; color: root.mutedText; font.pixelSize: 14; wrapMode: Text.WordWrap; Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter }
+                    MenuActionButton { text: blanky.language === "pt" ? "Abrir modo Geral  ›" : "Open General mode  ›"; Layout.alignment: Qt.AlignHCenter; Layout.preferredWidth: 240; Layout.preferredHeight: 42; accentColor: root.accentColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; onClicked: root.openGeneralView() }
+                }
+            }
+
+            Label { Layout.fillWidth: true; text: blanky.language === "pt" ? "As vistas focadas de Voz, Text-Bot, Painel de Operação e Telemóvel serão acrescentadas depois de validar este menu no Raspberry Pi." : "The focused Voice, Text-Bot, Operation Panel and Phone views will be added after this menu is validated on the Raspberry Pi."; color: root.mutedText; font.pixelSize: 13; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap }
+
+            Item { Layout.fillHeight: true }
+        }
     }
 
     Rectangle {
