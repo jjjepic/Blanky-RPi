@@ -1266,7 +1266,22 @@ ApplicationWindow {
                                     contentItem: RowLayout {
                                         anchors.fill: parent; anchors.margins: 19; spacing: 15
                                         Label { text: "🎙"; color: root.successColor; font.pixelSize: Math.round(42 * root.textScale) }
-                                        ColumnLayout { Layout.fillWidth: true; spacing: 3; Label { text: blanky.language === "pt" ? "Voz" : "Voice"; color: root.textColor; font.bold: true; font.pixelSize: Math.round(23 * root.textScale) }; Label { text: blanky.language === "pt" ? "Comandos de voz e\nresposta falada" : "Voice commands and\nspoken response"; color: root.mutedText; font.pixelSize: Math.round(14 * root.textScale); lineHeight: 0.95 } }
+                                        ColumnLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 3
+                                            Label {
+                                                text: blanky.language === "pt" ? "Voz" : "Voice"
+                                                color: root.textColor
+                                                font.bold: true
+                                                font.pixelSize: Math.round(23 * root.textScale)
+                                            }
+                                            Label {
+                                                text: blanky.language === "pt" ? "Comandos de voz e\nresposta falada" : "Voice commands and\nspoken response"
+                                                color: root.mutedText
+                                                font.pixelSize: Math.round(14 * root.textScale)
+                                                lineHeight: 0.95
+                                            }
+                                        }
                                         Rectangle { Layout.preferredWidth: 37; Layout.preferredHeight: 37; radius: width / 2; color: voiceCard.hovered ? root.successColor : root.panelColor; border.color: root.successColor; border.width: 1; Label { anchors.centerIn: parent; text: "›"; color: voiceCard.hovered ? root.panelColor : root.successColor; font.pixelSize: 29; font.bold: true } }
                                     }
                                 }
@@ -1287,7 +1302,22 @@ ApplicationWindow {
                                     contentItem: RowLayout {
                                         anchors.fill: parent; anchors.margins: 19; spacing: 15
                                         Label { text: "▤"; color: root.warningColor; font.pixelSize: Math.round(46 * root.textScale) }
-                                        ColumnLayout { Layout.fillWidth: true; spacing: 3; Label { text: "Text-Bot"; color: root.textColor; font.bold: true; font.pixelSize: Math.round(23 * root.textScale) }; Label { text: blanky.language === "pt" ? "Interação e interpretação\npor texto" : "Text interaction and\ninterpretation"; color: root.mutedText; font.pixelSize: Math.round(14 * root.textScale); lineHeight: 0.95 } }
+                                        ColumnLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 3
+                                            Label {
+                                                text: "Text-Bot"
+                                                color: root.textColor
+                                                font.bold: true
+                                                font.pixelSize: Math.round(23 * root.textScale)
+                                            }
+                                            Label {
+                                                text: blanky.language === "pt" ? "Interação e interpretação\npor texto" : "Text interaction and\ninterpretation"
+                                                color: root.mutedText
+                                                font.pixelSize: Math.round(14 * root.textScale)
+                                                lineHeight: 0.95
+                                            }
+                                        }
                                         Rectangle { Layout.preferredWidth: 37; Layout.preferredHeight: 37; radius: width / 2; color: textCard.hovered ? root.warningColor : root.panelColor; border.color: root.warningColor; border.width: 1; Label { anchors.centerIn: parent; text: "›"; color: textCard.hovered ? root.panelColor : root.warningColor; font.pixelSize: 29; font.bold: true } }
                                     }
                                 }
@@ -1308,7 +1338,22 @@ ApplicationWindow {
                                     contentItem: RowLayout {
                                         anchors.fill: parent; anchors.margins: 19; spacing: 15
                                         Label { text: "☷"; color: "#cf8cff"; font.pixelSize: Math.round(45 * root.textScale) }
-                                        ColumnLayout { Layout.fillWidth: true; spacing: 3; Label { text: blanky.language === "pt" ? "Operação" : "Operation"; color: root.textColor; font.bold: true; font.pixelSize: Math.round(23 * root.textScale) }; Label { text: blanky.language === "pt" ? "Controlo direto dos\nmodos e atuadores" : "Direct control of modes\nand actuators"; color: root.mutedText; font.pixelSize: Math.round(14 * root.textScale); lineHeight: 0.95 } }
+                                        ColumnLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 3
+                                            Label {
+                                                text: blanky.language === "pt" ? "Operação" : "Operation"
+                                                color: root.textColor
+                                                font.bold: true
+                                                font.pixelSize: Math.round(23 * root.textScale)
+                                            }
+                                            Label {
+                                                text: blanky.language === "pt" ? "Controlo direto dos\nmodos e atuadores" : "Direct control of modes\nand actuators"
+                                                color: root.mutedText
+                                                font.pixelSize: Math.round(14 * root.textScale)
+                                                lineHeight: 0.95
+                                            }
+                                        }
                                         Rectangle { Layout.preferredWidth: 37; Layout.preferredHeight: 37; radius: width / 2; color: operationCard.hovered ? "#cf8cff" : root.panelColor; border.color: "#cf8cff"; border.width: 1; Label { anchors.centerIn: parent; text: "›"; color: operationCard.hovered ? root.panelColor : "#cf8cff"; font.pixelSize: 29; font.bold: true } }
                                     }
                                 }
@@ -1329,7 +1374,22 @@ ApplicationWindow {
                                     contentItem: RowLayout {
                                         anchors.fill: parent; anchors.margins: 19; spacing: 15
                                         Label { text: "▯"; color: root.accentColor; font.pixelSize: Math.round(49 * root.textScale) }
-                                        ColumnLayout { Layout.fillWidth: true; spacing: 3; Label { text: blanky.language === "pt" ? "Telemóvel" : "Phone"; color: root.textColor; font.bold: true; font.pixelSize: Math.round(23 * root.textScale) }; Label { text: blanky.language === "pt" ? "Atividade e comunicação\nMQTT" : "Activity and MQTT\ncommunication"; color: root.mutedText; font.pixelSize: Math.round(14 * root.textScale); lineHeight: 0.95 } }
+                                        ColumnLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 3
+                                            Label {
+                                                text: blanky.language === "pt" ? "Telemóvel" : "Phone"
+                                                color: root.textColor
+                                                font.bold: true
+                                                font.pixelSize: Math.round(23 * root.textScale)
+                                            }
+                                            Label {
+                                                text: blanky.language === "pt" ? "Atividade e comunicação\nMQTT" : "Activity and MQTT\ncommunication"
+                                                color: root.mutedText
+                                                font.pixelSize: Math.round(14 * root.textScale)
+                                                lineHeight: 0.95
+                                            }
+                                        }
                                         Rectangle { Layout.preferredWidth: 37; Layout.preferredHeight: 37; radius: width / 2; color: phoneCard.hovered ? root.accentColor : root.panelColor; border.color: root.accentColor; border.width: 1; Label { anchors.centerIn: parent; text: "›"; color: phoneCard.hovered ? root.panelColor : root.accentColor; font.pixelSize: 29; font.bold: true } }
                                     }
                                 }
