@@ -191,6 +191,23 @@ ApplicationWindow {
         return blanky.language === "pt" ? "modo geral" : "general mode"
     }
 
+    function viewTransitionText() {
+        if (transitionToMenu)
+            return blanky.language === "pt" ? "A regressar ao Menu Inicial..." : "Returning to Main Menu..."
+        if (blanky.language === "en") {
+            if (activeView === "voice") return "Preparing voice control..."
+            if (activeView === "text") return "Opening Text-Bot..."
+            if (activeView === "operation") return "Preparing operation panel..."
+            if (activeView === "phone") return "Opening phone control..."
+            return "Opening general view..."
+        }
+        if (activeView === "voice") return "A preparar controlo por voz..."
+        if (activeView === "text") return "A abrir Text-Bot..."
+        if (activeView === "operation") return "A preparar painel de operação..."
+        if (activeView === "phone") return "A abrir controlo por telemóvel..."
+        return "A abrir vista geral..."
+    }
+
     function beginSystemTransition(action) {
         if (systemTransitionActive)
             return
@@ -1070,80 +1087,267 @@ ApplicationWindow {
             GradientStop { position: 1.0; color: root.bgColor }
         }
 
+        // Low-contrast structural lines add depth without becoming information-bearing.
+        Item {
+            anchors.fill: parent
+            clip: true
+            opacity: root.dark ? 0.16 : 0.08
+
+            Rectangle { width: parent.width * 0.62; height: 2; x: -parent.width * 0.09; y: parent.height * 0.23; rotation: 0; color: root.accentColor }
+            Rectangle { width: parent.width * 0.34; height: parent.height * 0.8; x: -parent.width * 0.22; y: parent.height * 0.3; rotation: -34; color: root.accentColor; opacity: 0.16 }
+            Rectangle { width: parent.width * 0.28; height: parent.height * 0.72; x: parent.width * 0.94; y: parent.height * 0.18; rotation: 34; color: root.accentColor; opacity: 0.14 }
+            Rectangle { width: parent.width * 0.32; height: 2; x: parent.width * 0.72; y: parent.height * 0.73; color: root.accentColor }
+        }
+
         ColumnLayout {
             anchors.fill: parent
-            anchors.margins: 28
-            spacing: 20
+            anchors.margins: 30
+            spacing: 10
 
             RowLayout {
                 Layout.fillWidth: true
 
                 Row {
                     spacing: 7
-                    MenuActionButton { text: "🇵🇹"; width: 50; height: 42; textPixelSize: 18; accentColor: blanky.language === "pt" ? root.successColor : root.inactiveColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; onClicked: blanky.setLanguage("pt") }
-                    MenuActionButton { text: "🇬🇧"; width: 50; height: 42; textPixelSize: 18; accentColor: blanky.language === "en" ? root.successColor : root.inactiveColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; onClicked: blanky.setLanguage("en") }
+                    MenuActionButton { id: portugueseMenuButton; text: "🇵🇹"; width: 50; height: 42; textPixelSize: 18; accentColor: blanky.language === "pt" ? root.successColor : root.inactiveColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; KeyNavigation.tab: englishMenuButton; onClicked: blanky.setLanguage("pt") }
+                    MenuActionButton { id: englishMenuButton; text: "🇬🇧"; width: 50; height: 42; textPixelSize: 18; accentColor: blanky.language === "en" ? root.successColor : root.inactiveColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; KeyNavigation.tab: appearanceMenuButton; onClicked: blanky.setLanguage("en") }
                 }
 
                 Item { Layout.fillWidth: true }
 
                 Row {
                     spacing: 7
-                    MenuActionButton { iconText: root.appearanceIcon(); width: 48; height: 42; textPixelSize: 20; accentColor: root.accentColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; toolTip: t("tooltipAppearance"); onClicked: appearancePanel.open() }
-                    MenuActionButton { text: "?"; width: 48; height: 42; textPixelSize: 20; accentColor: root.accentColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; toolTip: blanky.language === "pt" ? "Ajuda / Tutorial" : "Help / Tutorial"; onClicked: { helpPanel.showHome(); helpPanel.open() } }
-                    MenuActionButton { iconText: "⚙"; width: 48; height: 42; textPixelSize: 20; accentColor: root.accentColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; toolTip: t("tooltipSettings"); onClicked: settingsPanel.open() }
-                    MenuActionButton { iconText: "⏻"; width: 48; height: 42; textPixelSize: 20; accentColor: root.errorColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; toolTip: t("tooltipShutdown"); onClicked: root.beginSystemTransition("shutdown") }
+                    MenuActionButton { id: appearanceMenuButton; iconText: root.appearanceIcon(); width: 48; height: 42; textPixelSize: 20; accentColor: root.accentColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; toolTip: t("tooltipAppearance"); KeyNavigation.tab: helpMenuButton; onClicked: appearancePanel.open() }
+                    MenuActionButton { id: helpMenuButton; text: "?"; width: 48; height: 42; textPixelSize: 20; accentColor: root.accentColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; toolTip: blanky.language === "pt" ? "Ajuda / Tutorial" : "Help / Tutorial"; KeyNavigation.tab: settingsMenuButton; onClicked: { helpPanel.showHome(); helpPanel.open() } }
+                    MenuActionButton { id: settingsMenuButton; iconText: "⚙"; width: 48; height: 42; textPixelSize: 20; accentColor: root.accentColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; toolTip: t("tooltipSettings"); KeyNavigation.tab: shutdownMenuButton; onClicked: settingsPanel.open() }
+                    MenuActionButton { id: shutdownMenuButton; iconText: "⏻"; width: 48; height: 42; textPixelSize: 20; accentColor: root.errorColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; toolTip: t("tooltipShutdown"); KeyNavigation.tab: generalCard; onClicked: root.beginSystemTransition("shutdown") }
                 }
             }
 
-            Item { Layout.fillHeight: true }
-
-            RowLayout {
-                Layout.alignment: Qt.AlignHCenter
-                spacing: 14
-
-                Image { source: root.logoSource(); Layout.preferredWidth: 86; Layout.preferredHeight: 86; fillMode: Image.PreserveAspectFit; smooth: true }
-                ColumnLayout {
-                    spacing: 3
-                    Label { text: "Blanky"; color: root.accentColor; font.pixelSize: 46; font.bold: true }
-                    Label { text: blanky.language === "pt" ? "Escolha a forma de interação" : "Choose an interaction method"; color: root.mutedText; font.pixelSize: 17 }
-                }
-            }
-
-            Rectangle {
-                Layout.alignment: Qt.AlignHCenter
-                Layout.preferredWidth: 540
-                Layout.preferredHeight: 300
-                radius: 16
-                color: root.panelAltColor
-                border.color: root.accentColor
-                border.width: 2
+            Flickable {
+                id: homeMenuFlickable
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                contentWidth: width
+                contentHeight: menuContent.implicitHeight + 24
+                boundsBehavior: Flickable.StopAtBounds
 
                 ColumnLayout {
-                    anchors.fill: parent
-                    anchors.margins: 22
-                    spacing: 9
-                    Label { text: blanky.language === "pt" ? "Escolha uma vista" : "Choose a view"; color: root.textColor; font.pixelSize: 25; font.bold: true; Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter }
-                    Label { text: blanky.language === "pt" ? "Todas usam o mesmo sistema, eventos e comunicações." : "All views use the same system, events and communications."; color: root.mutedText; font.pixelSize: 14; wrapMode: Text.WordWrap; Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter }
+                    id: menuContent
+                    width: Math.min(homeMenuFlickable.width - 20, 1040)
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    y: Math.max(12, (homeMenuFlickable.height - implicitHeight) / 2)
+                    spacing: 14
+
                     RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 10
-                        MenuActionButton { text: "◈  " + (blanky.language === "pt" ? "Geral" : "General"); Layout.fillWidth: true; Layout.preferredHeight: 48; accentColor: root.accentColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; onClicked: root.openView("general") }
-                        MenuActionButton { text: "🎙  " + (blanky.language === "pt" ? "Voz" : "Voice"); Layout.fillWidth: true; Layout.preferredHeight: 48; accentColor: root.successColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; onClicked: root.openView("voice") }
-                        MenuActionButton { text: "⌨  Text-Bot"; Layout.fillWidth: true; Layout.preferredHeight: 48; accentColor: root.warningColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; onClicked: root.openView("text") }
+                        Layout.alignment: Qt.AlignHCenter
+                        spacing: 16
+
+                        Image { source: root.logoSource(); Layout.preferredWidth: Math.round(88 * root.controlScale); Layout.preferredHeight: Math.round(88 * root.controlScale); fillMode: Image.PreserveAspectFit; smooth: true }
+                        ColumnLayout {
+                            spacing: 2
+                            Label { text: "Blanky"; color: root.accentColor; font.pixelSize: Math.round(48 * root.textScale); font.bold: true }
+                            Label { text: blanky.language === "pt" ? "Escolha a forma de interação" : "Choose an interaction method"; color: root.mutedText; font.pixelSize: Math.round(17 * root.textScale) }
+                        }
                     }
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: generalCard.implicitHeight + viewChoices.anchors.margins * 2 + 68
+                        radius: 22
+                        color: root.panelAltColor
+                        border.color: root.accentColor
+                        border.width: 2
+
+                        ColumnLayout {
+                            id: viewChoices
+                            anchors.fill: parent
+                            anchors.margins: Math.round(24 * root.spacingScale)
+                            spacing: 12
+
+                            Label {
+                                Layout.fillWidth: true
+                                text: blanky.language === "pt" ? "Escolha uma vista" : "Choose a view"
+                                color: root.textColor
+                                font.pixelSize: Math.round(28 * root.textScale)
+                                font.bold: true
+                                horizontalAlignment: Text.AlignHCenter
+                            }
+                            Label {
+                                Layout.fillWidth: true
+                                text: blanky.language === "pt" ? "Todas usam o mesmo sistema, eventos e comunicações." : "All views use the same system, events and communications."
+                                color: root.mutedText
+                                font.pixelSize: Math.round(14 * root.textScale)
+                                horizontalAlignment: Text.AlignHCenter
+                                wrapMode: Text.WordWrap
+                            }
+
+                            Button {
+                                id: generalCard
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: Math.round(134 * root.controlScale + (root.textScale - 1.0) * 44)
+                                hoverEnabled: true
+                                focusPolicy: Qt.StrongFocus
+                                focus: homeMenu.visible
+                                padding: 0
+                                KeyNavigation.tab: voiceCard
+                                onClicked: root.openView("general")
+
+                                background: Rectangle {
+                                    radius: 19
+                                    color: generalCard.hovered ? root.panelAltColor : root.panelColor
+                                    border.color: generalCard.activeFocus ? root.textColor : root.accentColor
+                                    border.width: generalCard.activeFocus ? 3 : (generalCard.hovered ? 3 : 2)
+
+                                    Rectangle { anchors.fill: parent; anchors.margins: 2; radius: parent.radius - 2; color: root.accentColor; opacity: generalCard.hovered ? 0.15 : 0.07 }
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                }
+
+                                contentItem: RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: Math.round(26 * root.spacingScale)
+                                    anchors.rightMargin: Math.round(26 * root.spacingScale)
+                                    spacing: 20
+
+                                    GridLayout {
+                                        Layout.preferredWidth: Math.round(82 * root.controlScale)
+                                        Layout.preferredHeight: Math.round(70 * root.controlScale)
+                                        columns: 2
+                                        columnSpacing: 8
+                                        rowSpacing: 8
+                                        Rectangle { Layout.fillWidth: true; Layout.fillHeight: true; radius: 5; color: root.accentColor }
+                                        Rectangle { Layout.fillWidth: true; Layout.fillHeight: true; radius: 5; color: root.accentColor }
+                                        Rectangle { Layout.fillWidth: true; Layout.fillHeight: true; radius: 5; color: root.accentColor }
+                                        Rectangle { Layout.fillWidth: true; Layout.fillHeight: true; radius: 5; color: root.accentColor }
+                                    }
+
+                                    Rectangle { Layout.preferredWidth: 2; Layout.fillHeight: true; Layout.topMargin: 18; Layout.bottomMargin: 18; color: root.accentColor; opacity: 0.85 }
+
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 3
+                                        Label { text: blanky.language === "pt" ? "Geral" : "General"; color: root.textColor; font.pixelSize: Math.round(34 * root.textScale); font.bold: true }
+                                        Label { text: blanky.language === "pt" ? "Vista completa do sistema" : "Complete system view"; color: root.textColor; font.pixelSize: Math.round(18 * root.textScale) }
+                                        Label { text: blanky.language === "pt" ? "VISÃO GLOBAL  •  MONITORIZAÇÃO  •  CONTROLO" : "GLOBAL VIEW  •  MONITORING  •  CONTROL"; color: root.accentColor; font.pixelSize: Math.round(11 * root.textScale); font.bold: true; font.letterSpacing: 1.4 }
+                                    }
+
+                                    Rectangle {
+                                        Layout.preferredWidth: 52
+                                        Layout.preferredHeight: 52
+                                        radius: width / 2
+                                        color: generalCard.hovered ? root.accentColor : root.panelColor
+                                        border.color: root.accentColor
+                                        border.width: 2
+                                        Label { anchors.centerIn: parent; text: "›"; color: generalCard.hovered ? root.panelColor : root.accentColor; font.pixelSize: 40; font.bold: true }
+                                    }
+                                }
+                            }
+
+                            GridLayout {
+                                Layout.fillWidth: true
+                                columns: 2
+                                columnSpacing: 16
+                                rowSpacing: 14
+
+                                Button {
+                                    id: voiceCard
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: Math.round(112 * root.controlScale + (root.textScale - 1.0) * 44)
+                                    hoverEnabled: true; focusPolicy: Qt.StrongFocus; padding: 0
+                                    KeyNavigation.tab: textCard
+                                    onClicked: root.openView("voice")
+                                    background: Rectangle {
+                                        radius: 17; color: voiceCard.hovered ? root.panelAltColor : root.panelColor
+                                        border.color: voiceCard.activeFocus ? root.textColor : root.successColor; border.width: voiceCard.activeFocus ? 3 : (voiceCard.hovered ? 3 : 2)
+                                        Rectangle { anchors.fill: parent; anchors.margins: 2; radius: parent.radius - 2; color: root.successColor; opacity: voiceCard.hovered ? 0.14 : 0.06 }
+                                        Behavior on color { ColorAnimation { duration: 150 } }
+                                    }
+                                    contentItem: RowLayout {
+                                        anchors.fill: parent; anchors.margins: 19; spacing: 15
+                                        Label { text: "🎙"; color: root.successColor; font.pixelSize: Math.round(42 * root.textScale) }
+                                        ColumnLayout { Layout.fillWidth: true; spacing: 3; Label { text: blanky.language === "pt" ? "Voz" : "Voice"; color: root.textColor; font.bold: true; font.pixelSize: Math.round(23 * root.textScale) }; Label { text: blanky.language === "pt" ? "Comandos de voz e\nresposta falada" : "Voice commands and\nspoken response"; color: root.mutedText; font.pixelSize: Math.round(14 * root.textScale); lineHeight: 0.95 } }
+                                        Rectangle { Layout.preferredWidth: 37; Layout.preferredHeight: 37; radius: width / 2; color: voiceCard.hovered ? root.successColor : root.panelColor; border.color: root.successColor; border.width: 1; Label { anchors.centerIn: parent; text: "›"; color: voiceCard.hovered ? root.panelColor : root.successColor; font.pixelSize: 29; font.bold: true } }
+                                    }
+                                }
+
+                                Button {
+                                    id: textCard
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: Math.round(112 * root.controlScale + (root.textScale - 1.0) * 44)
+                                    hoverEnabled: true; focusPolicy: Qt.StrongFocus; padding: 0
+                                    KeyNavigation.tab: operationCard
+                                    onClicked: root.openView("text")
+                                    background: Rectangle {
+                                        radius: 17; color: textCard.hovered ? root.panelAltColor : root.panelColor
+                                        border.color: textCard.activeFocus ? root.textColor : root.warningColor; border.width: textCard.activeFocus ? 3 : (textCard.hovered ? 3 : 2)
+                                        Rectangle { anchors.fill: parent; anchors.margins: 2; radius: parent.radius - 2; color: root.warningColor; opacity: textCard.hovered ? 0.14 : 0.06 }
+                                        Behavior on color { ColorAnimation { duration: 150 } }
+                                    }
+                                    contentItem: RowLayout {
+                                        anchors.fill: parent; anchors.margins: 19; spacing: 15
+                                        Label { text: "▤"; color: root.warningColor; font.pixelSize: Math.round(46 * root.textScale) }
+                                        ColumnLayout { Layout.fillWidth: true; spacing: 3; Label { text: "Text-Bot"; color: root.textColor; font.bold: true; font.pixelSize: Math.round(23 * root.textScale) }; Label { text: blanky.language === "pt" ? "Interação e interpretação\npor texto" : "Text interaction and\ninterpretation"; color: root.mutedText; font.pixelSize: Math.round(14 * root.textScale); lineHeight: 0.95 } }
+                                        Rectangle { Layout.preferredWidth: 37; Layout.preferredHeight: 37; radius: width / 2; color: textCard.hovered ? root.warningColor : root.panelColor; border.color: root.warningColor; border.width: 1; Label { anchors.centerIn: parent; text: "›"; color: textCard.hovered ? root.panelColor : root.warningColor; font.pixelSize: 29; font.bold: true } }
+                                    }
+                                }
+
+                                Button {
+                                    id: operationCard
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: Math.round(112 * root.controlScale + (root.textScale - 1.0) * 44)
+                                    hoverEnabled: true; focusPolicy: Qt.StrongFocus; padding: 0
+                                    KeyNavigation.tab: phoneCard
+                                    onClicked: root.openView("operation")
+                                    background: Rectangle {
+                                        radius: 17; color: operationCard.hovered ? root.panelAltColor : root.panelColor
+                                        border.color: operationCard.activeFocus ? root.textColor : "#cf8cff"; border.width: operationCard.activeFocus ? 3 : (operationCard.hovered ? 3 : 2)
+                                        Rectangle { anchors.fill: parent; anchors.margins: 2; radius: parent.radius - 2; color: "#cf8cff"; opacity: operationCard.hovered ? 0.14 : 0.06 }
+                                        Behavior on color { ColorAnimation { duration: 150 } }
+                                    }
+                                    contentItem: RowLayout {
+                                        anchors.fill: parent; anchors.margins: 19; spacing: 15
+                                        Label { text: "☷"; color: "#cf8cff"; font.pixelSize: Math.round(45 * root.textScale) }
+                                        ColumnLayout { Layout.fillWidth: true; spacing: 3; Label { text: blanky.language === "pt" ? "Operação" : "Operation"; color: root.textColor; font.bold: true; font.pixelSize: Math.round(23 * root.textScale) }; Label { text: blanky.language === "pt" ? "Controlo direto dos\nmodos e atuadores" : "Direct control of modes\nand actuators"; color: root.mutedText; font.pixelSize: Math.round(14 * root.textScale); lineHeight: 0.95 } }
+                                        Rectangle { Layout.preferredWidth: 37; Layout.preferredHeight: 37; radius: width / 2; color: operationCard.hovered ? "#cf8cff" : root.panelColor; border.color: "#cf8cff"; border.width: 1; Label { anchors.centerIn: parent; text: "›"; color: operationCard.hovered ? root.panelColor : "#cf8cff"; font.pixelSize: 29; font.bold: true } }
+                                    }
+                                }
+
+                                Button {
+                                    id: phoneCard
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: Math.round(112 * root.controlScale + (root.textScale - 1.0) * 44)
+                                    hoverEnabled: true; focusPolicy: Qt.StrongFocus; padding: 0
+                                    KeyNavigation.tab: portugueseMenuButton
+                                    onClicked: root.openView("phone")
+                                    background: Rectangle {
+                                        radius: 17; color: phoneCard.hovered ? root.panelAltColor : root.panelColor
+                                        border.color: phoneCard.activeFocus ? root.textColor : root.accentColor; border.width: phoneCard.activeFocus ? 3 : (phoneCard.hovered ? 3 : 2)
+                                        Rectangle { anchors.fill: parent; anchors.margins: 2; radius: parent.radius - 2; color: root.accentColor; opacity: phoneCard.hovered ? 0.14 : 0.06 }
+                                        Behavior on color { ColorAnimation { duration: 150 } }
+                                    }
+                                    contentItem: RowLayout {
+                                        anchors.fill: parent; anchors.margins: 19; spacing: 15
+                                        Label { text: "▯"; color: root.accentColor; font.pixelSize: Math.round(49 * root.textScale) }
+                                        ColumnLayout { Layout.fillWidth: true; spacing: 3; Label { text: blanky.language === "pt" ? "Telemóvel" : "Phone"; color: root.textColor; font.bold: true; font.pixelSize: Math.round(23 * root.textScale) }; Label { text: blanky.language === "pt" ? "Atividade e comunicação\nMQTT" : "Activity and MQTT\ncommunication"; color: root.mutedText; font.pixelSize: Math.round(14 * root.textScale); lineHeight: 0.95 } }
+                                        Rectangle { Layout.preferredWidth: 37; Layout.preferredHeight: 37; radius: width / 2; color: phoneCard.hovered ? root.accentColor : root.panelColor; border.color: root.accentColor; border.width: 1; Label { anchors.centerIn: parent; text: "›"; color: phoneCard.hovered ? root.panelColor : root.accentColor; font.pixelSize: 29; font.bold: true } }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 10
-                        MenuActionButton { text: "⚙  " + (blanky.language === "pt" ? "Operação" : "Operation"); Layout.fillWidth: true; Layout.preferredHeight: 48; accentColor: "#cf8cff"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; onClicked: root.openView("operation") }
-                        MenuActionButton { text: "📱  " + (blanky.language === "pt" ? "Telemóvel" : "Phone"); Layout.fillWidth: true; Layout.preferredHeight: 48; accentColor: root.accentColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; onClicked: root.openView("phone") }
+                        Layout.alignment: Qt.AlignHCenter
+                        spacing: 13
+                        Rectangle { Layout.preferredWidth: 112; Layout.preferredHeight: 1; color: root.accentColor; opacity: 0.55 }
+                        Rectangle { Layout.preferredWidth: 8; Layout.preferredHeight: 8; radius: 4; color: root.accentColor }
+                        Label { text: blanky.language === "pt" ? "Todas as vistas mantêm Eventos e Comunicações ativas." : "All views keep Events and Communications active."; color: root.mutedText; font.pixelSize: Math.round(13 * root.textScale); horizontalAlignment: Text.AlignHCenter }
+                        Rectangle { Layout.preferredWidth: 8; Layout.preferredHeight: 8; radius: 4; color: root.accentColor }
+                        Rectangle { Layout.preferredWidth: 112; Layout.preferredHeight: 1; color: root.accentColor; opacity: 0.55 }
                     }
-                    Label { text: blanky.language === "pt" ? "Voz e Text-Bot destacam a respetiva interação. Operação amplia o controlo direto. Telemóvel mostra Eventos e Comunicações MQTT." : "Voice and Text-Bot highlight their interaction. Operation expands direct control. Phone shows Events and MQTT Communications."; color: root.mutedText; font.pixelSize: 13; wrapMode: Text.WordWrap; Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter }
                 }
             }
-
-            Label { Layout.fillWidth: true; text: blanky.language === "pt" ? "Cada vista mantém o mesmo sistema, histórico de eventos e comunicações em funcionamento." : "Each view keeps the same system, event history and communications running."; color: root.mutedText; font.pixelSize: 13; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap }
-
-            Item { Layout.fillHeight: true }
         }
     }
 
@@ -1170,9 +1374,7 @@ ApplicationWindow {
 
             Label {
                 width: parent.width
-                text: root.transitionToMenu
-                    ? (blanky.language === "pt" ? "A regressar ao Menu Inicial..." : "Returning to Main Menu...")
-                    : (blanky.language === "pt" ? "A preparar " + root.activeViewLabel() + "..." : "Preparing " + root.activeViewLabel() + "...")
+                text: root.viewTransitionText()
                 color: root.textColor
                 font.pixelSize: 20
                 font.bold: true
