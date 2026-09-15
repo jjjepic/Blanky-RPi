@@ -1243,49 +1243,62 @@ ApplicationWindow {
                                     Behavior on color { ColorAnimation { duration: 150 } }
                                 }
 
-                                contentItem: RowLayout {
+                                contentItem: Item {
                                     anchors.fill: parent
-                                    anchors.leftMargin: Math.round(26 * root.spacingScale)
-                                    anchors.rightMargin: Math.round(26 * root.spacingScale)
-                                    spacing: 20
+                                    readonly property real sideMargin: Math.round(26 * root.spacingScale)
+                                    readonly property real contentGap: Math.round(22 * root.spacingScale)
 
-                                    GridLayout {
-                                        Layout.preferredWidth: Math.round(82 * root.textScale)
-                                        Layout.minimumWidth: Math.round(82 * root.textScale)
-                                        Layout.maximumWidth: Math.round(82 * root.textScale)
-                                        Layout.preferredHeight: Math.round(70 * root.textScale)
-                                        Layout.minimumHeight: Math.round(70 * root.textScale)
-                                        Layout.maximumHeight: Math.round(70 * root.textScale)
-                                        Layout.alignment: Qt.AlignVCenter
+                                    Grid {
+                                        id: generalCardIcon
+                                        width: Math.round(82 * root.textScale)
+                                        height: Math.round(70 * root.textScale)
+                                        anchors.left: parent.left
+                                        anchors.leftMargin: parent.sideMargin
+                                        anchors.verticalCenter: parent.verticalCenter
                                         columns: 2
                                         columnSpacing: Math.round(8 * root.textScale)
                                         rowSpacing: Math.round(8 * root.textScale)
-                                        Rectangle { Layout.preferredWidth: Math.round(35 * root.textScale); Layout.preferredHeight: Math.round(29 * root.textScale); radius: 5; color: "transparent"; border.color: generalCard.strongHover ? generalCard.hoverTextColor : generalCard.cardAccent; border.width: 4 }
-                                        Rectangle { Layout.preferredWidth: Math.round(35 * root.textScale); Layout.preferredHeight: Math.round(29 * root.textScale); radius: 5; color: "transparent"; border.color: generalCard.strongHover ? generalCard.hoverTextColor : generalCard.cardAccent; border.width: 4 }
-                                        Rectangle { Layout.preferredWidth: Math.round(35 * root.textScale); Layout.preferredHeight: Math.round(29 * root.textScale); radius: 5; color: "transparent"; border.color: generalCard.strongHover ? generalCard.hoverTextColor : generalCard.cardAccent; border.width: 4 }
-                                        Rectangle { Layout.preferredWidth: Math.round(35 * root.textScale); Layout.preferredHeight: Math.round(29 * root.textScale); radius: 5; color: "transparent"; border.color: generalCard.strongHover ? generalCard.hoverTextColor : generalCard.cardAccent; border.width: 4 }
-                                    }
-
-                                    Rectangle { Layout.preferredWidth: 2; Layout.fillHeight: true; Layout.topMargin: 18; Layout.bottomMargin: 18; color: generalCard.strongHover ? generalCard.hoverTextColor : generalCard.cardAccent; opacity: 0.85 }
-
-                                    ColumnLayout {
-                                        Layout.fillWidth: true
-                                        Layout.alignment: Qt.AlignVCenter
-                                        spacing: 3
-                                        Label { text: blanky.language === "pt" ? "Geral" : "General"; color: generalCard.strongHover ? generalCard.hoverTextColor : root.textColor; font.pixelSize: Math.round(34 * root.textScale); font.bold: true }
-                                        Label { text: blanky.language === "pt" ? "Vista completa do sistema" : "Complete system view"; color: generalCard.strongHover ? generalCard.hoverTextColor : root.textColor; font.pixelSize: Math.round(18 * root.textScale) }
-                                        Label { text: blanky.language === "pt" ? "VISÃO GLOBAL  •  MONITORIZAÇÃO  •  CONTROLO" : "GLOBAL VIEW  •  MONITORING  •  CONTROL"; color: generalCard.strongHover ? generalCard.hoverTextColor : generalCard.cardAccent; font.pixelSize: Math.round(11 * root.textScale); font.bold: true; font.letterSpacing: 1.4 }
+                                        Rectangle { width: Math.round(35 * root.textScale); height: Math.round(29 * root.textScale); radius: 5; color: "transparent"; border.color: generalCard.strongHover ? generalCard.hoverTextColor : generalCard.cardAccent; border.width: 4 }
+                                        Rectangle { width: Math.round(35 * root.textScale); height: Math.round(29 * root.textScale); radius: 5; color: "transparent"; border.color: generalCard.strongHover ? generalCard.hoverTextColor : generalCard.cardAccent; border.width: 4 }
+                                        Rectangle { width: Math.round(35 * root.textScale); height: Math.round(29 * root.textScale); radius: 5; color: "transparent"; border.color: generalCard.strongHover ? generalCard.hoverTextColor : generalCard.cardAccent; border.width: 4 }
+                                        Rectangle { width: Math.round(35 * root.textScale); height: Math.round(29 * root.textScale); radius: 5; color: "transparent"; border.color: generalCard.strongHover ? generalCard.hoverTextColor : generalCard.cardAccent; border.width: 4 }
                                     }
 
                                     Rectangle {
-                                        Layout.preferredWidth: Math.round(52 * root.textScale)
-                                        Layout.preferredHeight: Math.round(52 * root.textScale)
-                                        Layout.alignment: Qt.AlignVCenter
+                                        id: generalCardDivider
+                                        width: 2
+                                        height: Math.round(70 * root.textScale)
+                                        anchors.left: generalCardIcon.right
+                                        anchors.leftMargin: parent.contentGap
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        color: generalCard.strongHover ? generalCard.hoverTextColor : generalCard.cardAccent
+                                        opacity: 0.85
+                                    }
+
+                                    Rectangle {
+                                        id: generalCardArrow
+                                        width: Math.round(52 * root.textScale)
+                                        height: width
+                                        anchors.right: parent.right
+                                        anchors.rightMargin: parent.sideMargin
+                                        anchors.verticalCenter: parent.verticalCenter
                                         radius: width / 2
                                         color: generalCard.strongHover ? generalCard.hoverTextColor : root.panelColor
                                         border.color: generalCard.strongHover ? generalCard.hoverTextColor : generalCard.cardAccent
                                         border.width: 2
                                         Label { anchors.centerIn: parent; text: "›"; color: generalCard.cardAccent; font.pixelSize: Math.round(40 * root.textScale); font.bold: true }
+                                    }
+
+                                    Column {
+                                        anchors.left: generalCardDivider.right
+                                        anchors.leftMargin: parent.contentGap
+                                        anchors.right: generalCardArrow.left
+                                        anchors.rightMargin: parent.contentGap
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        spacing: 3
+                                        Label { width: parent.width; text: blanky.language === "pt" ? "Geral" : "General"; color: generalCard.strongHover ? generalCard.hoverTextColor : root.textColor; font.pixelSize: Math.round(34 * root.textScale); font.bold: true }
+                                        Label { width: parent.width; text: blanky.language === "pt" ? "Vista completa do sistema" : "Complete system view"; color: generalCard.strongHover ? generalCard.hoverTextColor : root.textColor; font.pixelSize: Math.round(18 * root.textScale) }
+                                        Label { width: parent.width; text: blanky.language === "pt" ? "VISÃO GLOBAL  •  MONITORIZAÇÃO  •  CONTROLO" : "GLOBAL VIEW  •  MONITORING  •  CONTROL"; color: generalCard.strongHover ? generalCard.hoverTextColor : generalCard.cardAccent; font.pixelSize: Math.round(11 * root.textScale); font.bold: true; font.letterSpacing: 1.4; elide: Text.ElideRight }
                                     }
                                 }
                             }
@@ -1315,21 +1328,51 @@ ApplicationWindow {
                                         Rectangle { anchors.fill: parent; anchors.margins: 2; radius: parent.radius - 2; color: voiceCard.cardAccent; opacity: voiceCard.strongHover ? 0 : 0.06 }
                                         Behavior on color { ColorAnimation { duration: 150 } }
                                     }
-                                    contentItem: RowLayout {
-                                        anchors.fill: parent; anchors.margins: Math.round(19 * root.spacingScale); spacing: Math.round(15 * root.spacingScale)
-                                        Label { Layout.preferredWidth: Math.round(52 * root.textScale); Layout.alignment: Qt.AlignVCenter; text: "🎙"; color: voiceCard.strongHover ? voiceCard.hoverTextColor : voiceCard.cardAccent; font.pixelSize: Math.round(42 * root.textScale); horizontalAlignment: Text.AlignHCenter }
-                                        ColumnLayout {
-                                            Layout.fillWidth: true
-                                            Layout.alignment: Qt.AlignVCenter
+                                    contentItem: Item {
+                                        anchors.fill: parent
+                                        readonly property real sideMargin: Math.round(19 * root.spacingScale)
+                                        readonly property real contentGap: Math.round(15 * root.spacingScale)
+
+                                        Label {
+                                            id: voiceCardIcon
+                                            width: Math.round(52 * root.textScale)
+                                            anchors.left: parent.left
+                                            anchors.leftMargin: parent.sideMargin
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: "🎙"
+                                            color: voiceCard.strongHover ? voiceCard.hoverTextColor : voiceCard.cardAccent
+                                            font.pixelSize: Math.round(42 * root.textScale)
+                                            horizontalAlignment: Text.AlignHCenter
+                                        }
+                                        Rectangle {
+                                            id: voiceCardArrow
+                                            width: Math.round(37 * root.textScale)
+                                            height: width
+                                            anchors.right: parent.right
+                                            anchors.rightMargin: parent.sideMargin
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            radius: width / 2
+                                            color: voiceCard.strongHover ? voiceCard.hoverTextColor : root.panelColor
+                                            border.color: voiceCard.strongHover ? voiceCard.hoverTextColor : voiceCard.cardAccent
+                                            border.width: 1
+                                            Label { anchors.centerIn: parent; text: "›"; color: voiceCard.cardAccent; font.pixelSize: Math.round(29 * root.textScale); font.bold: true }
+                                        }
+                                        Column {
+                                            anchors.left: voiceCardIcon.right
+                                            anchors.leftMargin: parent.contentGap
+                                            anchors.right: voiceCardArrow.left
+                                            anchors.rightMargin: parent.contentGap
+                                            anchors.verticalCenter: parent.verticalCenter
                                             spacing: 3
                                             Label {
+                                                width: parent.width
                                                 text: blanky.language === "pt" ? "Voz" : "Voice"
                                                 color: voiceCard.strongHover ? voiceCard.hoverTextColor : root.textColor
                                                 font.bold: true
                                                 font.pixelSize: Math.round(23 * root.textScale)
                                             }
                                             Label {
-                                                Layout.fillWidth: true
+                                                width: parent.width
                                                 text: blanky.language === "pt" ? "Comandos de voz e resposta falada" : "Voice commands and spoken response"
                                                 color: voiceCard.strongHover ? voiceCard.hoverTextColor : root.mutedText
                                                 font.pixelSize: Math.round(14 * root.textScale)
@@ -1339,7 +1382,6 @@ ApplicationWindow {
                                                 elide: Text.ElideRight
                                             }
                                         }
-                                        Rectangle { Layout.preferredWidth: Math.round(37 * root.textScale); Layout.preferredHeight: Math.round(37 * root.textScale); Layout.alignment: Qt.AlignVCenter; radius: width / 2; color: voiceCard.strongHover ? voiceCard.hoverTextColor : root.panelColor; border.color: voiceCard.strongHover ? voiceCard.hoverTextColor : voiceCard.cardAccent; border.width: 1; Label { anchors.centerIn: parent; text: "›"; color: voiceCard.cardAccent; font.pixelSize: Math.round(29 * root.textScale); font.bold: true } }
                                     }
                                 }
 
@@ -1362,12 +1404,18 @@ ApplicationWindow {
                                         Rectangle { anchors.fill: parent; anchors.margins: 2; radius: parent.radius - 2; color: textCard.cardAccent; opacity: textCard.strongHover ? 0 : 0.06 }
                                         Behavior on color { ColorAnimation { duration: 150 } }
                                     }
-                                    contentItem: RowLayout {
-                                        anchors.fill: parent; anchors.margins: Math.round(19 * root.spacingScale); spacing: Math.round(15 * root.spacingScale)
+                                    contentItem: Item {
+                                        anchors.fill: parent
+                                        readonly property real sideMargin: Math.round(19 * root.spacingScale)
+                                        readonly property real contentGap: Math.round(15 * root.spacingScale)
+
                                         Item {
-                                            Layout.preferredWidth: Math.round(52 * root.textScale)
-                                            Layout.preferredHeight: Math.round(52 * root.textScale)
-                                            Layout.alignment: Qt.AlignVCenter
+                                            id: textCardIcon
+                                            width: Math.round(52 * root.textScale)
+                                            height: Math.round(52 * root.textScale)
+                                            anchors.left: parent.left
+                                            anchors.leftMargin: parent.sideMargin
+                                            anchors.verticalCenter: parent.verticalCenter
                                             Rectangle {
                                                 width: Math.round(42 * root.textScale); height: Math.round(32 * root.textScale)
                                                 anchors.horizontalCenter: parent.horizontalCenter
@@ -1386,18 +1434,35 @@ ApplicationWindow {
                                             }
                                             Rectangle { width: Math.round(14 * root.textScale); height: 3; x: Math.round(7 * root.textScale); y: Math.round(38 * root.textScale); rotation: -32; color: textCard.strongHover ? textCard.hoverTextColor : textCard.cardAccent }
                                         }
-                                        ColumnLayout {
-                                            Layout.fillWidth: true
-                                            Layout.alignment: Qt.AlignVCenter
+                                        Rectangle {
+                                            id: textCardArrow
+                                            width: Math.round(37 * root.textScale)
+                                            height: width
+                                            anchors.right: parent.right
+                                            anchors.rightMargin: parent.sideMargin
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            radius: width / 2
+                                            color: textCard.strongHover ? textCard.hoverTextColor : root.panelColor
+                                            border.color: textCard.strongHover ? textCard.hoverTextColor : textCard.cardAccent
+                                            border.width: 1
+                                            Label { anchors.centerIn: parent; text: "›"; color: textCard.cardAccent; font.pixelSize: Math.round(29 * root.textScale); font.bold: true }
+                                        }
+                                        Column {
+                                            anchors.left: textCardIcon.right
+                                            anchors.leftMargin: parent.contentGap
+                                            anchors.right: textCardArrow.left
+                                            anchors.rightMargin: parent.contentGap
+                                            anchors.verticalCenter: parent.verticalCenter
                                             spacing: 3
                                             Label {
+                                                width: parent.width
                                                 text: "Text-Bot"
                                                 color: textCard.strongHover ? textCard.hoverTextColor : root.textColor
                                                 font.bold: true
                                                 font.pixelSize: Math.round(23 * root.textScale)
                                             }
                                             Label {
-                                                Layout.fillWidth: true
+                                                width: parent.width
                                                 text: blanky.language === "pt" ? "Interação e interpretação por texto" : "Text interaction and interpretation"
                                                 color: textCard.strongHover ? textCard.hoverTextColor : root.mutedText
                                                 font.pixelSize: Math.round(14 * root.textScale)
@@ -1407,7 +1472,6 @@ ApplicationWindow {
                                                 elide: Text.ElideRight
                                             }
                                         }
-                                        Rectangle { Layout.preferredWidth: Math.round(37 * root.textScale); Layout.preferredHeight: Math.round(37 * root.textScale); Layout.alignment: Qt.AlignVCenter; radius: width / 2; color: textCard.strongHover ? textCard.hoverTextColor : root.panelColor; border.color: textCard.strongHover ? textCard.hoverTextColor : textCard.cardAccent; border.width: 1; Label { anchors.centerIn: parent; text: "›"; color: textCard.cardAccent; font.pixelSize: Math.round(29 * root.textScale); font.bold: true } }
                                     }
                                 }
 
@@ -1430,12 +1494,18 @@ ApplicationWindow {
                                         Rectangle { anchors.fill: parent; anchors.margins: 2; radius: parent.radius - 2; color: operationCard.cardAccent; opacity: operationCard.strongHover ? 0 : 0.06 }
                                         Behavior on color { ColorAnimation { duration: 150 } }
                                     }
-                                    contentItem: RowLayout {
-                                        anchors.fill: parent; anchors.margins: Math.round(19 * root.spacingScale); spacing: Math.round(15 * root.spacingScale)
+                                    contentItem: Item {
+                                        anchors.fill: parent
+                                        readonly property real sideMargin: Math.round(19 * root.spacingScale)
+                                        readonly property real contentGap: Math.round(15 * root.spacingScale)
+
                                         Item {
-                                            Layout.preferredWidth: Math.round(52 * root.textScale)
-                                            Layout.preferredHeight: Math.round(52 * root.textScale)
-                                            Layout.alignment: Qt.AlignVCenter
+                                            id: operationCardIcon
+                                            width: Math.round(52 * root.textScale)
+                                            height: Math.round(52 * root.textScale)
+                                            anchors.left: parent.left
+                                            anchors.leftMargin: parent.sideMargin
+                                            anchors.verticalCenter: parent.verticalCenter
                                             Rectangle { width: 3; height: Math.round(43 * root.textScale); x: Math.round(8 * root.textScale); y: Math.round(4 * root.textScale); radius: 2; color: operationCard.strongHover ? operationCard.hoverTextColor : operationCard.cardAccent }
                                             Rectangle { width: 3; height: Math.round(43 * root.textScale); x: Math.round(25 * root.textScale); y: Math.round(4 * root.textScale); radius: 2; color: operationCard.strongHover ? operationCard.hoverTextColor : operationCard.cardAccent }
                                             Rectangle { width: 3; height: Math.round(43 * root.textScale); x: Math.round(42 * root.textScale); y: Math.round(4 * root.textScale); radius: 2; color: operationCard.strongHover ? operationCard.hoverTextColor : operationCard.cardAccent }
@@ -1443,18 +1513,35 @@ ApplicationWindow {
                                             Rectangle { width: Math.round(12 * root.textScale); height: Math.round(12 * root.textScale); x: Math.round(20 * root.textScale); y: Math.round(29 * root.textScale); radius: width / 2; color: operationCard.strongHover ? operationCard.cardAccent : root.panelColor; border.color: operationCard.strongHover ? operationCard.hoverTextColor : operationCard.cardAccent; border.width: 3 }
                                             Rectangle { width: Math.round(12 * root.textScale); height: Math.round(12 * root.textScale); x: Math.round(37 * root.textScale); y: Math.round(18 * root.textScale); radius: width / 2; color: operationCard.strongHover ? operationCard.cardAccent : root.panelColor; border.color: operationCard.strongHover ? operationCard.hoverTextColor : operationCard.cardAccent; border.width: 3 }
                                         }
-                                        ColumnLayout {
-                                            Layout.fillWidth: true
-                                            Layout.alignment: Qt.AlignVCenter
+                                        Rectangle {
+                                            id: operationCardArrow
+                                            width: Math.round(37 * root.textScale)
+                                            height: width
+                                            anchors.right: parent.right
+                                            anchors.rightMargin: parent.sideMargin
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            radius: width / 2
+                                            color: operationCard.strongHover ? operationCard.hoverTextColor : root.panelColor
+                                            border.color: operationCard.strongHover ? operationCard.hoverTextColor : operationCard.cardAccent
+                                            border.width: 1
+                                            Label { anchors.centerIn: parent; text: "›"; color: operationCard.cardAccent; font.pixelSize: Math.round(29 * root.textScale); font.bold: true }
+                                        }
+                                        Column {
+                                            anchors.left: operationCardIcon.right
+                                            anchors.leftMargin: parent.contentGap
+                                            anchors.right: operationCardArrow.left
+                                            anchors.rightMargin: parent.contentGap
+                                            anchors.verticalCenter: parent.verticalCenter
                                             spacing: 3
                                             Label {
+                                                width: parent.width
                                                 text: blanky.language === "pt" ? "Operação" : "Operation"
                                                 color: operationCard.strongHover ? operationCard.hoverTextColor : root.textColor
                                                 font.bold: true
                                                 font.pixelSize: Math.round(23 * root.textScale)
                                             }
                                             Label {
-                                                Layout.fillWidth: true
+                                                width: parent.width
                                                 text: blanky.language === "pt" ? "Controlo direto dos modos e atuadores" : "Direct control of modes and actuators"
                                                 color: operationCard.strongHover ? operationCard.hoverTextColor : root.mutedText
                                                 font.pixelSize: Math.round(14 * root.textScale)
@@ -1464,7 +1551,6 @@ ApplicationWindow {
                                                 elide: Text.ElideRight
                                             }
                                         }
-                                        Rectangle { Layout.preferredWidth: Math.round(37 * root.textScale); Layout.preferredHeight: Math.round(37 * root.textScale); Layout.alignment: Qt.AlignVCenter; radius: width / 2; color: operationCard.strongHover ? operationCard.hoverTextColor : root.panelColor; border.color: operationCard.strongHover ? operationCard.hoverTextColor : operationCard.cardAccent; border.width: 1; Label { anchors.centerIn: parent; text: "›"; color: operationCard.cardAccent; font.pixelSize: Math.round(29 * root.textScale); font.bold: true } }
                                     }
                                 }
 
@@ -1487,12 +1573,18 @@ ApplicationWindow {
                                         Rectangle { anchors.fill: parent; anchors.margins: 2; radius: parent.radius - 2; color: phoneCard.cardAccent; opacity: phoneCard.strongHover ? 0 : 0.06 }
                                         Behavior on color { ColorAnimation { duration: 150 } }
                                     }
-                                    contentItem: RowLayout {
-                                        anchors.fill: parent; anchors.margins: Math.round(19 * root.spacingScale); spacing: Math.round(15 * root.spacingScale)
+                                    contentItem: Item {
+                                        anchors.fill: parent
+                                        readonly property real sideMargin: Math.round(19 * root.spacingScale)
+                                        readonly property real contentGap: Math.round(15 * root.spacingScale)
+
                                         Item {
-                                            Layout.preferredWidth: Math.round(52 * root.textScale)
-                                            Layout.preferredHeight: Math.round(52 * root.textScale)
-                                            Layout.alignment: Qt.AlignVCenter
+                                            id: phoneCardIcon
+                                            width: Math.round(52 * root.textScale)
+                                            height: Math.round(52 * root.textScale)
+                                            anchors.left: parent.left
+                                            anchors.leftMargin: parent.sideMargin
+                                            anchors.verticalCenter: parent.verticalCenter
                                             Rectangle {
                                                 width: Math.round(27 * root.textScale); height: Math.round(47 * root.textScale)
                                                 anchors.centerIn: parent
@@ -1504,18 +1596,35 @@ ApplicationWindow {
                                                 Rectangle { width: Math.round(4 * root.textScale); height: width; radius: width / 2; anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: Math.round(4 * root.textScale); color: phoneCard.strongHover ? phoneCard.hoverTextColor : phoneCard.cardAccent }
                                             }
                                         }
-                                        ColumnLayout {
-                                            Layout.fillWidth: true
-                                            Layout.alignment: Qt.AlignVCenter
+                                        Rectangle {
+                                            id: phoneCardArrow
+                                            width: Math.round(37 * root.textScale)
+                                            height: width
+                                            anchors.right: parent.right
+                                            anchors.rightMargin: parent.sideMargin
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            radius: width / 2
+                                            color: phoneCard.strongHover ? phoneCard.hoverTextColor : root.panelColor
+                                            border.color: phoneCard.strongHover ? phoneCard.hoverTextColor : phoneCard.cardAccent
+                                            border.width: 1
+                                            Label { anchors.centerIn: parent; text: "›"; color: phoneCard.cardAccent; font.pixelSize: Math.round(29 * root.textScale); font.bold: true }
+                                        }
+                                        Column {
+                                            anchors.left: phoneCardIcon.right
+                                            anchors.leftMargin: parent.contentGap
+                                            anchors.right: phoneCardArrow.left
+                                            anchors.rightMargin: parent.contentGap
+                                            anchors.verticalCenter: parent.verticalCenter
                                             spacing: 3
                                             Label {
+                                                width: parent.width
                                                 text: blanky.language === "pt" ? "Telemóvel" : "Phone"
                                                 color: phoneCard.strongHover ? phoneCard.hoverTextColor : root.textColor
                                                 font.bold: true
                                                 font.pixelSize: Math.round(23 * root.textScale)
                                             }
                                             Label {
-                                                Layout.fillWidth: true
+                                                width: parent.width
                                                 text: blanky.language === "pt" ? "Atividade e comunicação MQTT" : "Activity and MQTT communication"
                                                 color: phoneCard.strongHover ? phoneCard.hoverTextColor : root.mutedText
                                                 font.pixelSize: Math.round(14 * root.textScale)
@@ -1525,7 +1634,6 @@ ApplicationWindow {
                                                 elide: Text.ElideRight
                                             }
                                         }
-                                        Rectangle { Layout.preferredWidth: Math.round(37 * root.textScale); Layout.preferredHeight: Math.round(37 * root.textScale); Layout.alignment: Qt.AlignVCenter; radius: width / 2; color: phoneCard.strongHover ? phoneCard.hoverTextColor : root.panelColor; border.color: phoneCard.strongHover ? phoneCard.hoverTextColor : phoneCard.cardAccent; border.width: 1; Label { anchors.centerIn: parent; text: "›"; color: phoneCard.cardAccent; font.pixelSize: Math.round(29 * root.textScale); font.bold: true } }
                                     }
                                 }
                             }
