@@ -49,6 +49,8 @@ ApplicationWindow {
     property string textBotMode: "online"
     property bool homeMenuVisible: true
     property string activeView: "general"
+    property bool viewTransitionActive: false
+    property bool transitionToMenu: false
     property var audioManualOverrides: ({})
     readonly property int rightPanelWidth: 660
 
@@ -161,8 +163,32 @@ ApplicationWindow {
     }
 
     function openView(view) {
+        if (viewTransitionActive)
+            return
         root.activeView = view
-        root.homeMenuVisible = false
+        root.transitionToMenu = false
+        root.viewTransitionActive = true
+        viewTransitionTimer.start()
+    }
+
+    function returnToHomeMenu() {
+        if (viewTransitionActive)
+            return
+        root.transitionToMenu = true
+        root.viewTransitionActive = true
+        viewTransitionTimer.start()
+    }
+
+    function activeViewLabel() {
+        if (activeView === "voice")
+            return blanky.language === "pt" ? "controlo por voz" : "voice control"
+        if (activeView === "text")
+            return "Text-Bot"
+        if (activeView === "operation")
+            return blanky.language === "pt" ? "painel de operação" : "operation panel"
+        if (activeView === "phone")
+            return blanky.language === "pt" ? "telemóvel" : "phone"
+        return blanky.language === "pt" ? "modo geral" : "general mode"
     }
 
     function beginSystemTransition(action) {
@@ -360,6 +386,16 @@ ApplicationWindow {
         }
     }
 
+    Timer {
+        id: viewTransitionTimer
+        interval: 520
+        repeat: false
+        onTriggered: {
+            root.homeMenuVisible = root.transitionToMenu
+            root.viewTransitionActive = false
+        }
+    }
+
     Component.onCompleted: {
         root.stateMap = root.parseStateCompact(blanky.stateCompact)
         root.commStateMap = root.parseCommCompact(blanky.commStatusCompact)
@@ -406,7 +442,7 @@ ApplicationWindow {
                     borderColor: root.borderColor
                     panelColor: root.panelAltColor
                     toolTip: blanky.language === "pt" ? "Menu Inicial" : "Main Menu"
-                    onClicked: root.homeMenuVisible = true
+                    onClicked: root.returnToHomeMenu()
                 }
 
                 MenuActionButton {
@@ -1109,6 +1145,47 @@ ApplicationWindow {
 
             Item { Layout.fillHeight: true }
         }
+    }
+
+    Rectangle {
+        id: viewTransitionOverlay
+        anchors.fill: parent
+        z: 190
+        visible: root.viewTransitionActive
+        color: Qt.rgba(0, 0, 0, 0.64)
+
+        Column {
+            anchors.centerIn: parent
+            width: Math.min(parent.width - 48, 390)
+            spacing: 14
+
+            Image {
+                source: root.logoSource()
+                width: 72
+                height: 72
+                anchors.horizontalCenter: parent.horizontalCenter
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+            }
+
+            Label {
+                width: parent.width
+                text: root.transitionToMenu
+                    ? (blanky.language === "pt" ? "A regressar ao Menu Inicial..." : "Returning to Main Menu...")
+                    : (blanky.language === "pt" ? "A preparar " + root.activeViewLabel() + "..." : "Preparing " + root.activeViewLabel() + "...")
+                color: root.textColor
+                font.pixelSize: 20
+                font.bold: true
+                horizontalAlignment: Text.AlignHCenter
+            }
+
+            BusyIndicator {
+                anchors.horizontalCenter: parent.horizontalCenter
+                running: root.viewTransitionActive
+            }
+        }
+
+        MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons }
     }
 
     Rectangle {
