@@ -580,7 +580,8 @@ ApplicationWindow {
             id: statusPanel
             Layout.fillWidth: true
             Layout.rightMargin: root.rightPanelWidth + 12
-            Layout.preferredHeight: 174
+            // Text, phone and operation views reserve enough vertical space for Communications.
+            Layout.preferredHeight: (root.activeView === "text" || root.activeView === "phone" || root.activeView === "operation") ? 270 : 174
             color: root.panelColor
             border.color: root.borderColor
             border.width: 2
@@ -961,7 +962,7 @@ ApplicationWindow {
 
                 DirectControlPanel {
                     id: directControlPanel
-                    visible: root.activeView === "general"
+                    visible: root.activeView === "general" || root.activeView === "operation"
                     Layout.alignment: Qt.AlignTop
                     Layout.fillHeight: true
                     Layout.topMargin: 0
@@ -994,7 +995,9 @@ ApplicationWindow {
         x: root.width - width - 18
         y: mainColumn.y + statusPanel.y
         width: root.rightPanelWidth
-        height: mainColumn.y + primaryControlsPanel.y + primaryControlsPanel.height - y
+        height: (root.activeView === "general" || root.activeView === "voice")
+            ? mainColumn.y + primaryControlsPanel.y + primaryControlsPanel.height - y
+            : statusPanel.height
         z: 3
         controller: blanky
         language: blanky.language
@@ -1073,7 +1076,7 @@ ApplicationWindow {
             Rectangle {
                 Layout.alignment: Qt.AlignHCenter
                 Layout.preferredWidth: 540
-                Layout.preferredHeight: 260
+                Layout.preferredHeight: 300
                 radius: 16
                 color: root.panelAltColor
                 border.color: root.accentColor
@@ -1092,11 +1095,17 @@ ApplicationWindow {
                         MenuActionButton { text: "🎙  " + (blanky.language === "pt" ? "Voz" : "Voice"); Layout.fillWidth: true; Layout.preferredHeight: 48; accentColor: root.successColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; onClicked: root.openView("voice") }
                         MenuActionButton { text: "⌨  Text-Bot"; Layout.fillWidth: true; Layout.preferredHeight: 48; accentColor: root.warningColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; onClicked: root.openView("text") }
                     }
-                    Label { text: blanky.language === "pt" ? "Voz destaca o reconhecimento e os controlos de resposta. Text-Bot destaca a introdução de comandos." : "Voice highlights recognition and response controls. Text-Bot highlights command input."; color: root.mutedText; font.pixelSize: 13; wrapMode: Text.WordWrap; Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 10
+                        MenuActionButton { text: "⚙  " + (blanky.language === "pt" ? "Operação" : "Operation"); Layout.fillWidth: true; Layout.preferredHeight: 48; accentColor: "#cf8cff"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; onClicked: root.openView("operation") }
+                        MenuActionButton { text: "📱  " + (blanky.language === "pt" ? "Telemóvel" : "Phone"); Layout.fillWidth: true; Layout.preferredHeight: 48; accentColor: root.accentColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; onClicked: root.openView("phone") }
+                    }
+                    Label { text: blanky.language === "pt" ? "Voz e Text-Bot destacam a respetiva interação. Operação amplia o controlo direto. Telemóvel mostra Eventos e Comunicações MQTT." : "Voice and Text-Bot highlight their interaction. Operation expands direct control. Phone shows Events and MQTT Communications."; color: root.mutedText; font.pixelSize: 13; wrapMode: Text.WordWrap; Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter }
                 }
             }
 
-            Label { Layout.fillWidth: true; text: blanky.language === "pt" ? "Painel de Operação e Telemóvel serão acrescentados na etapa seguinte." : "Operation Panel and Phone will be added in the next stage."; color: root.mutedText; font.pixelSize: 13; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap }
+            Label { Layout.fillWidth: true; text: blanky.language === "pt" ? "Cada vista mantém o mesmo sistema, histórico de eventos e comunicações em funcionamento." : "Each view keeps the same system, event history and communications running."; color: root.mutedText; font.pixelSize: 13; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap }
 
             Item { Layout.fillHeight: true }
         }
