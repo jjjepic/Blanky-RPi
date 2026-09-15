@@ -62,6 +62,11 @@ ApplicationWindow {
         return Number(value).toFixed(digits)
     }
 
+    function hoverForeground(accent) {
+        var luminance = 0.2126 * accent.r + 0.7152 * accent.g + 0.0722 * accent.b
+        return luminance > 0.62 ? "#07111a" : "#f7fbff"
+    }
+
     function eventsHeaderText() {
         if (blanky.language === "en")
             return "ID    | Time     | Source     | Command            | State     | Description"
@@ -1144,7 +1149,7 @@ ApplicationWindow {
                         Layout.alignment: Qt.AlignHCenter
                         spacing: 16
 
-                        Image { source: root.logoSource(); Layout.preferredWidth: Math.round(88 * root.controlScale); Layout.preferredHeight: Math.round(88 * root.controlScale); fillMode: Image.PreserveAspectFit; smooth: true }
+                        Image { source: root.logoSource(); Layout.preferredWidth: Math.round(88 * root.textScale); Layout.preferredHeight: Math.round(88 * root.textScale); fillMode: Image.PreserveAspectFit; smooth: true }
                         ColumnLayout {
                             spacing: 2
                             Label { text: "Blanky"; color: root.accentColor; font.pixelSize: Math.round(48 * root.textScale); font.bold: true }
@@ -1185,22 +1190,28 @@ ApplicationWindow {
 
                             Button {
                                 id: generalCard
+                                readonly property color cardAccent: root.accentColor
+                                readonly property bool strongHover: hovered && blanky.hoverAnimationsEnabled
+                                readonly property color hoverTextColor: root.hoverForeground(cardAccent)
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: Math.round(134 * root.controlScale + (root.textScale - 1.0) * 44)
                                 hoverEnabled: true
                                 focusPolicy: Qt.StrongFocus
                                 focus: homeMenu.visible
                                 padding: 0
+                                scale: strongHover ? 1.015 : 1.0
+                                z: hovered ? 1 : 0
                                 KeyNavigation.tab: voiceCard
                                 onClicked: root.openView("general")
+                                Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
 
                                 background: Rectangle {
                                     radius: 19
-                                    color: generalCard.hovered ? root.panelAltColor : root.panelColor
-                                    border.color: generalCard.activeFocus ? root.textColor : root.accentColor
-                                    border.width: generalCard.activeFocus ? 3 : (generalCard.hovered ? 3 : 2)
+                                    color: generalCard.strongHover ? generalCard.cardAccent : (generalCard.hovered ? Qt.lighter(root.panelColor, 1.28) : root.panelColor)
+                                    border.color: generalCard.activeFocus ? root.textColor : (generalCard.strongHover ? Qt.lighter(generalCard.cardAccent, 1.12) : generalCard.cardAccent)
+                                    border.width: generalCard.activeFocus || generalCard.strongHover ? 3 : 2
 
-                                    Rectangle { anchors.fill: parent; anchors.margins: 2; radius: parent.radius - 2; color: root.accentColor; opacity: generalCard.hovered ? 0.15 : 0.07 }
+                                    Rectangle { anchors.fill: parent; anchors.margins: 2; radius: parent.radius - 2; color: generalCard.cardAccent; opacity: generalCard.strongHover ? 0 : 0.07 }
                                     Behavior on color { ColorAnimation { duration: 150 } }
                                 }
 
@@ -1211,39 +1222,42 @@ ApplicationWindow {
                                     spacing: 20
 
                                     GridLayout {
-                                        Layout.preferredWidth: Math.round(82 * root.controlScale)
-                                        Layout.minimumWidth: Math.round(82 * root.controlScale)
-                                        Layout.maximumWidth: Math.round(82 * root.controlScale)
-                                        Layout.preferredHeight: Math.round(70 * root.controlScale)
-                                        Layout.minimumHeight: Math.round(70 * root.controlScale)
-                                        Layout.maximumHeight: Math.round(70 * root.controlScale)
+                                        Layout.preferredWidth: Math.round(82 * root.textScale)
+                                        Layout.minimumWidth: Math.round(82 * root.textScale)
+                                        Layout.maximumWidth: Math.round(82 * root.textScale)
+                                        Layout.preferredHeight: Math.round(70 * root.textScale)
+                                        Layout.minimumHeight: Math.round(70 * root.textScale)
+                                        Layout.maximumHeight: Math.round(70 * root.textScale)
+                                        Layout.alignment: Qt.AlignVCenter
                                         columns: 2
-                                        columnSpacing: 8
-                                        rowSpacing: 8
-                                        Rectangle { Layout.preferredWidth: Math.round(35 * root.controlScale); Layout.preferredHeight: Math.round(29 * root.controlScale); radius: 5; color: "transparent"; border.color: root.accentColor; border.width: 4 }
-                                        Rectangle { Layout.preferredWidth: Math.round(35 * root.controlScale); Layout.preferredHeight: Math.round(29 * root.controlScale); radius: 5; color: "transparent"; border.color: root.accentColor; border.width: 4 }
-                                        Rectangle { Layout.preferredWidth: Math.round(35 * root.controlScale); Layout.preferredHeight: Math.round(29 * root.controlScale); radius: 5; color: "transparent"; border.color: root.accentColor; border.width: 4 }
-                                        Rectangle { Layout.preferredWidth: Math.round(35 * root.controlScale); Layout.preferredHeight: Math.round(29 * root.controlScale); radius: 5; color: "transparent"; border.color: root.accentColor; border.width: 4 }
+                                        columnSpacing: Math.round(8 * root.textScale)
+                                        rowSpacing: Math.round(8 * root.textScale)
+                                        Rectangle { Layout.preferredWidth: Math.round(35 * root.textScale); Layout.preferredHeight: Math.round(29 * root.textScale); radius: 5; color: "transparent"; border.color: generalCard.strongHover ? generalCard.hoverTextColor : generalCard.cardAccent; border.width: 4 }
+                                        Rectangle { Layout.preferredWidth: Math.round(35 * root.textScale); Layout.preferredHeight: Math.round(29 * root.textScale); radius: 5; color: "transparent"; border.color: generalCard.strongHover ? generalCard.hoverTextColor : generalCard.cardAccent; border.width: 4 }
+                                        Rectangle { Layout.preferredWidth: Math.round(35 * root.textScale); Layout.preferredHeight: Math.round(29 * root.textScale); radius: 5; color: "transparent"; border.color: generalCard.strongHover ? generalCard.hoverTextColor : generalCard.cardAccent; border.width: 4 }
+                                        Rectangle { Layout.preferredWidth: Math.round(35 * root.textScale); Layout.preferredHeight: Math.round(29 * root.textScale); radius: 5; color: "transparent"; border.color: generalCard.strongHover ? generalCard.hoverTextColor : generalCard.cardAccent; border.width: 4 }
                                     }
 
-                                    Rectangle { Layout.preferredWidth: 2; Layout.fillHeight: true; Layout.topMargin: 18; Layout.bottomMargin: 18; color: root.accentColor; opacity: 0.85 }
+                                    Rectangle { Layout.preferredWidth: 2; Layout.fillHeight: true; Layout.topMargin: 18; Layout.bottomMargin: 18; color: generalCard.strongHover ? generalCard.hoverTextColor : generalCard.cardAccent; opacity: 0.85 }
 
                                     ColumnLayout {
                                         Layout.fillWidth: true
+                                        Layout.alignment: Qt.AlignVCenter
                                         spacing: 3
-                                        Label { text: blanky.language === "pt" ? "Geral" : "General"; color: root.textColor; font.pixelSize: Math.round(34 * root.textScale); font.bold: true }
-                                        Label { text: blanky.language === "pt" ? "Vista completa do sistema" : "Complete system view"; color: root.textColor; font.pixelSize: Math.round(18 * root.textScale) }
-                                        Label { text: blanky.language === "pt" ? "VISÃO GLOBAL  •  MONITORIZAÇÃO  •  CONTROLO" : "GLOBAL VIEW  •  MONITORING  •  CONTROL"; color: root.accentColor; font.pixelSize: Math.round(11 * root.textScale); font.bold: true; font.letterSpacing: 1.4 }
+                                        Label { text: blanky.language === "pt" ? "Geral" : "General"; color: generalCard.strongHover ? generalCard.hoverTextColor : root.textColor; font.pixelSize: Math.round(34 * root.textScale); font.bold: true }
+                                        Label { text: blanky.language === "pt" ? "Vista completa do sistema" : "Complete system view"; color: generalCard.strongHover ? generalCard.hoverTextColor : root.textColor; font.pixelSize: Math.round(18 * root.textScale) }
+                                        Label { text: blanky.language === "pt" ? "VISÃO GLOBAL  •  MONITORIZAÇÃO  •  CONTROLO" : "GLOBAL VIEW  •  MONITORING  •  CONTROL"; color: generalCard.strongHover ? generalCard.hoverTextColor : generalCard.cardAccent; font.pixelSize: Math.round(11 * root.textScale); font.bold: true; font.letterSpacing: 1.4 }
                                     }
 
                                     Rectangle {
-                                        Layout.preferredWidth: 52
-                                        Layout.preferredHeight: 52
+                                        Layout.preferredWidth: Math.round(52 * root.textScale)
+                                        Layout.preferredHeight: Math.round(52 * root.textScale)
+                                        Layout.alignment: Qt.AlignVCenter
                                         radius: width / 2
-                                        color: generalCard.hovered ? root.accentColor : root.panelColor
-                                        border.color: root.accentColor
+                                        color: generalCard.strongHover ? generalCard.hoverTextColor : root.panelColor
+                                        border.color: generalCard.strongHover ? generalCard.hoverTextColor : generalCard.cardAccent
                                         border.width: 2
-                                        Label { anchors.centerIn: parent; text: "›"; color: generalCard.hovered ? root.panelColor : root.accentColor; font.pixelSize: 40; font.bold: true }
+                                        Label { anchors.centerIn: parent; text: "›"; color: generalCard.cardAccent; font.pixelSize: Math.round(40 * root.textScale); font.bold: true }
                                     }
                                 }
                             }
@@ -1256,187 +1270,234 @@ ApplicationWindow {
 
                                 Button {
                                     id: voiceCard
+                                    readonly property color cardAccent: root.successColor
+                                    readonly property bool strongHover: hovered && blanky.hoverAnimationsEnabled
+                                    readonly property color hoverTextColor: root.hoverForeground(cardAccent)
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: Math.round(112 * root.controlScale + (root.textScale - 1.0) * 44)
                                     hoverEnabled: true; focusPolicy: Qt.StrongFocus; padding: 0
+                                    scale: strongHover ? 1.015 : 1.0
+                                    z: hovered ? 1 : 0
                                     KeyNavigation.tab: textCard
                                     onClicked: root.openView("voice")
+                                    Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
                                     background: Rectangle {
-                                        radius: 17; color: voiceCard.hovered ? root.panelAltColor : root.panelColor
-                                        border.color: voiceCard.activeFocus ? root.textColor : root.successColor; border.width: voiceCard.activeFocus ? 3 : (voiceCard.hovered ? 3 : 2)
-                                        Rectangle { anchors.fill: parent; anchors.margins: 2; radius: parent.radius - 2; color: root.successColor; opacity: voiceCard.hovered ? 0.14 : 0.06 }
+                                        radius: 17; color: voiceCard.strongHover ? voiceCard.cardAccent : (voiceCard.hovered ? Qt.lighter(root.panelColor, 1.28) : root.panelColor)
+                                        border.color: voiceCard.activeFocus ? root.textColor : (voiceCard.strongHover ? Qt.lighter(voiceCard.cardAccent, 1.12) : voiceCard.cardAccent); border.width: voiceCard.activeFocus || voiceCard.strongHover ? 3 : 2
+                                        Rectangle { anchors.fill: parent; anchors.margins: 2; radius: parent.radius - 2; color: voiceCard.cardAccent; opacity: voiceCard.strongHover ? 0 : 0.06 }
                                         Behavior on color { ColorAnimation { duration: 150 } }
                                     }
                                     contentItem: RowLayout {
-                                        anchors.fill: parent; anchors.margins: 19; spacing: 15
-                                        Label { Layout.preferredWidth: 52; text: "🎙"; color: root.successColor; font.pixelSize: Math.round(42 * root.textScale); horizontalAlignment: Text.AlignHCenter }
+                                        anchors.fill: parent; anchors.margins: Math.round(19 * root.spacingScale); spacing: Math.round(15 * root.spacingScale)
+                                        Label { Layout.preferredWidth: Math.round(52 * root.textScale); Layout.alignment: Qt.AlignVCenter; text: "🎙"; color: voiceCard.strongHover ? voiceCard.hoverTextColor : voiceCard.cardAccent; font.pixelSize: Math.round(42 * root.textScale); horizontalAlignment: Text.AlignHCenter }
                                         ColumnLayout {
                                             Layout.fillWidth: true
+                                            Layout.alignment: Qt.AlignVCenter
                                             spacing: 3
                                             Label {
                                                 text: blanky.language === "pt" ? "Voz" : "Voice"
-                                                color: root.textColor
+                                                color: voiceCard.strongHover ? voiceCard.hoverTextColor : root.textColor
                                                 font.bold: true
                                                 font.pixelSize: Math.round(23 * root.textScale)
                                             }
                                             Label {
-                                                text: blanky.language === "pt" ? "Comandos de voz e\nresposta falada" : "Voice commands and\nspoken response"
-                                                color: root.mutedText
+                                                Layout.fillWidth: true
+                                                text: blanky.language === "pt" ? "Comandos de voz e resposta falada" : "Voice commands and spoken response"
+                                                color: voiceCard.strongHover ? voiceCard.hoverTextColor : root.mutedText
                                                 font.pixelSize: Math.round(14 * root.textScale)
                                                 lineHeight: 0.95
+                                                wrapMode: Text.WordWrap
+                                                maximumLineCount: 2
+                                                elide: Text.ElideRight
                                             }
                                         }
-                                        Rectangle { Layout.preferredWidth: 37; Layout.preferredHeight: 37; radius: width / 2; color: voiceCard.hovered ? root.successColor : root.panelColor; border.color: root.successColor; border.width: 1; Label { anchors.centerIn: parent; text: "›"; color: voiceCard.hovered ? root.panelColor : root.successColor; font.pixelSize: 29; font.bold: true } }
+                                        Rectangle { Layout.preferredWidth: Math.round(37 * root.textScale); Layout.preferredHeight: Math.round(37 * root.textScale); Layout.alignment: Qt.AlignVCenter; radius: width / 2; color: voiceCard.strongHover ? voiceCard.hoverTextColor : root.panelColor; border.color: voiceCard.strongHover ? voiceCard.hoverTextColor : voiceCard.cardAccent; border.width: 1; Label { anchors.centerIn: parent; text: "›"; color: voiceCard.cardAccent; font.pixelSize: Math.round(29 * root.textScale); font.bold: true } }
                                     }
                                 }
 
                                 Button {
                                     id: textCard
+                                    readonly property color cardAccent: root.warningColor
+                                    readonly property bool strongHover: hovered && blanky.hoverAnimationsEnabled
+                                    readonly property color hoverTextColor: root.hoverForeground(cardAccent)
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: Math.round(112 * root.controlScale + (root.textScale - 1.0) * 44)
                                     hoverEnabled: true; focusPolicy: Qt.StrongFocus; padding: 0
+                                    scale: strongHover ? 1.015 : 1.0
+                                    z: hovered ? 1 : 0
                                     KeyNavigation.tab: operationCard
                                     onClicked: root.openView("text")
+                                    Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
                                     background: Rectangle {
-                                        radius: 17; color: textCard.hovered ? root.panelAltColor : root.panelColor
-                                        border.color: textCard.activeFocus ? root.textColor : root.warningColor; border.width: textCard.activeFocus ? 3 : (textCard.hovered ? 3 : 2)
-                                        Rectangle { anchors.fill: parent; anchors.margins: 2; radius: parent.radius - 2; color: root.warningColor; opacity: textCard.hovered ? 0.14 : 0.06 }
+                                        radius: 17; color: textCard.strongHover ? textCard.cardAccent : (textCard.hovered ? Qt.lighter(root.panelColor, 1.28) : root.panelColor)
+                                        border.color: textCard.activeFocus ? root.textColor : (textCard.strongHover ? Qt.lighter(textCard.cardAccent, 1.12) : textCard.cardAccent); border.width: textCard.activeFocus || textCard.strongHover ? 3 : 2
+                                        Rectangle { anchors.fill: parent; anchors.margins: 2; radius: parent.radius - 2; color: textCard.cardAccent; opacity: textCard.strongHover ? 0 : 0.06 }
                                         Behavior on color { ColorAnimation { duration: 150 } }
                                     }
                                     contentItem: RowLayout {
-                                        anchors.fill: parent; anchors.margins: 19; spacing: 15
+                                        anchors.fill: parent; anchors.margins: Math.round(19 * root.spacingScale); spacing: Math.round(15 * root.spacingScale)
                                         Item {
-                                            Layout.preferredWidth: 52
-                                            Layout.preferredHeight: 52
+                                            Layout.preferredWidth: Math.round(52 * root.textScale)
+                                            Layout.preferredHeight: Math.round(52 * root.textScale)
+                                            Layout.alignment: Qt.AlignVCenter
                                             Rectangle {
-                                                width: 42; height: 32
+                                                width: Math.round(42 * root.textScale); height: Math.round(32 * root.textScale)
                                                 anchors.horizontalCenter: parent.horizontalCenter
-                                                y: 5
-                                                radius: 5
+                                                y: Math.round(5 * root.textScale)
+                                                radius: Math.round(5 * root.textScale)
                                                 color: "transparent"
-                                                border.color: root.warningColor
+                                                border.color: textCard.strongHover ? textCard.hoverTextColor : textCard.cardAccent
                                                 border.width: 3
                                                 Column {
                                                     anchors.centerIn: parent
-                                                    spacing: 4
-                                                    Rectangle { width: 25; height: 2; color: root.warningColor }
-                                                    Rectangle { width: 25; height: 2; color: root.warningColor }
-                                                    Rectangle { width: 18; height: 2; color: root.warningColor }
+                                                    spacing: Math.round(4 * root.textScale)
+                                                    Rectangle { width: Math.round(25 * root.textScale); height: 2; color: textCard.strongHover ? textCard.hoverTextColor : textCard.cardAccent }
+                                                    Rectangle { width: Math.round(25 * root.textScale); height: 2; color: textCard.strongHover ? textCard.hoverTextColor : textCard.cardAccent }
+                                                    Rectangle { width: Math.round(18 * root.textScale); height: 2; color: textCard.strongHover ? textCard.hoverTextColor : textCard.cardAccent }
                                                 }
                                             }
-                                            Rectangle { width: 14; height: 3; x: 7; y: 38; rotation: -32; color: root.warningColor }
+                                            Rectangle { width: Math.round(14 * root.textScale); height: 3; x: Math.round(7 * root.textScale); y: Math.round(38 * root.textScale); rotation: -32; color: textCard.strongHover ? textCard.hoverTextColor : textCard.cardAccent }
                                         }
                                         ColumnLayout {
                                             Layout.fillWidth: true
+                                            Layout.alignment: Qt.AlignVCenter
                                             spacing: 3
                                             Label {
                                                 text: "Text-Bot"
-                                                color: root.textColor
+                                                color: textCard.strongHover ? textCard.hoverTextColor : root.textColor
                                                 font.bold: true
                                                 font.pixelSize: Math.round(23 * root.textScale)
                                             }
                                             Label {
-                                                text: blanky.language === "pt" ? "Interação e interpretação\npor texto" : "Text interaction and\ninterpretation"
-                                                color: root.mutedText
+                                                Layout.fillWidth: true
+                                                text: blanky.language === "pt" ? "Interação e interpretação por texto" : "Text interaction and interpretation"
+                                                color: textCard.strongHover ? textCard.hoverTextColor : root.mutedText
                                                 font.pixelSize: Math.round(14 * root.textScale)
                                                 lineHeight: 0.95
+                                                wrapMode: Text.WordWrap
+                                                maximumLineCount: 2
+                                                elide: Text.ElideRight
                                             }
                                         }
-                                        Rectangle { Layout.preferredWidth: 37; Layout.preferredHeight: 37; radius: width / 2; color: textCard.hovered ? root.warningColor : root.panelColor; border.color: root.warningColor; border.width: 1; Label { anchors.centerIn: parent; text: "›"; color: textCard.hovered ? root.panelColor : root.warningColor; font.pixelSize: 29; font.bold: true } }
+                                        Rectangle { Layout.preferredWidth: Math.round(37 * root.textScale); Layout.preferredHeight: Math.round(37 * root.textScale); Layout.alignment: Qt.AlignVCenter; radius: width / 2; color: textCard.strongHover ? textCard.hoverTextColor : root.panelColor; border.color: textCard.strongHover ? textCard.hoverTextColor : textCard.cardAccent; border.width: 1; Label { anchors.centerIn: parent; text: "›"; color: textCard.cardAccent; font.pixelSize: Math.round(29 * root.textScale); font.bold: true } }
                                     }
                                 }
 
                                 Button {
                                     id: operationCard
+                                    readonly property color cardAccent: "#cf8cff"
+                                    readonly property bool strongHover: hovered && blanky.hoverAnimationsEnabled
+                                    readonly property color hoverTextColor: root.hoverForeground(cardAccent)
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: Math.round(112 * root.controlScale + (root.textScale - 1.0) * 44)
                                     hoverEnabled: true; focusPolicy: Qt.StrongFocus; padding: 0
+                                    scale: strongHover ? 1.015 : 1.0
+                                    z: hovered ? 1 : 0
                                     KeyNavigation.tab: phoneCard
                                     onClicked: root.openView("operation")
+                                    Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
                                     background: Rectangle {
-                                        radius: 17; color: operationCard.hovered ? root.panelAltColor : root.panelColor
-                                        border.color: operationCard.activeFocus ? root.textColor : "#cf8cff"; border.width: operationCard.activeFocus ? 3 : (operationCard.hovered ? 3 : 2)
-                                        Rectangle { anchors.fill: parent; anchors.margins: 2; radius: parent.radius - 2; color: "#cf8cff"; opacity: operationCard.hovered ? 0.14 : 0.06 }
+                                        radius: 17; color: operationCard.strongHover ? operationCard.cardAccent : (operationCard.hovered ? Qt.lighter(root.panelColor, 1.28) : root.panelColor)
+                                        border.color: operationCard.activeFocus ? root.textColor : (operationCard.strongHover ? Qt.lighter(operationCard.cardAccent, 1.12) : operationCard.cardAccent); border.width: operationCard.activeFocus || operationCard.strongHover ? 3 : 2
+                                        Rectangle { anchors.fill: parent; anchors.margins: 2; radius: parent.radius - 2; color: operationCard.cardAccent; opacity: operationCard.strongHover ? 0 : 0.06 }
                                         Behavior on color { ColorAnimation { duration: 150 } }
                                     }
                                     contentItem: RowLayout {
-                                        anchors.fill: parent; anchors.margins: 19; spacing: 15
+                                        anchors.fill: parent; anchors.margins: Math.round(19 * root.spacingScale); spacing: Math.round(15 * root.spacingScale)
                                         Item {
-                                            Layout.preferredWidth: 52
-                                            Layout.preferredHeight: 52
-                                            Rectangle { width: 3; height: 43; x: 8; y: 4; radius: 2; color: "#cf8cff" }
-                                            Rectangle { width: 3; height: 43; x: 25; y: 4; radius: 2; color: "#cf8cff" }
-                                            Rectangle { width: 3; height: 43; x: 42; y: 4; radius: 2; color: "#cf8cff" }
-                                            Rectangle { width: 12; height: 12; x: 3; y: 12; radius: 6; color: root.panelColor; border.color: "#cf8cff"; border.width: 3 }
-                                            Rectangle { width: 12; height: 12; x: 20; y: 29; radius: 6; color: root.panelColor; border.color: "#cf8cff"; border.width: 3 }
-                                            Rectangle { width: 12; height: 12; x: 37; y: 18; radius: 6; color: root.panelColor; border.color: "#cf8cff"; border.width: 3 }
+                                            Layout.preferredWidth: Math.round(52 * root.textScale)
+                                            Layout.preferredHeight: Math.round(52 * root.textScale)
+                                            Layout.alignment: Qt.AlignVCenter
+                                            Rectangle { width: 3; height: Math.round(43 * root.textScale); x: Math.round(8 * root.textScale); y: Math.round(4 * root.textScale); radius: 2; color: operationCard.strongHover ? operationCard.hoverTextColor : operationCard.cardAccent }
+                                            Rectangle { width: 3; height: Math.round(43 * root.textScale); x: Math.round(25 * root.textScale); y: Math.round(4 * root.textScale); radius: 2; color: operationCard.strongHover ? operationCard.hoverTextColor : operationCard.cardAccent }
+                                            Rectangle { width: 3; height: Math.round(43 * root.textScale); x: Math.round(42 * root.textScale); y: Math.round(4 * root.textScale); radius: 2; color: operationCard.strongHover ? operationCard.hoverTextColor : operationCard.cardAccent }
+                                            Rectangle { width: Math.round(12 * root.textScale); height: Math.round(12 * root.textScale); x: Math.round(3 * root.textScale); y: Math.round(12 * root.textScale); radius: width / 2; color: operationCard.strongHover ? operationCard.cardAccent : root.panelColor; border.color: operationCard.strongHover ? operationCard.hoverTextColor : operationCard.cardAccent; border.width: 3 }
+                                            Rectangle { width: Math.round(12 * root.textScale); height: Math.round(12 * root.textScale); x: Math.round(20 * root.textScale); y: Math.round(29 * root.textScale); radius: width / 2; color: operationCard.strongHover ? operationCard.cardAccent : root.panelColor; border.color: operationCard.strongHover ? operationCard.hoverTextColor : operationCard.cardAccent; border.width: 3 }
+                                            Rectangle { width: Math.round(12 * root.textScale); height: Math.round(12 * root.textScale); x: Math.round(37 * root.textScale); y: Math.round(18 * root.textScale); radius: width / 2; color: operationCard.strongHover ? operationCard.cardAccent : root.panelColor; border.color: operationCard.strongHover ? operationCard.hoverTextColor : operationCard.cardAccent; border.width: 3 }
                                         }
                                         ColumnLayout {
                                             Layout.fillWidth: true
+                                            Layout.alignment: Qt.AlignVCenter
                                             spacing: 3
                                             Label {
                                                 text: blanky.language === "pt" ? "Operação" : "Operation"
-                                                color: root.textColor
+                                                color: operationCard.strongHover ? operationCard.hoverTextColor : root.textColor
                                                 font.bold: true
                                                 font.pixelSize: Math.round(23 * root.textScale)
                                             }
                                             Label {
-                                                text: blanky.language === "pt" ? "Controlo direto dos\nmodos e atuadores" : "Direct control of modes\nand actuators"
-                                                color: root.mutedText
+                                                Layout.fillWidth: true
+                                                text: blanky.language === "pt" ? "Controlo direto dos modos e atuadores" : "Direct control of modes and actuators"
+                                                color: operationCard.strongHover ? operationCard.hoverTextColor : root.mutedText
                                                 font.pixelSize: Math.round(14 * root.textScale)
                                                 lineHeight: 0.95
+                                                wrapMode: Text.WordWrap
+                                                maximumLineCount: 2
+                                                elide: Text.ElideRight
                                             }
                                         }
-                                        Rectangle { Layout.preferredWidth: 37; Layout.preferredHeight: 37; radius: width / 2; color: operationCard.hovered ? "#cf8cff" : root.panelColor; border.color: "#cf8cff"; border.width: 1; Label { anchors.centerIn: parent; text: "›"; color: operationCard.hovered ? root.panelColor : "#cf8cff"; font.pixelSize: 29; font.bold: true } }
+                                        Rectangle { Layout.preferredWidth: Math.round(37 * root.textScale); Layout.preferredHeight: Math.round(37 * root.textScale); Layout.alignment: Qt.AlignVCenter; radius: width / 2; color: operationCard.strongHover ? operationCard.hoverTextColor : root.panelColor; border.color: operationCard.strongHover ? operationCard.hoverTextColor : operationCard.cardAccent; border.width: 1; Label { anchors.centerIn: parent; text: "›"; color: operationCard.cardAccent; font.pixelSize: Math.round(29 * root.textScale); font.bold: true } }
                                     }
                                 }
 
                                 Button {
                                     id: phoneCard
+                                    readonly property color cardAccent: root.accentColor
+                                    readonly property bool strongHover: hovered && blanky.hoverAnimationsEnabled
+                                    readonly property color hoverTextColor: root.hoverForeground(cardAccent)
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: Math.round(112 * root.controlScale + (root.textScale - 1.0) * 44)
                                     hoverEnabled: true; focusPolicy: Qt.StrongFocus; padding: 0
+                                    scale: strongHover ? 1.015 : 1.0
+                                    z: hovered ? 1 : 0
                                     KeyNavigation.tab: portugueseMenuButton
                                     onClicked: root.openView("phone")
+                                    Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
                                     background: Rectangle {
-                                        radius: 17; color: phoneCard.hovered ? root.panelAltColor : root.panelColor
-                                        border.color: phoneCard.activeFocus ? root.textColor : root.accentColor; border.width: phoneCard.activeFocus ? 3 : (phoneCard.hovered ? 3 : 2)
-                                        Rectangle { anchors.fill: parent; anchors.margins: 2; radius: parent.radius - 2; color: root.accentColor; opacity: phoneCard.hovered ? 0.14 : 0.06 }
+                                        radius: 17; color: phoneCard.strongHover ? phoneCard.cardAccent : (phoneCard.hovered ? Qt.lighter(root.panelColor, 1.28) : root.panelColor)
+                                        border.color: phoneCard.activeFocus ? root.textColor : (phoneCard.strongHover ? Qt.lighter(phoneCard.cardAccent, 1.12) : phoneCard.cardAccent); border.width: phoneCard.activeFocus || phoneCard.strongHover ? 3 : 2
+                                        Rectangle { anchors.fill: parent; anchors.margins: 2; radius: parent.radius - 2; color: phoneCard.cardAccent; opacity: phoneCard.strongHover ? 0 : 0.06 }
                                         Behavior on color { ColorAnimation { duration: 150 } }
                                     }
                                     contentItem: RowLayout {
-                                        anchors.fill: parent; anchors.margins: 19; spacing: 15
+                                        anchors.fill: parent; anchors.margins: Math.round(19 * root.spacingScale); spacing: Math.round(15 * root.spacingScale)
                                         Item {
-                                            Layout.preferredWidth: 52
-                                            Layout.preferredHeight: 52
+                                            Layout.preferredWidth: Math.round(52 * root.textScale)
+                                            Layout.preferredHeight: Math.round(52 * root.textScale)
+                                            Layout.alignment: Qt.AlignVCenter
                                             Rectangle {
-                                                width: 27; height: 47
+                                                width: Math.round(27 * root.textScale); height: Math.round(47 * root.textScale)
                                                 anchors.centerIn: parent
-                                                radius: 5
+                                                radius: Math.round(5 * root.textScale)
                                                 color: "transparent"
-                                                border.color: root.accentColor
+                                                border.color: phoneCard.strongHover ? phoneCard.hoverTextColor : phoneCard.cardAccent
                                                 border.width: 3
-                                                Rectangle { width: 9; height: 2; anchors.horizontalCenter: parent.horizontalCenter; y: 5; color: root.accentColor }
-                                                Rectangle { width: 4; height: 4; radius: 2; anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 4; color: root.accentColor }
+                                                Rectangle { width: Math.round(9 * root.textScale); height: 2; anchors.horizontalCenter: parent.horizontalCenter; y: Math.round(5 * root.textScale); color: phoneCard.strongHover ? phoneCard.hoverTextColor : phoneCard.cardAccent }
+                                                Rectangle { width: Math.round(4 * root.textScale); height: width; radius: width / 2; anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: Math.round(4 * root.textScale); color: phoneCard.strongHover ? phoneCard.hoverTextColor : phoneCard.cardAccent }
                                             }
                                         }
                                         ColumnLayout {
                                             Layout.fillWidth: true
+                                            Layout.alignment: Qt.AlignVCenter
                                             spacing: 3
                                             Label {
                                                 text: blanky.language === "pt" ? "Telemóvel" : "Phone"
-                                                color: root.textColor
+                                                color: phoneCard.strongHover ? phoneCard.hoverTextColor : root.textColor
                                                 font.bold: true
                                                 font.pixelSize: Math.round(23 * root.textScale)
                                             }
                                             Label {
-                                                text: blanky.language === "pt" ? "Atividade e comunicação\nMQTT" : "Activity and MQTT\ncommunication"
-                                                color: root.mutedText
+                                                Layout.fillWidth: true
+                                                text: blanky.language === "pt" ? "Atividade e comunicação MQTT" : "Activity and MQTT communication"
+                                                color: phoneCard.strongHover ? phoneCard.hoverTextColor : root.mutedText
                                                 font.pixelSize: Math.round(14 * root.textScale)
                                                 lineHeight: 0.95
+                                                wrapMode: Text.WordWrap
+                                                maximumLineCount: 2
+                                                elide: Text.ElideRight
                                             }
                                         }
-                                        Rectangle { Layout.preferredWidth: 37; Layout.preferredHeight: 37; radius: width / 2; color: phoneCard.hovered ? root.accentColor : root.panelColor; border.color: root.accentColor; border.width: 1; Label { anchors.centerIn: parent; text: "›"; color: phoneCard.hovered ? root.panelColor : root.accentColor; font.pixelSize: 29; font.bold: true } }
+                                        Rectangle { Layout.preferredWidth: Math.round(37 * root.textScale); Layout.preferredHeight: Math.round(37 * root.textScale); Layout.alignment: Qt.AlignVCenter; radius: width / 2; color: phoneCard.strongHover ? phoneCard.hoverTextColor : root.panelColor; border.color: phoneCard.strongHover ? phoneCard.hoverTextColor : phoneCard.cardAccent; border.width: 1; Label { anchors.centerIn: parent; text: "›"; color: phoneCard.cardAccent; font.pixelSize: Math.round(29 * root.textScale); font.bold: true } }
                                     }
                                 }
                             }
@@ -1579,12 +1640,14 @@ ApplicationWindow {
         }
 
         function refreshSnapshot() {
-            dashboardLayer.grabToImage(function(result) {
+            var sourceItem = root.homeMenuVisible ? homeMenu : dashboardLayer
+            sourceItem.grabToImage(function(result) {
                 modalBackdrop.snapshotUrl = result.url
             }, Qt.size(Math.max(1, Math.round(width / 5)), Math.max(1, Math.round(height / 5))))
         }
 
         function scheduleSnapshot() {
+            modalBackdrop.snapshotUrl = ""
             snapshotTimer.restart()
         }
 
