@@ -54,6 +54,7 @@ class BlankyController(QObject):
     appearanceModeChanged = Signal()
     colorVisionProfileChanged = Signal()
     appearanceTextScaleChanged = Signal()
+    displayScaleProfileChanged = Signal()
     hoverAnimationsEnabledChanged = Signal()
     customAppearanceChanged = Signal()
     monitorEventsTextChanged = Signal()
@@ -254,6 +255,12 @@ class BlankyController(QObject):
         self._appearance_text_scale = self._saved_appearance_value(
             "appearanceTextScale", 1.18 if legacy_large_readability else 1.0, 1.0, 1.25
         )
+        saved_display_profile = str(
+            self._settings.value("displayScaleProfile", "auto") or "auto"
+        ).lower()
+        self._display_scale_profile = saved_display_profile if saved_display_profile in {
+            "auto", "compact_1280", "hd_1366", "large_1600", "full_hd"
+        } else "auto"
         self._hover_animations_enabled = bool(
             self._settings.value("hoverAnimationsEnabled", True, type=bool)
         )
@@ -375,6 +382,10 @@ class BlankyController(QObject):
     @Property(float, notify=appearanceTextScaleChanged)
     def appearanceTextScale(self):
         return self._appearance_text_scale
+
+    @Property(str, notify=displayScaleProfileChanged)
+    def displayScaleProfile(self):
+        return self._display_scale_profile
 
     @Property(bool, notify=hoverAnimationsEnabledChanged)
     def hoverAnimationsEnabled(self):
@@ -631,6 +642,18 @@ class BlankyController(QObject):
         self._settings.sync()
         self.appearanceTextScaleChanged.emit()
         self.monitorEventsTextChanged.emit()
+
+    @Slot(str)
+    def setDisplayScaleProfile(self, profile: str):
+        profile = (profile or "auto").strip().lower()
+        if profile not in {"auto", "compact_1280", "hd_1366", "large_1600", "full_hd"}:
+            return
+        if self._display_scale_profile == profile:
+            return
+        self._display_scale_profile = profile
+        self._settings.setValue("displayScaleProfile", profile)
+        self._settings.sync()
+        self.displayScaleProfileChanged.emit()
 
     @Slot(bool)
     def setHoverAnimationsEnabled(self, enabled: bool):

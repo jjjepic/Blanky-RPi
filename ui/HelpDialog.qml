@@ -16,8 +16,8 @@ FloatingPanel {
     property real textScale: 1.0
     property string sectionId: ""
 
-    width: 1060
-    height: 720
+    width: Math.min(1060, Math.max(360, parent ? parent.width - 24 : 1060))
+    height: Math.min(720, Math.max(360, parent ? parent.height - 24 : 720))
     panelTitle: language === "pt" ? "Ajuda e Tutorial" : "Help and Tutorial"
 
     function tr(pt, en) {

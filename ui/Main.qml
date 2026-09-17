@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Dialogs
+import QtQuick.Window
 import "Translations.js" as I18n
 import "ColorVisionProfiles.js" as ColorVisionProfiles
 
@@ -10,8 +11,9 @@ ApplicationWindow {
     visible: true
     width: 1540
     height: 860
-    minimumWidth: 1540
-    minimumHeight: 850
+    minimumWidth: 800
+    minimumHeight: 480
+    visibility: Window.Maximized
     title: "Blanky"
 
     ThemePalette {
@@ -42,6 +44,29 @@ ApplicationWindow {
     readonly property real textScale: theme.textScale
     readonly property real controlScale: theme.controlScale
     readonly property real spacingScale: theme.spacingScale
+    readonly property real referenceWidth: 1540
+    readonly property real referenceHeight: 850
+    readonly property real readabilityLayoutFactor: 1.0 + (textScale - 1.0) * 0.55
+    readonly property real automaticInterfaceScale: Math.min(
+        1.0,
+        width / (referenceWidth * readabilityLayoutFactor),
+        height / (referenceHeight * readabilityLayoutFactor)
+    )
+    readonly property real selectedInterfaceScaleLimit: {
+        if (blanky.displayScaleProfile === "compact_1280")
+            return 0.80
+        if (blanky.displayScaleProfile === "hd_1366")
+            return 0.86
+        if (blanky.displayScaleProfile === "large_1600")
+            return 0.94
+        return 1.0
+    }
+    readonly property real interfaceScale: Math.max(
+        0.45,
+        Math.min(automaticInterfaceScale, selectedInterfaceScaleLimit)
+    )
+    readonly property real logicalWidth: width / interfaceScale
+    readonly property real logicalHeight: height / interfaceScale
     property var ttsVoiceModel: blanky.ttsVoiceOptions ? blanky.ttsVoiceOptions.split("|") : []
     property var stateMap: ({})
     property var commStateMap: ({})
@@ -129,6 +154,16 @@ ApplicationWindow {
             { id: "colorblind", icon: "◉", tone: theme.accent, title: t("colorblindUniversal"), description: t("colorVisionProfileSelected", { profile: colorVisionProfileName(blanky.colorVisionProfile) }) },
             { id: "monochrome", icon: "◻", tone: "#d7d7d7", title: t("monochrome"), description: blanky.language === "pt" ? "Estados compreensíveis sem depender da cor." : "States that do not depend on colour." },
             { id: "custom", icon: "⚙", tone: "#cf8cff", title: t("customAppearance"), description: t("customAppearanceDescription") }
+        ]
+    }
+
+    function displayProfileOptions() {
+        return [
+            { id: "auto", title: t("displayProfileAuto") },
+            { id: "compact_1280", title: t("displayProfileCompact") },
+            { id: "hd_1366", title: t("displayProfileHd") },
+            { id: "large_1600", title: t("displayProfileLarge") },
+            { id: "full_hd", title: t("displayProfileFullHd") }
         ]
     }
 
@@ -447,6 +482,11 @@ ApplicationWindow {
             if (root.popupBackdropVisible)
                 modalBackdrop.scheduleSnapshot(false)
         }
+        function onDisplayScaleProfileChanged() {
+            homeMenuRelayoutTimer.restart()
+            if (root.popupBackdropVisible)
+                modalBackdrop.scheduleSnapshot(false)
+        }
     }
 
     Component.onCompleted: {
@@ -458,7 +498,10 @@ ApplicationWindow {
 
     Item {
         id: dashboardLayer
-        anchors.fill: parent
+        width: root.logicalWidth
+        height: root.logicalHeight
+        scale: root.interfaceScale
+        transformOrigin: Item.TopLeft
         visible: !root.homeMenuVisible
 
         Rectangle {
@@ -1100,7 +1143,7 @@ ApplicationWindow {
     CommunicationsPanel {
         id: rightCommunicationsPanel
         parent: dashboardLayer
-        x: root.width - width - 18
+        x: dashboardLayer.width - width - 18
         y: mainColumn.y + statusPanel.y
         width: root.rightPanelWidth
         height: (root.activeView === "general" || root.activeView === "voice")
@@ -1132,7 +1175,10 @@ ApplicationWindow {
 
     Rectangle {
         id: homeMenu
-        anchors.fill: parent
+        width: root.logicalWidth
+        height: root.logicalHeight
+        scale: root.interfaceScale
+        transformOrigin: Item.TopLeft
         visible: root.homeMenuVisible
         color: root.bgColor
         z: 20
@@ -2026,8 +2072,8 @@ ApplicationWindow {
 
     FloatingPanel {
         id: commandsPanel
-        width: 980
-        height: 680
+        width: Math.min(980, Math.max(360, root.width - 24))
+        height: Math.min(680, Math.max(360, root.height - 24))
         panelTitle: t("commandListTitle")
         panelColor: root.panelColor
         borderColor: root.borderColor
@@ -2300,47 +2346,118 @@ ApplicationWindow {
                 }
 
                 Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: Math.round(72 * root.controlScale)
-                radius: 9
-                color: root.panelAltColor
-                border.color: root.borderColor
-                border.width: 1
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Math.round(72 * root.controlScale)
+                    radius: 9
+                    color: root.panelAltColor
+                    border.color: root.borderColor
+                    border.width: 1
 
-                ColumnLayout {
-                    anchors.fill: parent
-                    anchors.leftMargin: 12
-                    anchors.rightMargin: 12
-                    spacing: 5
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 12
+                        spacing: 5
 
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Label { text: "🔎 " + t("readabilitySize"); color: root.textColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale); Layout.fillWidth: true }
-                        Label { text: Math.round(blanky.appearanceTextScale * 100) + "%"; color: root.accentColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
-                        MenuActionButton {
-                            text: t("resetSize")
-                            Layout.preferredWidth: Math.round(68 * root.controlScale)
-                            Layout.preferredHeight: 24
-                            accentColor: root.inactiveColor
-                            textColor: root.textColor
-                            mutedText: root.mutedText
-                            borderColor: root.borderColor
-                            panelColor: root.panelColor
-                            onClicked: blanky.setAppearanceTextScale(1.0)
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Label { text: "🔎 " + t("readabilitySize"); color: root.textColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale); Layout.fillWidth: true }
+                            Label { text: Math.round(blanky.appearanceTextScale * 100) + "%"; color: root.accentColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
+                            MenuActionButton {
+                                text: t("resetSize")
+                                Layout.preferredWidth: Math.round(68 * root.controlScale)
+                                Layout.preferredHeight: 24
+                                accentColor: root.inactiveColor
+                                textColor: root.textColor
+                                mutedText: root.mutedText
+                                borderColor: root.borderColor
+                                panelColor: root.panelColor
+                                onClicked: blanky.setAppearanceTextScale(1.0)
+                            }
+                        }
+
+                        Slider {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 22
+                            Layout.bottomMargin: 4
+                            from: 1.0
+                            to: 1.25
+                            stepSize: 0.01
+                            value: blanky.appearanceTextScale
+                            onMoved: blanky.setAppearanceTextScale(value)
                         }
                     }
-
-                    Slider {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 22
-                        Layout.bottomMargin: 4
-                        from: 1.0
-                        to: 1.25
-                        stepSize: 0.01
-                        value: blanky.appearanceTextScale
-                        onMoved: blanky.setAppearanceTextScale(value)
-                    }
                 }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Math.round(112 * root.controlScale)
+                    radius: 9
+                    color: root.panelAltColor
+                    border.color: root.borderColor
+                    border.width: 1
+
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.margins: 12
+                        spacing: 6
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+                            Label {
+                                text: "▣ " + t("displayAdaptation")
+                                color: root.textColor
+                                font.bold: true
+                                font.pixelSize: Math.round(12 * root.textScale)
+                                Layout.fillWidth: true
+                            }
+                            Label {
+                                text: t("displayDetected", {
+                                    width: Math.round(root.width),
+                                    height: Math.round(root.height),
+                                    scale: Math.round(root.interfaceScale * 100)
+                                })
+                                color: root.mutedText
+                                font.pixelSize: Math.round(9 * root.textScale)
+                            }
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Label {
+                                text: t("displayAdaptationDescription")
+                                color: root.mutedText
+                                font.pixelSize: Math.round(9 * root.textScale)
+                                Layout.fillWidth: true
+                            }
+                        }
+
+                        GridLayout {
+                            Layout.fillWidth: true
+                            columns: 5
+                            columnSpacing: 6
+
+                            Repeater {
+                                model: root.displayProfileOptions()
+
+                                MenuActionButton {
+                                    required property var modelData
+                                    readonly property bool selected: blanky.displayScaleProfile === modelData.id
+                                    text: (selected ? "✓ " : "") + modelData.title
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: Math.round(30 * root.controlScale)
+                                    textPixelSize: Math.round(10 * root.textScale)
+                                    accentColor: selected ? root.successColor : root.inactiveColor
+                                    textColor: root.textColor
+                                    mutedText: root.mutedText
+                                    borderColor: root.borderColor
+                                    panelColor: root.panelColor
+                                    onClicked: blanky.setDisplayScaleProfile(modelData.id)
+                                }
+                            }
+                        }
+                    }
                 }
 
                 Rectangle {
@@ -2403,8 +2520,8 @@ ApplicationWindow {
 
     FloatingPanel {
         id: colorVisionProfilesPanel
-        width: 650
-        height: 490
+        width: Math.min(650, Math.max(360, root.width - 24))
+        height: Math.min(490, Math.max(360, root.height - 24))
         panelTitle: t("colorVisionProfilesTitle")
         panelColor: root.panelColor
         borderColor: root.borderColor
@@ -2527,8 +2644,8 @@ ApplicationWindow {
 
     FloatingPanel {
         id: customAppearancePanel
-        width: 540
-        height: 390
+        width: Math.min(540, Math.max(360, root.width - 24))
+        height: Math.min(390, Math.max(360, root.height - 24))
         panelTitle: t("customAppearanceTitle")
         panelColor: root.panelColor
         borderColor: root.borderColor
@@ -2618,8 +2735,8 @@ ApplicationWindow {
 
     FloatingPanel {
         id: voicePanel
-        width: 980
-        height: 590
+        width: Math.min(980, Math.max(360, root.width - 24))
+        height: Math.min(590, Math.max(360, root.height - 24))
         panelTitle: t("voiceTitle")
         panelColor: root.panelColor
         borderColor: root.borderColor
@@ -2779,8 +2896,8 @@ ApplicationWindow {
 
     FloatingPanel {
         id: audioSettingsPanel
-        width: 840
-        height: 700
+        width: Math.min(840, Math.max(360, root.width - 24))
+        height: Math.min(700, Math.max(360, root.height - 24))
         panelTitle: t("audioTitle")
         panelColor: root.panelColor
         borderColor: root.borderColor
@@ -3115,8 +3232,8 @@ ApplicationWindow {
 
     FloatingPanel {
         id: settingsPanel
-        width: 700
-        height: 390
+        width: Math.min(700, Math.max(360, root.width - 24))
+        height: Math.min(390, Math.max(360, root.height - 24))
         panelTitle: t("settingsTitle")
         panelColor: root.panelColor
         borderColor: root.borderColor
@@ -3248,8 +3365,8 @@ ApplicationWindow {
 
     FloatingPanel {
         id: communicationsSettingsPanel
-        width: 760
-        height: 650
+        width: Math.min(760, Math.max(360, root.width - 24))
+        height: Math.min(650, Math.max(360, root.height - 24))
         panelTitle: t("communicationsSettings")
         panelColor: root.panelColor
         borderColor: root.borderColor
@@ -3462,8 +3579,8 @@ ApplicationWindow {
 
     FloatingPanel {
         id: audioLogsPanel
-        width: 760
-        height: 520
+        width: Math.min(760, Math.max(360, root.width - 24))
+        height: Math.min(520, Math.max(360, root.height - 24))
         panelTitle: t("audioLogs")
         panelColor: root.panelColor
         borderColor: root.borderColor
