@@ -698,6 +698,12 @@ ApplicationWindow {
                 Layout.preferredHeight: 58
                 fillMode: Image.PreserveAspectFit
                 smooth: true
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.returnToHomeMenu()
+                }
             }
 
             Label {
@@ -1073,11 +1079,24 @@ ApplicationWindow {
                                             placeholderText: t("textBotPlaceholder")
                                             placeholderTextColor: root.mutedText
                                             color: root.textColor
+                                            activeFocusOnPress: true
+                                            selectByMouse: true
                                             font.pixelSize: Math.round((root.activeView === "text" ? 15 : 12) * root.textScale)
+                                            cursorDelegate: Rectangle {
+                                                width: Math.max(2, Math.round(root.textScale * 2))
+                                                color: root.accentColor
+
+                                                SequentialAnimation on opacity {
+                                                    running: eventsTextBotEditor.activeFocus
+                                                    loops: Animation.Infinite
+                                                    NumberAnimation { to: 0; duration: 520 }
+                                                    NumberAnimation { to: 1; duration: 520 }
+                                                }
+                                            }
                                             background: Rectangle {
                                                 color: root.panelColor
-                                                border.color: root.borderColor
-                                                border.width: 1
+                                                border.color: eventsTextBotEditor.activeFocus ? root.accentColor : root.borderColor
+                                                border.width: eventsTextBotEditor.activeFocus ? 2 : 1
                                                 radius: 7
                                             }
                                             Keys.onPressed: function(event) {
@@ -1246,7 +1265,19 @@ ApplicationWindow {
                         Layout.alignment: Qt.AlignHCenter
                         spacing: 16
 
-                        Image { source: root.logoSource(); Layout.preferredWidth: Math.round(88 * root.textScale); Layout.preferredHeight: Math.round(88 * root.textScale); fillMode: Image.PreserveAspectFit; smooth: true }
+                        Image {
+                            source: root.logoSource()
+                            Layout.preferredWidth: Math.round(88 * root.textScale)
+                            Layout.preferredHeight: Math.round(88 * root.textScale)
+                            fillMode: Image.PreserveAspectFit
+                            smooth: true
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: homeMenuFlickable.contentY = 0
+                            }
+                        }
                         ColumnLayout {
                             spacing: 2
                             Label { text: "Blanky"; color: root.accentColor; font.pixelSize: Math.round(48 * root.textScale); font.bold: true }
@@ -2257,6 +2288,7 @@ ApplicationWindow {
             anchors.fill: parent
             clip: true
             contentWidth: availableWidth
+            rightPadding: Math.round(16 * root.textScale)
             ScrollBar.vertical.policy: ScrollBar.AsNeeded
 
             ColumnLayout {

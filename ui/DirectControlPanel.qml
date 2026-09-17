@@ -31,11 +31,12 @@ Rectangle {
     readonly property color idealModeColor: accentColor
     readonly property color manualModeColor: successColor
     readonly property color changeModeColor: accentColor
-    readonly property bool compact: panel.height < 430
+    // Compact the geometry before enlarged text can push the lower controls out.
+    readonly property bool compact: panel.height < Math.round(500 * readabilityScale)
     readonly property int sectionSpacing: Math.round((compact ? 4 : 8) * (readabilityScale > 1 ? 1.10 : 1.0))
     readonly property int blockMargin: Math.round((compact ? 7 : 10) * (readabilityScale > 1 ? 1.08 : 1.0))
     readonly property real actionButtonHeight: compact
-        ? Math.max(28, Math.min(36, Math.floor((panel.height - 150) / 5)))
+        ? Math.max(34, Math.min(readabilityScale > 1 ? 44 : 40, Math.floor((panel.height - 140) / 5)))
         : Math.max(40, Math.min(readabilityScale > 1 ? 62 : 58, Math.floor((panel.height - 180) / 5)))
 
     function t(key, values) {
@@ -111,6 +112,7 @@ Rectangle {
     }
 
     color: panel.panelColor
+    clip: true
     border.color: panel.borderColor
     border.width: 1
     radius: 10
@@ -223,12 +225,12 @@ Rectangle {
                             RowLayout {
                                 Layout.fillWidth: true
                                 Label { text: panel.t("systemState"); color: panel.textColor; font.pixelSize: Math.round(12 * panel.readabilityScale); Layout.fillWidth: true }
-                                Label { text: panel.systemInfo().text; color: panel.systemInfo().color; font.pixelSize: Math.round(12 * panel.readabilityScale); font.bold: true; elide: Text.ElideRight; Layout.preferredWidth: 148; horizontalAlignment: Text.AlignRight }
+                                Label { text: panel.systemInfo().text; color: panel.systemInfo().color; font.pixelSize: Math.round(12 * panel.readabilityScale); font.bold: true; elide: Text.ElideRight; Layout.preferredWidth: Math.round(parent.width * 0.58); Layout.minimumWidth: 0; horizontalAlignment: Text.AlignRight }
                             }
                             RowLayout {
                                 Layout.fillWidth: true
                                 Label { text: panel.t("currentProcess"); color: panel.textColor; font.pixelSize: Math.round(12 * panel.readabilityScale); Layout.fillWidth: true }
-                                Label { text: panel.processInfo().text; color: panel.processInfo().color; font.pixelSize: Math.round(12 * panel.readabilityScale); elide: Text.ElideNone; Layout.preferredWidth: 148; horizontalAlignment: Text.AlignRight }
+                                Label { text: panel.processInfo().text; color: panel.processInfo().color; font.pixelSize: Math.round(12 * panel.readabilityScale); elide: Text.ElideRight; Layout.preferredWidth: Math.round(parent.width * 0.58); Layout.minimumWidth: 0; horizontalAlignment: Text.AlignRight }
                             }
                         }
                     }
@@ -262,7 +264,7 @@ Rectangle {
                         Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: panel.borderColor }
                     }
 
-                    Label { text: panel.t("lights"); color: panel.mutedText; font.bold: true; font.pixelSize: panel.compact ? 11 : 12; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+                    Label { text: panel.t("lights"); color: panel.mutedText; font.bold: true; font.pixelSize: Math.round((panel.compact ? 11 : 12) * panel.readabilityScale); horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
                     Row {
                         Layout.fillWidth: true
                         Layout.preferredHeight: panel.actionButtonHeight
@@ -272,7 +274,7 @@ Rectangle {
                         ManualCommandButton { width: (parent.width - parent.spacing) / 2; height: panel.actionButtonHeight; commandEnabled: panel.manualAvailable; label: panel.t("redLight"); iconText: "\u25CF"; command: panel.toggleCommand("light_red", "RED_ON", "RED_OFF"); active: panel.stateValue("light_red") === 1; stateText: panel.toggleStateText("light_red", "ON", "OFF"); iconColor: active ? panel.errorColor : panel.inactiveColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
                     }
 
-                    Label { text: panel.t("cylinders"); color: panel.mutedText; font.bold: true; font.pixelSize: panel.compact ? 11 : 12; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+                    Label { text: panel.t("cylinders"); color: panel.mutedText; font.bold: true; font.pixelSize: Math.round((panel.compact ? 11 : 12) * panel.readabilityScale); horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
                     Flow {
                         property real controlButtonHeight: panel.actionButtonHeight
                         Layout.fillWidth: true
@@ -284,7 +286,7 @@ Rectangle {
                         ManualCommandButton { width: (parent.width - parent.spacing) / 2; commandEnabled: panel.manualAvailable; label: panel.t("cylinder", { letter: "D" }); iconText: "\u25B0"; command: panel.toggleCommand("cyl_d", "CYL_D_EXTEND", "CYL_D_RETRACT"); active: panel.stateValue("cyl_d") === 1; stateText: panel.toggleStateText("cyl_d", panel.t("forward"), panel.t("backward")); iconColor: panel.accentColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
                     }
 
-                    Label { text: panel.t("motors"); color: panel.mutedText; font.bold: true; font.pixelSize: panel.compact ? 11 : 12; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+                    Label { text: panel.t("motors"); color: panel.mutedText; font.bold: true; font.pixelSize: Math.round((panel.compact ? 11 : 12) * panel.readabilityScale); horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
                     Row {
                         Layout.fillWidth: true
                         Layout.preferredHeight: panel.actionButtonHeight
@@ -295,7 +297,7 @@ Rectangle {
                         ManualCommandButton { width: (parent.width - parent.spacing * 2) / 3; height: panel.actionButtonHeight; commandEnabled: panel.manualAvailable; singleLineTitle: true; label: panel.t("motor", { number: 3 }); iconText: "\u2699"; command: panel.toggleCommand("motor_3", "MOTOR_3_ON", "MOTOR_3_OFF"); active: panel.stateValue("motor_3") === 1; stateText: panel.toggleStateText("motor_3", "ON", "OFF"); iconColor: active ? panel.accentColor : panel.inactiveColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
                     }
 
-                    Label { text: panel.t("robot"); color: panel.mutedText; font.bold: true; font.pixelSize: panel.compact ? 11 : 12; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+                    Label { text: panel.t("robot"); color: panel.mutedText; font.bold: true; font.pixelSize: Math.round((panel.compact ? 11 : 12) * panel.readabilityScale); horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
                     Row {
                         Layout.fillWidth: true
                         Layout.preferredHeight: panel.actionButtonHeight
