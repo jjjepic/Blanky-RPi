@@ -35,6 +35,10 @@ ApplicationWindow {
     readonly property color warningColor: theme.warning
     readonly property color errorColor: theme.error
     readonly property color inactiveColor: theme.inactive
+    readonly property color phoneCardColor: blanky.appearanceMode === "monochrome" ? root.textColor
+        : blanky.appearanceMode === "high_contrast" ? root.warningColor
+        : blanky.appearanceMode === "colorblind" || blanky.appearanceMode === "custom" ? root.warningColor
+        : blanky.appearanceMode === "light" ? "#a84632" : "#ff8a65"
     readonly property real textScale: theme.textScale
     readonly property real controlScale: theme.controlScale
     readonly property real spacingScale: theme.spacingScale
@@ -47,8 +51,21 @@ ApplicationWindow {
     property int systemTransitionProgress: 0
     property double systemTransitionStartedAt: 0
     property string textBotMode: "online"
+    property bool homeMenuVisible: true
+    property string activeView: "general"
+    property bool viewTransitionActive: false
+    property bool transitionToMenu: false
     property var audioManualOverrides: ({})
     readonly property int rightPanelWidth: 660
+    readonly property int homeGeneralCardHeight: Math.round(134 * controlScale + (textScale - 1.0) * 44)
+    readonly property int homeSecondaryCardHeight: Math.round(112 * controlScale + (textScale - 1.0) * 44)
+    readonly property int homeViewPanelHeight: Math.round(
+        48 * spacingScale
+        + 51 * textScale
+        + homeGeneralCardHeight
+        + 2 * homeSecondaryCardHeight
+        + 50 * spacingScale
+    )
 
     function formatPercent(value) {
         return Math.round(Number(value) * 100) + "%"
@@ -56,6 +73,11 @@ ApplicationWindow {
 
     function formatFixed(value, digits) {
         return Number(value).toFixed(digits)
+    }
+
+    function hoverForeground(accent) {
+        var luminance = 0.2126 * accent.r + 0.7152 * accent.g + 0.0722 * accent.b
+        return luminance > 0.62 ? "#07111a" : "#f7fbff"
     }
 
     function eventsHeaderText() {
@@ -156,6 +178,52 @@ ApplicationWindow {
             volumePopover.close()
         else
             volumePopover.open()
+    }
+
+    function openView(view) {
+        if (viewTransitionActive)
+            return
+        root.activeView = view
+        root.transitionToMenu = false
+        root.viewTransitionActive = true
+        viewTransitionTimer.start()
+    }
+
+    function returnToHomeMenu() {
+        if (viewTransitionActive)
+            return
+        root.transitionToMenu = true
+        root.viewTransitionActive = true
+        viewTransitionTimer.start()
+    }
+
+    function activeViewLabel() {
+        if (activeView === "voice")
+            return blanky.language === "pt" ? "controlo por voz" : "voice control"
+        if (activeView === "text")
+            return "Text-Bot"
+        if (activeView === "operation")
+            return blanky.language === "pt" ? "painel de operação" : "operation panel"
+        if (activeView === "phone")
+            return blanky.language === "pt" ? "telemóvel" : "phone"
+        return blanky.language === "pt" ? "modo geral" : "general mode"
+    }
+
+    function viewTransitionText() {
+        if (transitionToMenu)
+            return blanky.language === "pt" ? "A regressar ao Menu Inicial..." : "Returning to Main Menu..."
+        if (blanky.language === "en") {
+            if (activeView === "voice") return "Preparing voice control..."
+            if (activeView === "text") return "Opening Text-Bot..."
+            if (activeView === "operation") return "Preparing operation panel..."
+            if (activeView === "phone") return "Opening phone control..."
+            return "Opening general view..."
+        }
+        if (activeView === "voice") return "A preparar controlo por voz..."
+        if (activeView === "text") return "A abrir Text-Bot..."
+        if (activeView === "operation") return "A preparar painel de operação..."
+        if (activeView === "phone") return "A abrir controlo por telemóvel..."
+        return "A abrir vista geral..."
     }
 
     function beginSystemTransition(action) {
@@ -353,6 +421,34 @@ ApplicationWindow {
         }
     }
 
+    Timer {
+        id: viewTransitionTimer
+        interval: 520
+        repeat: false
+        onTriggered: {
+            root.homeMenuVisible = root.transitionToMenu
+            root.viewTransitionActive = false
+        }
+    }
+
+    Timer {
+        id: homeMenuRelayoutTimer
+        interval: 0
+        repeat: false
+        onTriggered: {
+            homeMenuFlickable.contentY = 0
+        }
+    }
+
+    Connections {
+        target: blanky
+        function onAppearanceTextScaleChanged() {
+            homeMenuRelayoutTimer.restart()
+            if (root.popupBackdropVisible)
+                modalBackdrop.scheduleSnapshot(false)
+        }
+    }
+
     Component.onCompleted: {
         root.stateMap = root.parseStateCompact(blanky.stateCompact)
         root.commStateMap = root.parseCommCompact(blanky.commStatusCompact)
@@ -363,6 +459,7 @@ ApplicationWindow {
     Item {
         id: dashboardLayer
         anchors.fill: parent
+        visible: !root.homeMenuVisible
 
         Rectangle {
             anchors.fill: parent
@@ -386,6 +483,20 @@ ApplicationWindow {
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 7
+
+                MenuActionButton {
+                    iconText: "⌂"
+                    width: 50
+                    height: 44
+                    textPixelSize: 22
+                    accentColor: root.accentColor
+                    textColor: root.textColor
+                    mutedText: root.mutedText
+                    borderColor: root.borderColor
+                    panelColor: root.panelAltColor
+                    toolTip: blanky.language === "pt" ? "Menu Inicial" : "Main Menu"
+                    onClicked: root.returnToHomeMenu()
+                }
 
                 MenuActionButton {
                     iconText: root.appearanceIcon()
@@ -476,6 +587,8 @@ ApplicationWindow {
                     width: 50
                     height: 44
                     textPixelSize: 22
+                    textHorizontalOffset: 1
+                    textVerticalOffset: 1
                     accentColor: blanky.soundEnabled ? root.accentColor : root.inactiveColor
                     textColor: root.textColor
                     mutedText: root.mutedText
@@ -518,6 +631,7 @@ ApplicationWindow {
                     width: 50
                     height: 44
                     textPixelSize: 21
+                    textVerticalOffset: 1
                     accentColor: root.errorColor
                     textColor: root.textColor
                     mutedText: root.mutedText
@@ -558,7 +672,8 @@ ApplicationWindow {
             id: statusPanel
             Layout.fillWidth: true
             Layout.rightMargin: root.rightPanelWidth + 12
-            Layout.preferredHeight: 174
+            // Text, phone and operation views reserve enough vertical space for Communications.
+            Layout.preferredHeight: (root.activeView === "text" || root.activeView === "phone" || root.activeView === "operation") ? 270 : 174
             color: root.panelColor
             border.color: root.borderColor
             border.width: 2
@@ -612,6 +727,7 @@ ApplicationWindow {
             id: primaryControlsPanel
             Layout.fillWidth: true
             Layout.rightMargin: root.rightPanelWidth + 12
+            visible: root.activeView === "general" || root.activeView === "voice"
             color: root.panelColor
             border.color: root.borderColor
             border.width: 1
@@ -712,6 +828,14 @@ ApplicationWindow {
                 }
 
             }
+        }
+
+        Item {
+            id: featuredTextBotSlot
+            visible: !root.systemTransitionActive && root.activeView === "text"
+            Layout.fillWidth: true
+            Layout.preferredHeight: Math.round(132 * root.controlScale + (root.textScale - 1.0) * 42)
+            Layout.minimumHeight: Layout.preferredHeight
         }
 
         Rectangle {
@@ -835,20 +959,28 @@ ApplicationWindow {
                             }
                         }
 
-                        Rectangle {
-                            visible: !root.systemTransitionActive
+                        Item {
+                            id: generalTextBotSlot
+                            visible: !root.systemTransitionActive && root.activeView === "general"
                             Layout.fillWidth: true
                             Layout.preferredHeight: Math.round(88 * root.controlScale + (root.textScale - 1.0) * 34)
                             Layout.minimumHeight: Layout.preferredHeight
+                        }
+
+                        Rectangle {
+                            id: textBotPanel
+                            parent: root.activeView === "text" ? featuredTextBotSlot : generalTextBotSlot
+                            anchors.fill: parent
+                            visible: !root.systemTransitionActive && (root.activeView === "general" || root.activeView === "text")
                             color: root.panelAltColor
-                            border.color: root.borderColor
-                            border.width: 1
-                            radius: 10
+                            border.color: root.activeView === "text" ? root.accentColor : root.borderColor
+                            border.width: root.activeView === "text" ? 2 : 1
+                            radius: root.activeView === "text" ? 14 : 10
 
                             ColumnLayout {
                                 anchors.fill: parent
-                                anchors.margins: 8
-                                spacing: 6
+                                anchors.margins: root.activeView === "text" ? 14 : 8
+                                spacing: root.activeView === "text" ? 10 : 6
 
                                 RowLayout {
                                     Layout.fillWidth: true
@@ -859,19 +991,19 @@ ApplicationWindow {
                                         text: t("textBot").toUpperCase()
                                         color: root.accentColor
                                         font.bold: true
-                                        font.pixelSize: Math.round(14 * root.textScale)
+                                        font.pixelSize: Math.round((root.activeView === "text" ? 17 : 14) * root.textScale)
                                     }
                                     Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: root.borderColor }
                                     MenuActionButton {
                                         text: t("textBotOffline")
-                                        Layout.preferredWidth: 82; Layout.preferredHeight: Math.round(28 * root.controlScale)
+                                        Layout.preferredWidth: root.activeView === "text" ? 100 : 82; Layout.preferredHeight: Math.round((root.activeView === "text" ? 34 : 28) * root.controlScale)
                                         accentColor: root.textBotMode === "offline" ? root.successColor : root.inactiveColor
                                         textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor
                                         onClicked: root.textBotMode = "offline"
                                     }
                                     MenuActionButton {
                                         text: t("textBotOnline")
-                                        Layout.preferredWidth: 82; Layout.preferredHeight: Math.round(28 * root.controlScale)
+                                        Layout.preferredWidth: root.activeView === "text" ? 100 : 82; Layout.preferredHeight: Math.round((root.activeView === "text" ? 34 : 28) * root.controlScale)
                                         accentColor: root.textBotMode === "online" ? root.accentColor : root.inactiveColor
                                         textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor
                                         onClicked: root.textBotMode = "online"
@@ -898,7 +1030,7 @@ ApplicationWindow {
                                             placeholderText: t("textBotPlaceholder")
                                             placeholderTextColor: root.mutedText
                                             color: root.textColor
-                                            font.pixelSize: Math.round(12 * root.textScale)
+                                            font.pixelSize: Math.round((root.activeView === "text" ? 15 : 12) * root.textScale)
                                             background: Rectangle {
                                                 color: root.panelColor
                                                 border.color: root.borderColor
@@ -938,6 +1070,7 @@ ApplicationWindow {
 
                 DirectControlPanel {
                     id: directControlPanel
+                    visible: root.activeView === "general" || root.activeView === "operation"
                     Layout.alignment: Qt.AlignTop
                     Layout.fillHeight: true
                     Layout.topMargin: 0
@@ -970,7 +1103,9 @@ ApplicationWindow {
         x: root.width - width - 18
         y: mainColumn.y + statusPanel.y
         width: root.rightPanelWidth
-        height: mainColumn.y + primaryControlsPanel.y + primaryControlsPanel.height - y
+        height: (root.activeView === "general" || root.activeView === "voice")
+            ? mainColumn.y + primaryControlsPanel.y + primaryControlsPanel.height - y
+            : statusPanel.height
         z: 3
         controller: blanky
         language: blanky.language
@@ -993,6 +1128,592 @@ ApplicationWindow {
         stateMap: root.commStateMap
     }
 
+    }
+
+    Rectangle {
+        id: homeMenu
+        anchors.fill: parent
+        visible: root.homeMenuVisible
+        color: root.bgColor
+        z: 20
+
+        gradient: Gradient {
+            GradientStop { position: 0.0; color: theme.backgroundTop }
+            GradientStop { position: 1.0; color: root.bgColor }
+        }
+
+        // Low-contrast structural lines add depth without becoming information-bearing.
+        Item {
+            anchors.fill: parent
+            clip: true
+            opacity: root.dark ? 0.13 : 0.07
+
+            Rectangle { width: parent.width * 0.44; height: 1; x: 0; y: parent.height * 0.26; color: root.accentColor }
+            Rectangle { width: parent.width * 0.25; height: 1; x: -parent.width * 0.03; y: parent.height * 0.62; rotation: 28; color: root.accentColor }
+            Rectangle { width: parent.width * 0.25; height: 1; x: parent.width * 0.78; y: parent.height * 0.62; rotation: -28; color: root.accentColor }
+            Rectangle { width: parent.width * 0.28; height: 1; x: parent.width * 0.72; y: parent.height * 0.76; color: root.accentColor }
+        }
+
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 30
+            spacing: 10
+
+            RowLayout {
+                Layout.fillWidth: true
+
+                Row {
+                    spacing: 7
+                    MenuActionButton { id: appearanceMenuButton; iconText: root.appearanceIcon(); width: 48; height: 42; textPixelSize: 20; accentColor: root.accentColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; toolTip: t("tooltipAppearance"); KeyNavigation.tab: portugueseMenuButton; onClicked: appearancePanel.open() }
+                    MenuActionButton { id: portugueseMenuButton; text: "🇵🇹"; width: 50; height: 42; textPixelSize: 18; accentColor: blanky.language === "pt" ? root.successColor : root.inactiveColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; KeyNavigation.tab: englishMenuButton; onClicked: blanky.setLanguage("pt") }
+                    MenuActionButton { id: englishMenuButton; text: "🇬🇧"; width: 50; height: 42; textPixelSize: 18; accentColor: blanky.language === "en" ? root.successColor : root.inactiveColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; KeyNavigation.tab: helpMenuButton; onClicked: blanky.setLanguage("en") }
+                }
+
+                Item { Layout.fillWidth: true }
+
+                Row {
+                    spacing: 7
+                    MenuActionButton { id: helpMenuButton; text: "?"; width: 48; height: 42; textPixelSize: 20; accentColor: root.accentColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; toolTip: blanky.language === "pt" ? "Ajuda / Tutorial" : "Help / Tutorial"; KeyNavigation.tab: settingsMenuButton; onClicked: { helpPanel.showHome(); helpPanel.open() } }
+                    MenuActionButton { id: settingsMenuButton; iconText: "⚙"; width: 48; height: 42; textPixelSize: 20; accentColor: root.accentColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; toolTip: t("tooltipSettings"); KeyNavigation.tab: shutdownMenuButton; onClicked: settingsPanel.open() }
+                    MenuActionButton { id: shutdownMenuButton; iconText: "⏻"; width: 48; height: 42; textPixelSize: 20; textVerticalOffset: 1; accentColor: root.errorColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; toolTip: t("tooltipShutdown"); KeyNavigation.tab: generalCard; onClicked: root.beginSystemTransition("shutdown") }
+                }
+            }
+
+            Flickable {
+                id: homeMenuFlickable
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                contentWidth: width
+                contentHeight: menuContent.height + 24
+                boundsBehavior: Flickable.StopAtBounds
+
+                ColumnLayout {
+                    id: menuContent
+                    width: Math.min(homeMenuFlickable.width - 20, 1040)
+                    height: implicitHeight
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    y: 12
+                    spacing: 14
+
+                    RowLayout {
+                        Layout.alignment: Qt.AlignHCenter
+                        spacing: 16
+
+                        Image { source: root.logoSource(); Layout.preferredWidth: Math.round(88 * root.textScale); Layout.preferredHeight: Math.round(88 * root.textScale); fillMode: Image.PreserveAspectFit; smooth: true }
+                        ColumnLayout {
+                            spacing: 2
+                            Label { text: "Blanky"; color: root.accentColor; font.pixelSize: Math.round(48 * root.textScale); font.bold: true }
+                            Label { text: blanky.language === "pt" ? "Escolha a forma de interação" : "Choose an interaction method"; color: root.mutedText; font.pixelSize: Math.round(17 * root.textScale) }
+                        }
+                    }
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: root.homeViewPanelHeight
+                        radius: 22
+                        color: root.panelAltColor
+                        border.color: root.accentColor
+                        border.width: 2
+
+                        ColumnLayout {
+                            id: viewChoices
+                            anchors.fill: parent
+                            anchors.margins: Math.round(24 * root.spacingScale)
+                            spacing: 12
+
+                            Label {
+                                Layout.fillWidth: true
+                                text: blanky.language === "pt" ? "Escolha uma vista" : "Choose a view"
+                                color: root.textColor
+                                font.pixelSize: Math.round(28 * root.textScale)
+                                font.bold: true
+                                horizontalAlignment: Text.AlignHCenter
+                            }
+                            Label {
+                                Layout.fillWidth: true
+                                text: blanky.language === "pt" ? "Todas usam o mesmo sistema, eventos e comunicações." : "All views use the same system, events and communications."
+                                color: root.mutedText
+                                font.pixelSize: Math.round(14 * root.textScale)
+                                horizontalAlignment: Text.AlignHCenter
+                                wrapMode: Text.WordWrap
+                            }
+
+                            Button {
+                                id: generalCard
+                                readonly property color cardAccent: root.accentColor
+                                readonly property bool strongHover: hovered && blanky.hoverAnimationsEnabled
+                                readonly property color hoverTextColor: root.hoverForeground(cardAccent)
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: root.homeGeneralCardHeight
+                                hoverEnabled: true
+                                focusPolicy: Qt.StrongFocus
+                                focus: homeMenu.visible
+                                padding: 0
+                                scale: strongHover ? 1.015 : 1.0
+                                z: hovered ? 1 : 0
+                                KeyNavigation.tab: voiceCard
+                                onClicked: root.openView("general")
+                                Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+
+                                background: Rectangle {
+                                    radius: 19
+                                    color: generalCard.strongHover ? generalCard.cardAccent : (generalCard.hovered ? Qt.lighter(root.panelColor, 1.28) : root.panelColor)
+                                    border.color: generalCard.activeFocus ? root.textColor : (generalCard.strongHover ? Qt.lighter(generalCard.cardAccent, 1.12) : generalCard.cardAccent)
+                                    border.width: generalCard.activeFocus || generalCard.strongHover ? 3 : 2
+
+                                    Rectangle { anchors.fill: parent; anchors.margins: 2; radius: parent.radius - 2; color: generalCard.cardAccent; opacity: generalCard.strongHover ? 0 : 0.07 }
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                }
+
+                                contentItem: Item {
+                                    anchors.fill: parent
+                                    readonly property real sideMargin: Math.round(26 * root.spacingScale)
+                                    readonly property real contentGap: Math.round(22 * root.spacingScale)
+
+                                    Grid {
+                                        id: generalCardIcon
+                                        width: Math.round(82 * root.textScale)
+                                        height: Math.round(70 * root.textScale)
+                                        anchors.left: parent.left
+                                        anchors.leftMargin: parent.sideMargin
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        columns: 2
+                                        columnSpacing: Math.round(8 * root.textScale)
+                                        rowSpacing: Math.round(8 * root.textScale)
+                                        Rectangle { width: Math.round(35 * root.textScale); height: Math.round(29 * root.textScale); radius: 5; color: "transparent"; border.color: generalCard.strongHover ? generalCard.hoverTextColor : generalCard.cardAccent; border.width: 4 }
+                                        Rectangle { width: Math.round(35 * root.textScale); height: Math.round(29 * root.textScale); radius: 5; color: "transparent"; border.color: generalCard.strongHover ? generalCard.hoverTextColor : generalCard.cardAccent; border.width: 4 }
+                                        Rectangle { width: Math.round(35 * root.textScale); height: Math.round(29 * root.textScale); radius: 5; color: "transparent"; border.color: generalCard.strongHover ? generalCard.hoverTextColor : generalCard.cardAccent; border.width: 4 }
+                                        Rectangle { width: Math.round(35 * root.textScale); height: Math.round(29 * root.textScale); radius: 5; color: "transparent"; border.color: generalCard.strongHover ? generalCard.hoverTextColor : generalCard.cardAccent; border.width: 4 }
+                                    }
+
+                                    Rectangle {
+                                        id: generalCardDivider
+                                        width: 2
+                                        height: Math.round(70 * root.textScale)
+                                        anchors.left: generalCardIcon.right
+                                        anchors.leftMargin: parent.contentGap
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        color: generalCard.strongHover ? generalCard.hoverTextColor : generalCard.cardAccent
+                                        opacity: 0.85
+                                    }
+
+                                    Rectangle {
+                                        id: generalCardArrow
+                                        width: Math.round(52 * root.textScale)
+                                        height: width
+                                        anchors.right: parent.right
+                                        anchors.rightMargin: parent.sideMargin
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        radius: width / 2
+                                        color: generalCard.strongHover ? generalCard.hoverTextColor : root.panelColor
+                                        border.color: generalCard.strongHover ? generalCard.hoverTextColor : generalCard.cardAccent
+                                        border.width: 2
+                                        Label { anchors.centerIn: parent; text: "›"; color: generalCard.cardAccent; font.pixelSize: Math.round(40 * root.textScale); font.bold: true }
+                                    }
+
+                                    Column {
+                                        anchors.left: generalCardDivider.right
+                                        anchors.leftMargin: parent.contentGap
+                                        anchors.right: generalCardArrow.left
+                                        anchors.rightMargin: parent.contentGap
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        spacing: 3
+                                        Label { width: parent.width; text: blanky.language === "pt" ? "Geral" : "General"; color: generalCard.strongHover ? generalCard.hoverTextColor : root.textColor; font.pixelSize: Math.round(34 * root.textScale); font.bold: true }
+                                        Label { width: parent.width; text: blanky.language === "pt" ? "Vista completa do sistema" : "Complete system view"; color: generalCard.strongHover ? generalCard.hoverTextColor : root.textColor; font.pixelSize: Math.round(18 * root.textScale) }
+                                        Label { width: parent.width; text: blanky.language === "pt" ? "VISÃO GLOBAL  •  MONITORIZAÇÃO  •  CONTROLO" : "GLOBAL VIEW  •  MONITORING  •  CONTROL"; color: generalCard.strongHover ? generalCard.hoverTextColor : generalCard.cardAccent; font.pixelSize: Math.round(11 * root.textScale); font.bold: true; font.letterSpacing: 1.4; elide: Text.ElideRight }
+                                    }
+                                }
+                            }
+
+                            GridLayout {
+                                Layout.fillWidth: true
+                                columns: 2
+                                columnSpacing: 16
+                                rowSpacing: 14
+
+                                Button {
+                                    id: voiceCard
+                                    readonly property color cardAccent: root.successColor
+                                    readonly property bool strongHover: hovered && blanky.hoverAnimationsEnabled
+                                    readonly property color hoverTextColor: root.hoverForeground(cardAccent)
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: root.homeSecondaryCardHeight
+                                    hoverEnabled: true; focusPolicy: Qt.StrongFocus; padding: 0
+                                    scale: strongHover ? 1.015 : 1.0
+                                    z: hovered ? 1 : 0
+                                    KeyNavigation.tab: textCard
+                                    onClicked: root.openView("voice")
+                                    Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+                                    background: Rectangle {
+                                        radius: 17; color: voiceCard.strongHover ? voiceCard.cardAccent : (voiceCard.hovered ? Qt.lighter(root.panelColor, 1.28) : root.panelColor)
+                                        border.color: voiceCard.activeFocus ? root.textColor : (voiceCard.strongHover ? Qt.lighter(voiceCard.cardAccent, 1.12) : voiceCard.cardAccent); border.width: voiceCard.activeFocus || voiceCard.strongHover ? 3 : 2
+                                        Rectangle { anchors.fill: parent; anchors.margins: 2; radius: parent.radius - 2; color: voiceCard.cardAccent; opacity: voiceCard.strongHover ? 0 : 0.06 }
+                                        Behavior on color { ColorAnimation { duration: 150 } }
+                                    }
+                                    contentItem: Item {
+                                        anchors.fill: parent
+                                        readonly property real sideMargin: Math.round(19 * root.spacingScale)
+                                        readonly property real contentGap: Math.round(15 * root.spacingScale)
+
+                                        Label {
+                                            id: voiceCardIcon
+                                            width: Math.round(52 * root.textScale)
+                                            anchors.left: parent.left
+                                            anchors.leftMargin: parent.sideMargin
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: "🎙"
+                                            color: voiceCard.strongHover ? voiceCard.hoverTextColor : voiceCard.cardAccent
+                                            font.pixelSize: Math.round(42 * root.textScale)
+                                            horizontalAlignment: Text.AlignHCenter
+                                        }
+                                        Rectangle {
+                                            id: voiceCardArrow
+                                            width: Math.round(37 * root.textScale)
+                                            height: width
+                                            anchors.right: parent.right
+                                            anchors.rightMargin: parent.sideMargin
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            radius: width / 2
+                                            color: voiceCard.strongHover ? voiceCard.hoverTextColor : root.panelColor
+                                            border.color: voiceCard.strongHover ? voiceCard.hoverTextColor : voiceCard.cardAccent
+                                            border.width: 1
+                                            Label { anchors.centerIn: parent; text: "›"; color: voiceCard.cardAccent; font.pixelSize: Math.round(29 * root.textScale); font.bold: true }
+                                        }
+                                        Column {
+                                            anchors.left: voiceCardIcon.right
+                                            anchors.leftMargin: parent.contentGap
+                                            anchors.right: voiceCardArrow.left
+                                            anchors.rightMargin: parent.contentGap
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            spacing: 3
+                                            Label {
+                                                width: parent.width
+                                                text: blanky.language === "pt" ? "Voz" : "Voice"
+                                                color: voiceCard.strongHover ? voiceCard.hoverTextColor : root.textColor
+                                                font.bold: true
+                                                font.pixelSize: Math.round(23 * root.textScale)
+                                            }
+                                            Label {
+                                                width: parent.width
+                                                text: blanky.language === "pt" ? "Comandos de voz e resposta falada" : "Voice commands and spoken response"
+                                                color: voiceCard.strongHover ? voiceCard.hoverTextColor : root.mutedText
+                                                font.pixelSize: Math.round(14 * root.textScale)
+                                                lineHeight: 0.95
+                                                wrapMode: Text.WordWrap
+                                                maximumLineCount: 2
+                                                elide: Text.ElideRight
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Button {
+                                    id: textCard
+                                    readonly property color cardAccent: root.warningColor
+                                    readonly property bool strongHover: hovered && blanky.hoverAnimationsEnabled
+                                    readonly property color hoverTextColor: root.hoverForeground(cardAccent)
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: root.homeSecondaryCardHeight
+                                    hoverEnabled: true; focusPolicy: Qt.StrongFocus; padding: 0
+                                    scale: strongHover ? 1.015 : 1.0
+                                    z: hovered ? 1 : 0
+                                    KeyNavigation.tab: operationCard
+                                    onClicked: root.openView("text")
+                                    Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+                                    background: Rectangle {
+                                        radius: 17; color: textCard.strongHover ? textCard.cardAccent : (textCard.hovered ? Qt.lighter(root.panelColor, 1.28) : root.panelColor)
+                                        border.color: textCard.activeFocus ? root.textColor : (textCard.strongHover ? Qt.lighter(textCard.cardAccent, 1.12) : textCard.cardAccent); border.width: textCard.activeFocus || textCard.strongHover ? 3 : 2
+                                        Rectangle { anchors.fill: parent; anchors.margins: 2; radius: parent.radius - 2; color: textCard.cardAccent; opacity: textCard.strongHover ? 0 : 0.06 }
+                                        Behavior on color { ColorAnimation { duration: 150 } }
+                                    }
+                                    contentItem: Item {
+                                        anchors.fill: parent
+                                        readonly property real sideMargin: Math.round(19 * root.spacingScale)
+                                        readonly property real contentGap: Math.round(15 * root.spacingScale)
+
+                                        Item {
+                                            id: textCardIcon
+                                            width: Math.round(52 * root.textScale)
+                                            height: Math.round(52 * root.textScale)
+                                            anchors.left: parent.left
+                                            anchors.leftMargin: parent.sideMargin
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            Rectangle {
+                                                width: Math.round(42 * root.textScale); height: Math.round(32 * root.textScale)
+                                                anchors.horizontalCenter: parent.horizontalCenter
+                                                y: Math.round(5 * root.textScale)
+                                                radius: Math.round(5 * root.textScale)
+                                                color: "transparent"
+                                                border.color: textCard.strongHover ? textCard.hoverTextColor : textCard.cardAccent
+                                                border.width: 3
+                                                Column {
+                                                    anchors.centerIn: parent
+                                                    spacing: Math.round(4 * root.textScale)
+                                                    Rectangle { width: Math.round(25 * root.textScale); height: 2; color: textCard.strongHover ? textCard.hoverTextColor : textCard.cardAccent }
+                                                    Rectangle { width: Math.round(25 * root.textScale); height: 2; color: textCard.strongHover ? textCard.hoverTextColor : textCard.cardAccent }
+                                                    Rectangle { width: Math.round(18 * root.textScale); height: 2; color: textCard.strongHover ? textCard.hoverTextColor : textCard.cardAccent }
+                                                }
+                                            }
+                                            Rectangle { width: Math.round(14 * root.textScale); height: 3; x: Math.round(7 * root.textScale); y: Math.round(38 * root.textScale); rotation: -32; color: textCard.strongHover ? textCard.hoverTextColor : textCard.cardAccent }
+                                        }
+                                        Rectangle {
+                                            id: textCardArrow
+                                            width: Math.round(37 * root.textScale)
+                                            height: width
+                                            anchors.right: parent.right
+                                            anchors.rightMargin: parent.sideMargin
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            radius: width / 2
+                                            color: textCard.strongHover ? textCard.hoverTextColor : root.panelColor
+                                            border.color: textCard.strongHover ? textCard.hoverTextColor : textCard.cardAccent
+                                            border.width: 1
+                                            Label { anchors.centerIn: parent; text: "›"; color: textCard.cardAccent; font.pixelSize: Math.round(29 * root.textScale); font.bold: true }
+                                        }
+                                        Column {
+                                            anchors.left: textCardIcon.right
+                                            anchors.leftMargin: parent.contentGap
+                                            anchors.right: textCardArrow.left
+                                            anchors.rightMargin: parent.contentGap
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            spacing: 3
+                                            Label {
+                                                width: parent.width
+                                                text: "Text-Bot"
+                                                color: textCard.strongHover ? textCard.hoverTextColor : root.textColor
+                                                font.bold: true
+                                                font.pixelSize: Math.round(23 * root.textScale)
+                                            }
+                                            Label {
+                                                width: parent.width
+                                                text: blanky.language === "pt" ? "Interação e interpretação por texto" : "Text interaction and interpretation"
+                                                color: textCard.strongHover ? textCard.hoverTextColor : root.mutedText
+                                                font.pixelSize: Math.round(14 * root.textScale)
+                                                lineHeight: 0.95
+                                                wrapMode: Text.WordWrap
+                                                maximumLineCount: 2
+                                                elide: Text.ElideRight
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Button {
+                                    id: operationCard
+                                    readonly property color cardAccent: "#cf8cff"
+                                    readonly property bool strongHover: hovered && blanky.hoverAnimationsEnabled
+                                    readonly property color hoverTextColor: root.hoverForeground(cardAccent)
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: root.homeSecondaryCardHeight
+                                    hoverEnabled: true; focusPolicy: Qt.StrongFocus; padding: 0
+                                    scale: strongHover ? 1.015 : 1.0
+                                    z: hovered ? 1 : 0
+                                    KeyNavigation.tab: phoneCard
+                                    onClicked: root.openView("operation")
+                                    Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+                                    background: Rectangle {
+                                        radius: 17; color: operationCard.strongHover ? operationCard.cardAccent : (operationCard.hovered ? Qt.lighter(root.panelColor, 1.28) : root.panelColor)
+                                        border.color: operationCard.activeFocus ? root.textColor : (operationCard.strongHover ? Qt.lighter(operationCard.cardAccent, 1.12) : operationCard.cardAccent); border.width: operationCard.activeFocus || operationCard.strongHover ? 3 : 2
+                                        Rectangle { anchors.fill: parent; anchors.margins: 2; radius: parent.radius - 2; color: operationCard.cardAccent; opacity: operationCard.strongHover ? 0 : 0.06 }
+                                        Behavior on color { ColorAnimation { duration: 150 } }
+                                    }
+                                    contentItem: Item {
+                                        anchors.fill: parent
+                                        readonly property real sideMargin: Math.round(19 * root.spacingScale)
+                                        readonly property real contentGap: Math.round(15 * root.spacingScale)
+
+                                        Item {
+                                            id: operationCardIcon
+                                            width: Math.round(52 * root.textScale)
+                                            height: Math.round(52 * root.textScale)
+                                            anchors.left: parent.left
+                                            anchors.leftMargin: parent.sideMargin
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            Rectangle { width: 3; height: Math.round(43 * root.textScale); x: Math.round(8 * root.textScale); y: Math.round(4 * root.textScale); radius: 2; color: operationCard.strongHover ? operationCard.hoverTextColor : operationCard.cardAccent }
+                                            Rectangle { width: 3; height: Math.round(43 * root.textScale); x: Math.round(25 * root.textScale); y: Math.round(4 * root.textScale); radius: 2; color: operationCard.strongHover ? operationCard.hoverTextColor : operationCard.cardAccent }
+                                            Rectangle { width: 3; height: Math.round(43 * root.textScale); x: Math.round(42 * root.textScale); y: Math.round(4 * root.textScale); radius: 2; color: operationCard.strongHover ? operationCard.hoverTextColor : operationCard.cardAccent }
+                                            Rectangle { width: Math.round(12 * root.textScale); height: Math.round(12 * root.textScale); x: Math.round(3 * root.textScale); y: Math.round(12 * root.textScale); radius: width / 2; color: operationCard.strongHover ? operationCard.cardAccent : root.panelColor; border.color: operationCard.strongHover ? operationCard.hoverTextColor : operationCard.cardAccent; border.width: 3 }
+                                            Rectangle { width: Math.round(12 * root.textScale); height: Math.round(12 * root.textScale); x: Math.round(20 * root.textScale); y: Math.round(29 * root.textScale); radius: width / 2; color: operationCard.strongHover ? operationCard.cardAccent : root.panelColor; border.color: operationCard.strongHover ? operationCard.hoverTextColor : operationCard.cardAccent; border.width: 3 }
+                                            Rectangle { width: Math.round(12 * root.textScale); height: Math.round(12 * root.textScale); x: Math.round(37 * root.textScale); y: Math.round(18 * root.textScale); radius: width / 2; color: operationCard.strongHover ? operationCard.cardAccent : root.panelColor; border.color: operationCard.strongHover ? operationCard.hoverTextColor : operationCard.cardAccent; border.width: 3 }
+                                        }
+                                        Rectangle {
+                                            id: operationCardArrow
+                                            width: Math.round(37 * root.textScale)
+                                            height: width
+                                            anchors.right: parent.right
+                                            anchors.rightMargin: parent.sideMargin
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            radius: width / 2
+                                            color: operationCard.strongHover ? operationCard.hoverTextColor : root.panelColor
+                                            border.color: operationCard.strongHover ? operationCard.hoverTextColor : operationCard.cardAccent
+                                            border.width: 1
+                                            Label { anchors.centerIn: parent; text: "›"; color: operationCard.cardAccent; font.pixelSize: Math.round(29 * root.textScale); font.bold: true }
+                                        }
+                                        Column {
+                                            anchors.left: operationCardIcon.right
+                                            anchors.leftMargin: parent.contentGap
+                                            anchors.right: operationCardArrow.left
+                                            anchors.rightMargin: parent.contentGap
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            spacing: 3
+                                            Label {
+                                                width: parent.width
+                                                text: blanky.language === "pt" ? "Operação" : "Operation"
+                                                color: operationCard.strongHover ? operationCard.hoverTextColor : root.textColor
+                                                font.bold: true
+                                                font.pixelSize: Math.round(23 * root.textScale)
+                                            }
+                                            Label {
+                                                width: parent.width
+                                                text: blanky.language === "pt" ? "Controlo direto dos modos e atuadores" : "Direct control of modes and actuators"
+                                                color: operationCard.strongHover ? operationCard.hoverTextColor : root.mutedText
+                                                font.pixelSize: Math.round(14 * root.textScale)
+                                                lineHeight: 0.95
+                                                wrapMode: Text.WordWrap
+                                                maximumLineCount: 2
+                                                elide: Text.ElideRight
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Button {
+                                    id: phoneCard
+                                    readonly property color cardAccent: root.phoneCardColor
+                                    readonly property bool strongHover: hovered && blanky.hoverAnimationsEnabled
+                                    readonly property color hoverTextColor: root.hoverForeground(cardAccent)
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: root.homeSecondaryCardHeight
+                                    hoverEnabled: true; focusPolicy: Qt.StrongFocus; padding: 0
+                                    scale: strongHover ? 1.015 : 1.0
+                                    z: hovered ? 1 : 0
+                                    KeyNavigation.tab: portugueseMenuButton
+                                    onClicked: root.openView("phone")
+                                    Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+                                    background: Rectangle {
+                                        radius: 17; color: phoneCard.strongHover ? phoneCard.cardAccent : (phoneCard.hovered ? Qt.lighter(root.panelColor, 1.28) : root.panelColor)
+                                        border.color: phoneCard.activeFocus ? root.textColor : (phoneCard.strongHover ? Qt.lighter(phoneCard.cardAccent, 1.12) : phoneCard.cardAccent); border.width: phoneCard.activeFocus || phoneCard.strongHover ? 3 : 2
+                                        Rectangle { anchors.fill: parent; anchors.margins: 2; radius: parent.radius - 2; color: phoneCard.cardAccent; opacity: phoneCard.strongHover ? 0 : 0.06 }
+                                        Behavior on color { ColorAnimation { duration: 150 } }
+                                    }
+                                    contentItem: Item {
+                                        anchors.fill: parent
+                                        readonly property real sideMargin: Math.round(19 * root.spacingScale)
+                                        readonly property real contentGap: Math.round(15 * root.spacingScale)
+
+                                        Item {
+                                            id: phoneCardIcon
+                                            width: Math.round(52 * root.textScale)
+                                            height: Math.round(52 * root.textScale)
+                                            anchors.left: parent.left
+                                            anchors.leftMargin: parent.sideMargin
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            Rectangle {
+                                                width: Math.round(27 * root.textScale); height: Math.round(47 * root.textScale)
+                                                anchors.centerIn: parent
+                                                radius: Math.round(5 * root.textScale)
+                                                color: "transparent"
+                                                border.color: phoneCard.strongHover ? phoneCard.hoverTextColor : phoneCard.cardAccent
+                                                border.width: 3
+                                                Rectangle { width: Math.round(9 * root.textScale); height: 2; anchors.horizontalCenter: parent.horizontalCenter; y: Math.round(5 * root.textScale); color: phoneCard.strongHover ? phoneCard.hoverTextColor : phoneCard.cardAccent }
+                                                Rectangle { width: Math.round(4 * root.textScale); height: width; radius: width / 2; anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: Math.round(4 * root.textScale); color: phoneCard.strongHover ? phoneCard.hoverTextColor : phoneCard.cardAccent }
+                                            }
+                                        }
+                                        Rectangle {
+                                            id: phoneCardArrow
+                                            width: Math.round(37 * root.textScale)
+                                            height: width
+                                            anchors.right: parent.right
+                                            anchors.rightMargin: parent.sideMargin
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            radius: width / 2
+                                            color: phoneCard.strongHover ? phoneCard.hoverTextColor : root.panelColor
+                                            border.color: phoneCard.strongHover ? phoneCard.hoverTextColor : phoneCard.cardAccent
+                                            border.width: 1
+                                            Label { anchors.centerIn: parent; text: "›"; color: phoneCard.cardAccent; font.pixelSize: Math.round(29 * root.textScale); font.bold: true }
+                                        }
+                                        Column {
+                                            anchors.left: phoneCardIcon.right
+                                            anchors.leftMargin: parent.contentGap
+                                            anchors.right: phoneCardArrow.left
+                                            anchors.rightMargin: parent.contentGap
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            spacing: 3
+                                            Label {
+                                                width: parent.width
+                                                text: blanky.language === "pt" ? "Telemóvel" : "Phone"
+                                                color: phoneCard.strongHover ? phoneCard.hoverTextColor : root.textColor
+                                                font.bold: true
+                                                font.pixelSize: Math.round(23 * root.textScale)
+                                            }
+                                            Label {
+                                                width: parent.width
+                                                text: blanky.language === "pt" ? "Atividade e comunicação MQTT" : "Activity and MQTT communication"
+                                                color: phoneCard.strongHover ? phoneCard.hoverTextColor : root.mutedText
+                                                font.pixelSize: Math.round(14 * root.textScale)
+                                                lineHeight: 0.95
+                                                wrapMode: Text.WordWrap
+                                                maximumLineCount: 2
+                                                elide: Text.ElideRight
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.alignment: Qt.AlignHCenter
+                        spacing: 13
+                        Rectangle { Layout.preferredWidth: 112; Layout.preferredHeight: 1; color: root.accentColor; opacity: 0.55 }
+                        Rectangle { Layout.preferredWidth: 8; Layout.preferredHeight: 8; radius: 4; color: root.accentColor }
+                        Label { text: blanky.language === "pt" ? "Todas as vistas mantêm Eventos e Comunicações ativas." : "All views keep Events and Communications active."; color: root.mutedText; font.pixelSize: Math.round(13 * root.textScale); horizontalAlignment: Text.AlignHCenter }
+                        Rectangle { Layout.preferredWidth: 8; Layout.preferredHeight: 8; radius: 4; color: root.accentColor }
+                        Rectangle { Layout.preferredWidth: 112; Layout.preferredHeight: 1; color: root.accentColor; opacity: 0.55 }
+                    }
+                }
+            }
+        }
+    }
+
+    Rectangle {
+        id: viewTransitionOverlay
+        anchors.fill: parent
+        z: 190
+        visible: root.viewTransitionActive
+        color: Qt.rgba(0, 0, 0, 0.64)
+
+        Column {
+            anchors.centerIn: parent
+            width: Math.min(parent.width - 48, 390)
+            spacing: 14
+
+            Image {
+                source: root.logoSource()
+                width: 72
+                height: 72
+                anchors.horizontalCenter: parent.horizontalCenter
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+            }
+
+            Label {
+                width: parent.width
+                text: root.viewTransitionText()
+                color: root.textColor
+                font.pixelSize: 20
+                font.bold: true
+                horizontalAlignment: Text.AlignHCenter
+            }
+
+            BusyIndicator {
+                anchors.horizontalCenter: parent.horizontalCenter
+                running: root.viewTransitionActive
+            }
+        }
+
+        MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons }
     }
 
     Rectangle {
@@ -1078,12 +1799,15 @@ ApplicationWindow {
         }
 
         function refreshSnapshot() {
-            dashboardLayer.grabToImage(function(result) {
+            var sourceItem = root.homeMenuVisible ? homeMenu : dashboardLayer
+            sourceItem.grabToImage(function(result) {
                 modalBackdrop.snapshotUrl = result.url
             }, Qt.size(Math.max(1, Math.round(width / 5)), Math.max(1, Math.round(height / 5))))
         }
 
-        function scheduleSnapshot() {
+        function scheduleSnapshot(clearExisting) {
+            if (clearExisting !== false)
+                modalBackdrop.snapshotUrl = ""
             snapshotTimer.restart()
         }
 
@@ -1239,6 +1963,8 @@ ApplicationWindow {
                     text: root.volumeGlyph()
                     iconOnly: true
                     textPixelSize: 15
+                    textHorizontalOffset: 1
+                    textVerticalOffset: 1
                     Layout.preferredWidth: 34
                     Layout.preferredHeight: 34
                     accentColor: blanky.soundEnabled ? "#63cbff" : "#ff6b6b"
