@@ -18,6 +18,16 @@ Rectangle {
     property bool commandEnabled: true
     property bool singleLineTitle: false
     readonly property real readabilityScale: typeof blanky !== "undefined" ? blanky.appearanceTextScale : 1.0
+    readonly property int titlePixelSize: Math.round((singleLineTitle ? 11 : 12) * readabilityScale)
+    readonly property int statePixelSize: Math.round(10 * readabilityScale)
+    readonly property string titleText: iconText.length > 0 ? iconText + " " + label : label
+    readonly property string formattedStateText: (active ? "✓ " : "○ ") + stateText
+    readonly property bool hasState: stateText.length > 0
+    readonly property real requiredHorizontalWidth: titleMetrics.advanceWidth + stateMetrics.advanceWidth
+        + Math.round(34 * readabilityScale)
+    readonly property bool stackedContent: hasState && (
+        width < requiredHorizontalWidth || width < Math.round(180 * readabilityScale)
+    )
     readonly property bool hovered: commandMouse.containsMouse
     readonly property bool hoverAnimationsEnabled: typeof blanky === "undefined" || blanky.hoverAnimationsEnabled
     readonly property bool strongHover: hovered && commandEnabled && hoverAnimationsEnabled
@@ -39,34 +49,115 @@ Rectangle {
     Behavior on color { ColorAnimation { duration: 140 } }
     Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
 
-    Text {
-        anchors.centerIn: parent
-        width: Math.max(0, parent.width - 16)
-        height: Math.min(implicitHeight, parent.height - 8)
-        text: control.iconText.length > 0
-            ? "<span style='color:" + (control.strongHover ? control.hoverTextColor : control.iconColor) + ";'>" + control.iconText + "</span> " + control.label
-            : control.label
-        textFormat: Text.RichText
-        color: control.strongHover ? control.hoverTextColor : control.textColor
-        font.pixelSize: Math.round((control.singleLineTitle ? 11 : 12) * control.readabilityScale)
+    TextMetrics {
+        id: titleMetrics
+        text: control.titleText
+        font.pixelSize: control.titlePixelSize
         font.bold: control.active
-        horizontalAlignment: Text.AlignHCenter
-        verticalAlignment: Text.AlignVCenter
-        wrapMode: control.singleLineTitle ? Text.NoWrap : Text.WordWrap
-        maximumLineCount: 2
-        elide: Text.ElideRight
     }
 
-    Label {
-        visible: control.stateText.length > 0
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        anchors.rightMargin: 9
-        anchors.bottomMargin: 6
-        text: (control.active ? "✓ " : "○ ") + control.stateText
-        color: control.strongHover ? control.hoverTextColor : (control.active ? control.iconColor : control.mutedText)
-        font.pixelSize: Math.round(10 * control.readabilityScale)
+    TextMetrics {
+        id: stateMetrics
+        text: control.formattedStateText
+        font.pixelSize: control.statePixelSize
         font.bold: true
+    }
+
+    Loader {
+        anchors.fill: parent
+        anchors.leftMargin: Math.round(6 * control.readabilityScale)
+        anchors.rightMargin: Math.round(6 * control.readabilityScale)
+        anchors.topMargin: Math.round(2 * control.readabilityScale)
+        anchors.bottomMargin: Math.round(2 * control.readabilityScale)
+        sourceComponent: control.stackedContent ? stackedButtonContent : horizontalButtonContent
+    }
+
+    Component {
+        id: horizontalButtonContent
+
+        RowLayout {
+            spacing: Math.round(7 * control.readabilityScale)
+
+            Text {
+                Layout.fillWidth: true
+                Layout.minimumWidth: 0
+                text: control.iconText.length > 0
+                    ? "<span style='color:" + (control.strongHover ? control.hoverTextColor : control.iconColor) + ";'>" + control.iconText + "</span> " + control.label
+                    : control.label
+                textFormat: Text.RichText
+                color: control.strongHover ? control.hoverTextColor : control.textColor
+                font.pixelSize: control.titlePixelSize
+                font.bold: control.active
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                wrapMode: Text.NoWrap
+                elide: Text.ElideRight
+            }
+
+            Rectangle {
+                visible: control.hasState
+                Layout.preferredWidth: Math.ceil(stateMetrics.advanceWidth + 12 * control.readabilityScale)
+                Layout.preferredHeight: Math.ceil(stateMetrics.boundingRect.height + 5 * control.readabilityScale)
+                radius: height / 2
+                color: control.strongHover ? "transparent" : Qt.rgba(control.iconColor.r, control.iconColor.g, control.iconColor.b, control.active ? 0.16 : 0.07)
+                border.color: control.strongHover ? control.hoverTextColor : (control.active ? control.iconColor : control.borderColor)
+                border.width: 1
+
+                Label {
+                    anchors.centerIn: parent
+                    text: control.formattedStateText
+                    color: control.strongHover ? control.hoverTextColor : (control.active ? control.iconColor : control.mutedText)
+                    font.pixelSize: control.statePixelSize
+                    font.bold: true
+                }
+            }
+        }
+    }
+
+    Component {
+        id: stackedButtonContent
+
+        ColumnLayout {
+            spacing: 0
+
+            Text {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                Layout.minimumHeight: 0
+                text: control.iconText.length > 0
+                    ? "<span style='color:" + (control.strongHover ? control.hoverTextColor : control.iconColor) + ";'>" + control.iconText + "</span> " + control.label
+                    : control.label
+                textFormat: Text.RichText
+                color: control.strongHover ? control.hoverTextColor : control.textColor
+                font.pixelSize: control.titlePixelSize
+                font.bold: control.active
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                wrapMode: Text.NoWrap
+                elide: Text.ElideRight
+            }
+
+            Rectangle {
+                Layout.alignment: Qt.AlignHCenter
+                Layout.preferredWidth: Math.min(parent.width, Math.ceil(stateMetrics.advanceWidth + 12 * control.readabilityScale))
+                Layout.preferredHeight: Math.ceil(stateMetrics.boundingRect.height + 3 * control.readabilityScale)
+                radius: height / 2
+                color: control.strongHover ? "transparent" : Qt.rgba(control.iconColor.r, control.iconColor.g, control.iconColor.b, control.active ? 0.16 : 0.07)
+                border.color: control.strongHover ? control.hoverTextColor : (control.active ? control.iconColor : control.borderColor)
+                border.width: 1
+
+                Label {
+                    anchors.centerIn: parent
+                    width: parent.width - 6
+                    text: control.formattedStateText
+                    color: control.strongHover ? control.hoverTextColor : (control.active ? control.iconColor : control.mutedText)
+                    font.pixelSize: control.statePixelSize
+                    font.bold: true
+                    horizontalAlignment: Text.AlignHCenter
+                    elide: Text.ElideRight
+                }
+            }
+        }
     }
 
     MouseArea {

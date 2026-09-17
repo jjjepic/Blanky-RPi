@@ -81,7 +81,9 @@ ApplicationWindow {
     property bool viewTransitionActive: false
     property bool transitionToMenu: false
     property var audioManualOverrides: ({})
-    readonly property int rightPanelWidth: 660
+    readonly property int rightPanelWidth: activeView === "operation"
+        ? Math.min(760, Math.round(logicalWidth * 0.49))
+        : 660
     readonly property int homeGeneralCardHeight: Math.round(134 * controlScale + (textScale - 1.0) * 44)
     readonly property int homeSecondaryCardHeight: Math.round(112 * controlScale + (textScale - 1.0) * 44)
     readonly property int homeViewPanelHeight: Math.round(
@@ -1141,6 +1143,7 @@ ApplicationWindow {
                     Layout.maximumWidth: root.rightPanelWidth
                     Layout.minimumHeight: 0
                     controller: blanky
+                    expandedView: root.activeView === "operation"
                     language: blanky.language
                     dark: root.dark
                     panelColor: root.panelColor

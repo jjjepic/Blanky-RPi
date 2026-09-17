@@ -19,6 +19,7 @@ Rectangle {
     property color warningColor: "#f8c25d"
     property color errorColor: "#ff6b6b"
     property color inactiveColor: "#8fa8b8"
+    property bool expandedView: false
     readonly property real readabilityScale: panel.controller ? panel.controller.appearanceTextScale : 1.0
     property var stateMap: ({})
     readonly property bool manualAvailable: stateValue("mode_manual") === 1
@@ -36,8 +37,14 @@ Rectangle {
     readonly property int sectionSpacing: Math.round((compact ? 4 : 8) * (readabilityScale > 1 ? 1.10 : 1.0))
     readonly property int blockMargin: Math.round((compact ? 7 : 10) * (readabilityScale > 1 ? 1.08 : 1.0))
     readonly property real actionButtonHeight: compact
-        ? Math.max(34, Math.min(readabilityScale > 1 ? 44 : 40, Math.floor((panel.height - 140) / 5)))
-        : Math.max(40, Math.min(readabilityScale > 1 ? 62 : 58, Math.floor((panel.height - 180) / 5)))
+        ? Math.max(
+            readabilityScale > 1 ? 44 : 38,
+            Math.min(
+                readabilityScale > 1 ? 48 : 42,
+                Math.floor((panel.height - Math.round(150 * readabilityScale)) / 5)
+            )
+        )
+        : Math.max(42, Math.min(expandedView ? 66 : (readabilityScale > 1 ? 62 : 58), Math.floor((panel.height - 180) / 5)))
 
     function t(key, values) {
         return I18n.text(panel.language, key, values)
