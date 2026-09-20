@@ -40,13 +40,17 @@ QtObject {
         : mode === "colorblind" ? colorVisionTokens.surfaceSecondary
         : mode === "monochrome" ? "#252525" : "#07111a"
     readonly property color textPrimary: mode === "custom" ? Qt.hsla(customHue / 360, 0.08, 0.45 + customContrast / 100 * 0.50, 1)
-        : mode === "light" ? "#16384c" : mode === "colorblind" ? colorVisionTokens.textPrimary : "#f2f7fb"
+        : mode === "light" ? "#16384c"
+        : mode === "colorblind" ? colorVisionTokens.textPrimary
+        : mode === "monochrome" ? "#f2f2f2" : "#f2f7fb"
     readonly property color textSecondary: mode === "custom" ? Qt.hsla(customHue / 360, 0.18, 0.34 + customContrast / 100 * 0.38, 1)
         : mode === "light" ? "#386b85"
         : mode === "high_contrast" ? "#d2d2d2"
         : mode === "colorblind" ? colorVisionTokens.textSecondary : mode === "monochrome" ? "#c5c5c5" : "#a8d8ee"
     readonly property color textDisabled: mode === "custom" ? Qt.hsla(customHue / 360, 0.12, 0.38 + customContrast / 100 * 0.25, 1)
-        : mode === "light" ? "#526e7d" : mode === "colorblind" ? colorVisionTokens.textDisabled : "#8fa8b8"
+        : mode === "light" ? "#526e7d"
+        : mode === "colorblind" ? colorVisionTokens.textDisabled
+        : mode === "monochrome" ? "#9a9a9a" : "#8fa8b8"
     readonly property color border: mode === "custom" ? Qt.hsla(customHue / 360, 0.65, 0.40 + customContrast / 100 * 0.18, 1)
         : mode === "light" ? "#5f98b8"
         : mode === "high_contrast" ? "#f2f2f2"

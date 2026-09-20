@@ -31,7 +31,7 @@ Rectangle {
     readonly property bool hoverAnimationsEnabled: typeof blanky === "undefined" || blanky.hoverAnimationsEnabled
     readonly property bool strongHover: hovered && enabled && hoverAnimationsEnabled
     readonly property real accentLuminance: 0.2126 * accentColor.r + 0.7152 * accentColor.g + 0.0722 * accentColor.b
-    readonly property color hoverTextColor: accentLuminance > 0.62 ? "#07111a" : "#f7fbff"
+    readonly property color hoverTextColor: accentLuminance > 0.62 ? "#101010" : "#ffffff"
 
     signal clicked()
 

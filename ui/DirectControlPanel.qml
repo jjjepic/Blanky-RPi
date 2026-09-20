@@ -9,6 +9,7 @@ Rectangle {
     property var controller
     property string language: "pt"
     property bool dark: true
+    property bool monochrome: false
     property color panelColor: "#091722"
     property color panelAltColor: "#07111a"
     property color borderColor: "#1f6fa8"
@@ -22,12 +23,13 @@ Rectangle {
     property bool expandedView: false
     readonly property real readabilityScale: panel.controller ? panel.controller.appearanceTextScale : 1.0
     property var stateMap: ({})
+    readonly property bool systemStarted: stateValue("start") === 1
     readonly property bool manualAvailable: stateValue("mode_manual") === 1
     readonly property bool modeChangeActive: stateValue("mode_change") === 1
     readonly property bool modeSelected: stateValue("mode_fast") === 1
         || stateValue("mode_ideal") === 1 || manualAvailable
-    readonly property bool canSelectMode: !modeSelected || modeChangeActive
-    readonly property bool canRequestModeChange: modeSelected && !modeChangeActive
+    readonly property bool canSelectMode: systemStarted && (!modeSelected || modeChangeActive)
+    readonly property bool canRequestModeChange: systemStarted && modeSelected && !modeChangeActive
     readonly property color fastModeColor: warningColor
     readonly property color idealModeColor: accentColor
     readonly property color manualModeColor: successColor
@@ -201,9 +203,9 @@ Rectangle {
                             Layout.preferredHeight: panel.actionButtonHeight
                             spacing: panel.compact ? 5 : 8
 
-                            ManualCommandButton { width: (parent.width - parent.spacing * 2) / 3; height: panel.actionButtonHeight; commandEnabled: panel.canSelectMode; label: panel.t("fast"); iconText: "\u26A1"; command: "MODE_FAST"; active: panel.stateValue("mode_fast") === 1; stateText: active ? "ON" : "OFF"; iconColor: panel.fastModeColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
-                            ManualCommandButton { width: (parent.width - parent.spacing * 2) / 3; height: panel.actionButtonHeight; commandEnabled: panel.canSelectMode; label: panel.t("ideal"); iconText: "\uD83C\uDFAF"; command: "MODE_IDEAL"; active: panel.stateValue("mode_ideal") === 1; stateText: active ? "ON" : "OFF"; iconColor: panel.idealModeColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
-                            ManualCommandButton { width: (parent.width - parent.spacing * 2) / 3; height: panel.actionButtonHeight; commandEnabled: panel.canSelectMode; label: panel.t("manual"); iconText: "\uD83D\uDD79"; command: "MODE_MANUAL"; active: panel.stateValue("mode_manual") === 1; stateText: active ? "ON" : "OFF"; iconColor: panel.manualModeColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
+                            ManualCommandButton { width: (parent.width - parent.spacing * 2) / 3; height: panel.actionButtonHeight; commandEnabled: panel.canSelectMode; label: panel.t("fast"); iconText: panel.monochrome ? "▶" : "\u26A1"; command: "MODE_FAST"; active: panel.stateValue("mode_fast") === 1; stateText: active ? "ON" : "OFF"; iconColor: panel.fastModeColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
+                            ManualCommandButton { width: (parent.width - parent.spacing * 2) / 3; height: panel.actionButtonHeight; commandEnabled: panel.canSelectMode; label: panel.t("ideal"); iconText: panel.monochrome ? "◎" : "\uD83C\uDFAF"; command: "MODE_IDEAL"; active: panel.stateValue("mode_ideal") === 1; stateText: active ? "ON" : "OFF"; iconColor: panel.idealModeColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
+                            ManualCommandButton { width: (parent.width - parent.spacing * 2) / 3; height: panel.actionButtonHeight; commandEnabled: panel.canSelectMode; label: panel.t("manual"); iconText: panel.monochrome ? "☷" : "\uD83D\uDD79"; command: "MODE_MANUAL"; active: panel.stateValue("mode_manual") === 1; stateText: active ? "ON" : "OFF"; iconColor: panel.manualModeColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
                         }
 
                         ManualCommandButton { Layout.fillWidth: true; Layout.preferredHeight: panel.actionButtonHeight; commandEnabled: panel.canRequestModeChange; label: panel.t("change"); iconText: "\u21C4"; command: "MODE_UNSPEC"; active: panel.modeChangeActive; stateText: active ? "ON" : "OFF"; iconColor: panel.changeModeColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
@@ -310,8 +312,8 @@ Rectangle {
                         Layout.preferredHeight: panel.actionButtonHeight
                         spacing: panel.compact ? 5 : 8
 
-                        ManualCommandButton { width: (parent.width - parent.spacing) / 2; height: panel.actionButtonHeight; commandEnabled: panel.manualAvailable; label: panel.t("robotMetal"); iconText: "\uD83E\uDD16"; command: "ROBOT_TO_METAL"; active: panel.stateValue("robot_metal") === 1; stateText: active ? "ON" : "OFF"; iconColor: panel.accentColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
-                        ManualCommandButton { width: (parent.width - parent.spacing) / 2; height: panel.actionButtonHeight; commandEnabled: panel.manualAvailable; label: panel.t("robotNonMetal"); iconText: "\uD83E\uDD16"; command: "ROBOT_TO_NONMETAL"; active: panel.stateValue("robot_nonmetal") === 1; stateText: active ? "ON" : "OFF"; iconColor: panel.accentColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
+                        ManualCommandButton { width: (parent.width - parent.spacing) / 2; height: panel.actionButtonHeight; commandEnabled: panel.manualAvailable; label: panel.t("robotMetal"); iconText: panel.monochrome ? "▣" : "\uD83E\uDD16"; command: "ROBOT_TO_METAL"; active: panel.stateValue("robot_metal") === 1; stateText: active ? "ON" : "OFF"; iconColor: panel.accentColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
+                        ManualCommandButton { width: (parent.width - parent.spacing) / 2; height: panel.actionButtonHeight; commandEnabled: panel.manualAvailable; label: panel.t("robotNonMetal"); iconText: panel.monochrome ? "▣" : "\uD83E\uDD16"; command: "ROBOT_TO_NONMETAL"; active: panel.stateValue("robot_nonmetal") === 1; stateText: active ? "ON" : "OFF"; iconColor: panel.accentColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
                     }
                 }
             }

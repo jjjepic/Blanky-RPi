@@ -183,7 +183,7 @@ FloatingPanel {
                             readonly property bool hovered: hoverArea.containsMouse
                             readonly property bool strongHover: hovered && (typeof blanky === "undefined" || blanky.hoverAnimationsEnabled)
                             readonly property real cardLuminance: 0.2126 * cardColor.r + 0.7152 * cardColor.g + 0.0722 * cardColor.b
-                            readonly property color hoverTextColor: cardLuminance > 0.62 ? "#07111a" : "#f7fbff"
+                            readonly property color hoverTextColor: cardLuminance > 0.62 ? "#101010" : "#ffffff"
                             Layout.preferredWidth: (parent.width - parent.columnSpacing) / 2
                             Layout.preferredHeight: Math.round(104 * dialog.textScale)
                             radius: Math.round(12 * dialog.textScale)

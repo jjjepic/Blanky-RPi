@@ -33,7 +33,7 @@ Rectangle {
     readonly property bool strongHover: hovered && commandEnabled && hoverAnimationsEnabled
     readonly property color hoverColor: active ? iconColor : borderColor
     readonly property real hoverLuminance: 0.2126 * hoverColor.r + 0.7152 * hoverColor.g + 0.0722 * hoverColor.b
-    readonly property color hoverTextColor: hoverLuminance > 0.62 ? "#07111a" : "#f7fbff"
+    readonly property color hoverTextColor: hoverLuminance > 0.62 ? "#101010" : "#ffffff"
 
     signal triggered(string command)
 

@@ -41,6 +41,7 @@ ApplicationWindow {
         : blanky.appearanceMode === "high_contrast" ? root.warningColor
         : blanky.appearanceMode === "colorblind" || blanky.appearanceMode === "custom" ? root.warningColor
         : blanky.appearanceMode === "light" ? "#a84632" : "#ff8a65"
+    readonly property color operationCardColor: blanky.appearanceMode === "monochrome" ? root.textColor : "#cf8cff"
     readonly property real textScale: theme.textScale
     readonly property real controlScale: theme.controlScale
     readonly property real spacingScale: theme.spacingScale
@@ -104,7 +105,7 @@ ApplicationWindow {
 
     function hoverForeground(accent) {
         var luminance = 0.2126 * accent.r + 0.7152 * accent.g + 0.0722 * accent.b
-        return luminance > 0.62 ? "#07111a" : "#f7fbff"
+        return luminance > 0.62 ? "#101010" : "#ffffff"
     }
 
     function eventsHeaderText() {
@@ -149,13 +150,14 @@ ApplicationWindow {
     }
 
     function appearanceOptions() {
+        var monochrome = blanky.appearanceMode === "monochrome"
         return [
-            { id: "dark", icon: "☾", tone: "#91a1b5", title: t("darkAppearance"), description: blanky.language === "pt" ? "Interface escura atual." : "Current dark interface." },
-            { id: "light", icon: "☀", tone: "#f8c25d", title: t("lightAppearance"), description: blanky.language === "pt" ? "Interface clara e equilibrada." : "Balanced light interface." },
-            { id: "high_contrast", icon: "◐", tone: "#00e5ff", title: t("highContrast"), description: blanky.language === "pt" ? "Máxima legibilidade e contornos fortes." : "Maximum legibility and strong borders." },
+            { id: "dark", icon: "☾", tone: monochrome ? root.inactiveColor : "#91a1b5", title: t("darkAppearance"), description: blanky.language === "pt" ? "Interface escura atual." : "Current dark interface." },
+            { id: "light", icon: "☀", tone: monochrome ? root.warningColor : "#f8c25d", title: t("lightAppearance"), description: blanky.language === "pt" ? "Interface clara e equilibrada." : "Balanced light interface." },
+            { id: "high_contrast", icon: "◐", tone: monochrome ? root.textColor : "#00e5ff", title: t("highContrast"), description: blanky.language === "pt" ? "Máxima legibilidade e contornos fortes." : "Maximum legibility and strong borders." },
             { id: "colorblind", icon: "◉", tone: theme.accent, title: t("colorblindUniversal"), description: t("colorVisionProfileSelected", { profile: colorVisionProfileName(blanky.colorVisionProfile) }) },
-            { id: "monochrome", icon: "◻", tone: "#d7d7d7", title: t("monochrome"), description: blanky.language === "pt" ? "Estados compreensíveis sem depender da cor." : "States that do not depend on colour." },
-            { id: "custom", icon: "⚙", tone: "#cf8cff", title: t("customAppearance"), description: t("customAppearanceDescription") }
+            { id: "monochrome", icon: "◻", tone: root.textColor, title: t("monochrome"), description: blanky.language === "pt" ? "Estados compreensíveis sem depender da cor." : "States that do not depend on colour." },
+            { id: "custom", icon: "⚙", tone: monochrome ? root.textColor : "#cf8cff", title: t("customAppearance"), description: t("customAppearanceDescription") }
         ]
     }
 
@@ -180,11 +182,12 @@ ApplicationWindow {
     }
 
     function colorVisionProfiles() {
+        var monochrome = blanky.appearanceMode === "monochrome"
         return [
-            { id: "universal", icon: "◉", tone: ColorVisionProfiles.profile("universal").information, title: t("colorVisionUniversal"), description: t("colorVisionUniversalDescription"), recommended: true },
-            { id: "protan", icon: "P", tone: ColorVisionProfiles.profile("protan").information, title: t("colorVisionProtan"), description: t("colorVisionProtanDescription"), recommended: false },
-            { id: "deutan", icon: "D", tone: ColorVisionProfiles.profile("deutan").information, title: t("colorVisionDeutan"), description: t("colorVisionDeutanDescription"), recommended: false },
-            { id: "tritan", icon: "T", tone: ColorVisionProfiles.profile("tritan").information, title: t("colorVisionTritan"), description: t("colorVisionTritanDescription"), recommended: false }
+            { id: "universal", icon: "◉", tone: monochrome ? root.textColor : ColorVisionProfiles.profile("universal").information, title: t("colorVisionUniversal"), description: t("colorVisionUniversalDescription"), recommended: true },
+            { id: "protan", icon: "P", tone: monochrome ? root.inactiveColor : ColorVisionProfiles.profile("protan").information, title: t("colorVisionProtan"), description: t("colorVisionProtanDescription"), recommended: false },
+            { id: "deutan", icon: "D", tone: monochrome ? root.warningColor : ColorVisionProfiles.profile("deutan").information, title: t("colorVisionDeutan"), description: t("colorVisionDeutanDescription"), recommended: false },
+            { id: "tritan", icon: "T", tone: monochrome ? root.successColor : ColorVisionProfiles.profile("tritan").information, title: t("colorVisionTritan"), description: t("colorVisionTritanDescription"), recommended: false }
         ]
     }
 
@@ -290,6 +293,8 @@ ApplicationWindow {
     }
 
     function volumeGlyph() {
+        if (blanky.appearanceMode === "monochrome")
+            return !blanky.soundEnabled || blanky.soundVolume <= 0.01 ? "∅" : "♪"
         if (!blanky.soundEnabled || blanky.soundVolume <= 0.01)
             return "\uD83D\uDD07"
         if (blanky.soundVolume < 0.34)
@@ -309,7 +314,7 @@ ApplicationWindow {
 
     function ttsSpeedGlyph() {
         if (blanky.ttsSpeed < 0.9)
-            return "\uD83D\uDC22"
+            return blanky.appearanceMode === "monochrome" ? "◁" : "\uD83D\uDC22"
         if (blanky.ttsSpeed > 1.1)
             return "\u26A1"
         return "\u25B6"
@@ -326,31 +331,58 @@ ApplicationWindow {
         return voice.charAt(0).toUpperCase() + voice.slice(1).toLowerCase()
     }
 
+    function voiceIcon(voice) {
+        var key = String(voice || "").toLowerCase()
+        if (key === "alloy") return "⚙"
+        if (key === "nova") return "★"
+        if (key === "shimmer") return "✦"
+        if (key === "sage") return "❧"
+        if (key === "coral") return "❀"
+        if (key === "fable") return "▤"
+        if (key === "ash") return "◈"
+        if (key === "echo") return "◎"
+        if (key === "onyx") return "◆"
+        return "●"
+    }
+
+    function voiceTone(voice) {
+        var key = String(voice || "").toLowerCase()
+        if (key === "nova") return root.warningColor
+        if (key === "shimmer") return Qt.lighter(root.accentColor, 1.22)
+        if (key === "sage") return root.successColor
+        if (key === "coral") return root.errorColor
+        if (key === "fable") return Qt.lighter(root.warningColor, 1.16)
+        if (key === "ash") return root.inactiveColor
+        if (key === "echo") return Qt.darker(root.accentColor, 1.22)
+        if (key === "onyx") return root.textColor
+        return root.accentColor
+    }
+
     function commandHelpGroups() {
         var pt = blanky.language === "pt"
         return [
             { title: pt ? "Sistema" : "System", commands: [
-                { icon: "\u25B6", color: "#48d66b", title: pt ? "Iniciar sistema" : "Start system", code: "START", input: pt ? "iniciar" : "start", description: pt ? "Inicia o funcionamento do sistema." : "Starts system operation.", examples: pt ? "iniciar · arrancar · come\u00e7ar" : "start · begin · launch" },
-                { icon: "\u23F9", color: "#ff6b6b", title: pt ? "Parar sistema" : "Stop system", code: "STOP", input: pt ? "parar" : "stop", description: pt ? "Para o sistema e rep\u00f5e os componentes." : "Stops the system and resets components.", examples: pt ? "parar · pausar · terminar" : "stop · halt · pause" }
+                { icon: "\u25B6", color: root.successColor, title: pt ? "Iniciar sistema" : "Start system", code: "START", input: pt ? "iniciar" : "start", description: pt ? "Inicia o funcionamento do sistema." : "Starts system operation.", examples: pt ? "iniciar · arrancar · come\u00e7ar" : "start · begin · launch" },
+                { icon: "\u23F9", color: root.errorColor, title: pt ? "Parar sistema" : "Stop system", code: "STOP", input: pt ? "parar" : "stop", description: pt ? "Para o sistema e rep\u00f5e os componentes." : "Stops the system and resets components.", examples: pt ? "parar · pausar · terminar" : "stop · halt · pause" }
             ]},
             { title: pt ? "Modos" : "Modes", commands: [
-                { icon: "\u26A1", color: "#f8c25d", title: pt ? "Modo r\u00e1pido" : "Fast mode", code: "MODE_FAST", input: pt ? "modo r\u00e1pido" : "fast mode", description: pt ? "Seleciona a opera\u00e7\u00e3o r\u00e1pida." : "Selects fast operation.", examples: pt ? "modo r\u00e1pido · alta velocidade · acelerado" : "fast mode · quick mode · high speed" },
-                { icon: "\uD83C\uDFAF", color: "#63cbff", title: pt ? "Modo ideal" : "Ideal mode", code: "MODE_IDEAL", input: pt ? "modo ideal" : "ideal mode", description: pt ? "Seleciona a opera\u00e7\u00e3o ideal." : "Selects ideal operation.", examples: pt ? "modo ideal · modo auto · modo normal" : "ideal mode · auto mode · normal mode" },
-                { icon: "\uD83D\uDD79", color: "#b7f7d4", title: pt ? "Modo manual" : "Manual mode", code: "MODE_MANUAL", input: pt ? "modo manual" : "manual mode", description: pt ? "Ativa os controlos manuais." : "Enables manual controls.", examples: pt ? "modo manual · opera\u00e7\u00e3o manual · manual" : "manual mode · operator mode · manual" },
-                { icon: "\u21C4", color: "#9dd9ff", title: pt ? "Trocar modo" : "Change mode", code: "MODE_UNSPEC", input: pt ? "trocar modo" : "change mode", description: pt ? "Permite escolher outro modo." : "Allows selecting another mode.", examples: pt ? "trocar modo · mudar modo · alterar modo" : "change mode · switch mode · set mode" }
+                { icon: blanky.appearanceMode === "monochrome" ? "▶" : "\u26A1", color: root.warningColor, title: pt ? "Modo r\u00e1pido" : "Fast mode", code: "MODE_FAST", input: pt ? "modo r\u00e1pido" : "fast mode", description: pt ? "Seleciona a opera\u00e7\u00e3o r\u00e1pida." : "Selects fast operation.", examples: pt ? "modo r\u00e1pido · alta velocidade · acelerado" : "fast mode · quick mode · high speed" },
+                { icon: blanky.appearanceMode === "monochrome" ? "◎" : "\uD83C\uDFAF", color: root.accentColor, title: pt ? "Modo ideal" : "Ideal mode", code: "MODE_IDEAL", input: pt ? "modo ideal" : "ideal mode", description: pt ? "Seleciona a opera\u00e7\u00e3o ideal." : "Selects ideal operation.", examples: pt ? "modo ideal · modo auto · modo normal" : "ideal mode · auto mode · normal mode" },
+                { icon: blanky.appearanceMode === "monochrome" ? "☷" : "\uD83D\uDD79", color: root.successColor, title: pt ? "Modo manual" : "Manual mode", code: "MODE_MANUAL", input: pt ? "modo manual" : "manual mode", description: pt ? "Ativa os controlos manuais." : "Enables manual controls.", examples: pt ? "modo manual · opera\u00e7\u00e3o manual · manual" : "manual mode · operator mode · manual" },
+                { icon: "\u21C4", color: root.mutedText, title: pt ? "Trocar modo" : "Change mode", code: "MODE_UNSPEC", input: pt ? "trocar modo" : "change mode", description: pt ? "Permite escolher outro modo." : "Allows selecting another mode.", examples: pt ? "trocar modo · mudar modo · alterar modo" : "change mode · switch mode · set mode" }
             ]},
             { title: pt ? "Motores" : "Motors", commands: [
-                { icon: "\u2699", color: "#63cbff", title: pt ? "Controlar motores" : "Control motors", code: "MOTOR_n_ON / MOTOR_n_OFF", input: pt ? "ligar motor 1" : "turn on motor 1", description: pt ? "Liga ou desliga o motor indicado." : "Turns the selected motor on or off.", examples: pt ? "ligar motor 1 · desligar motor 2 · ativar motor 3" : "turn on motor 1 · disable motor 2 · start motor 3" }
+                { icon: "\u2699", color: root.accentColor, title: pt ? "Controlar motores" : "Control motors", code: "MOTOR_n_ON / MOTOR_n_OFF", input: pt ? "ligar motor 1" : "turn on motor 1", description: pt ? "Liga ou desliga o motor indicado." : "Turns the selected motor on or off.", examples: pt ? "ligar motor 1 · desligar motor 2 · ativar motor 3" : "turn on motor 1 · disable motor 2 · start motor 3" }
             ]},
             { title: pt ? "Cilindros" : "Cylinders", commands: [
-                { icon: "\u25B0", color: "#63cbff", title: pt ? "Controlar cilindros" : "Control cylinders", code: "CYL_X_EXTEND / CYL_X_RETRACT", input: pt ? "ligar cilindro A" : "turn on cylinder A", description: pt ? "Avan\u00e7a ou recolhe o cilindro indicado." : "Extends or retracts the selected cylinder.", examples: pt ? "avan\u00e7ar cilindro A · recolher cilindro B · cilindro C recuar" : "extend cylinder A · retract cylinder B · cylinder C back" }
+                { icon: "\u25B0", color: root.accentColor, title: pt ? "Controlar cilindros" : "Control cylinders", code: "CYL_X_EXTEND / CYL_X_RETRACT", input: pt ? "ligar cilindro A" : "turn on cylinder A", description: pt ? "Avan\u00e7a ou recolhe o cilindro indicado." : "Extends or retracts the selected cylinder.", examples: pt ? "avan\u00e7ar cilindro A · recolher cilindro B · cilindro C recuar" : "extend cylinder A · retract cylinder B · cylinder C back" }
             ]},
             { title: pt ? "Luzes" : "Lights", commands: [
-                { icon: "\u25CF", color: "#48d66b", title: pt ? "Luz verde" : "Green light", code: "GREEN_ON / GREEN_OFF", input: pt ? "ligar luz verde" : "turn on green light", description: pt ? "Liga ou desliga a luz verde." : "Turns the green light on or off.", examples: pt ? "ligar luz verde · apagar verde · ativar verde" : "turn on green light · switch green off · enable green" },
-                { icon: "\u25CF", color: "#ff6b6b", title: pt ? "Luz vermelha" : "Red light", code: "RED_ON / RED_OFF", input: pt ? "ligar luz vermelha" : "turn on red light", description: pt ? "Liga ou desliga a luz vermelha." : "Turns the red light on or off.", examples: pt ? "ligar luz vermelha · apagar vermelha · desativar vermelho" : "turn on red light · switch red off · disable red" }
+                { icon: "\u25CF", color: root.successColor, title: pt ? "Luz verde" : "Green light", code: "GREEN_ON / GREEN_OFF", input: pt ? "ligar luz verde" : "turn on green light", description: pt ? "Liga ou desliga a luz verde." : "Turns the green light on or off.", examples: pt ? "ligar luz verde · apagar verde · ativar verde" : "turn on green light · switch green off · enable green" },
+                { icon: "\u25CF", color: root.errorColor, title: pt ? "Luz vermelha" : "Red light", code: "RED_ON / RED_OFF", input: pt ? "ligar luz vermelha" : "turn on red light", description: pt ? "Liga ou desliga a luz vermelha." : "Turns the red light on or off.", examples: pt ? "ligar luz vermelha · apagar vermelha · desativar vermelho" : "turn on red light · switch red off · disable red" }
             ]},
             { title: pt ? "Rob\u00f4" : "Robot", commands: [
-                { icon: "\uD83E\uDD16", color: "#b7f7d4", title: pt ? "Enviar rob\u00f4" : "Move robot", code: "ROBOT_TO_METAL / ROBOT_TO_NONMETAL", input: pt ? "rob\u00f4 vai metal" : "send robot to metal", description: pt ? "Envia o rob\u00f4 para metal ou n\u00e3o metal." : "Sends the robot to metal or non-metal.", examples: pt ? "rob\u00f4 para metal · mandar rob\u00f4 para n\u00e3o metal · rob\u00f4 vai para metal" : "robot to metal · send robot to non-metal · move robot to metal" }
+                { icon: blanky.appearanceMode === "monochrome" ? "▣" : "\uD83E\uDD16", color: root.successColor, title: pt ? "Enviar rob\u00f4" : "Move robot", code: "ROBOT_TO_METAL / ROBOT_TO_NONMETAL", input: pt ? "rob\u00f4 vai metal" : "send robot to metal", description: pt ? "Envia o rob\u00f4 para metal ou n\u00e3o metal." : "Sends the robot to metal or non-metal.", examples: pt ? "rob\u00f4 para metal · mandar rob\u00f4 para n\u00e3o metal · rob\u00f4 vai para metal" : "robot to metal · send robot to non-metal · move robot to metal" }
             ]}
         ]
     }
@@ -530,20 +562,6 @@ ApplicationWindow {
                 spacing: 7
 
                 MenuActionButton {
-                    iconText: "⌂"
-                    width: 50
-                    height: 44
-                    textPixelSize: 22
-                    accentColor: root.accentColor
-                    textColor: root.textColor
-                    mutedText: root.mutedText
-                    borderColor: root.borderColor
-                    panelColor: root.panelAltColor
-                    toolTip: blanky.language === "pt" ? "Menu Inicial" : "Main Menu"
-                    onClicked: root.returnToHomeMenu()
-                }
-
-                MenuActionButton {
                     iconText: root.appearanceIcon()
                     width: 50
                     height: 44
@@ -558,7 +576,7 @@ ApplicationWindow {
                 }
 
                 MenuActionButton {
-                    text: "\uD83C\uDDF5\uD83C\uDDF9"
+                    text: blanky.appearanceMode === "monochrome" ? "PT" : "\uD83C\uDDF5\uD83C\uDDF9"
                     width: 54
                     height: 44
                     textPixelSize: 20
@@ -572,7 +590,7 @@ ApplicationWindow {
                 }
 
                 MenuActionButton {
-                    text: "\uD83C\uDDEC\uD83C\uDDE7"
+                    text: blanky.appearanceMode === "monochrome" ? "EN" : "\uD83C\uDDEC\uD83C\uDDE7"
                     width: 54
                     height: 44
                     textPixelSize: 20
@@ -792,7 +810,9 @@ ApplicationWindow {
                 spacing: 10
 
                 MenuActionButton {
-                    text: blanky.listening ? "\uD83D\uDD34 " + t("listening") : "\uD83C\uDFA4 " + t("listen")
+                    text: blanky.listening
+                        ? (blanky.appearanceMode === "monochrome" ? "● " : "\uD83D\uDD34 ") + t("listening")
+                        : (blanky.appearanceMode === "monochrome" ? "◉ " : "\uD83C\uDFA4 ") + t("listen")
                     enabled: !blanky.listening
                     Layout.fillWidth: true
                     Layout.preferredWidth: 155
@@ -810,7 +830,7 @@ ApplicationWindow {
                 }
 
                 MenuActionButton {
-                    iconText: "\uD83D\uDDE3"
+                    iconText: blanky.appearanceMode === "monochrome" ? "◖" : "\uD83D\uDDE3"
                     labelText: t("voiceButton") + ": <b>" + root.voiceLabel() + "</b>"
                     Layout.fillWidth: true
                     Layout.preferredWidth: 170
@@ -845,7 +865,7 @@ ApplicationWindow {
                 }
 
                 MenuActionButton {
-                    iconText: "\uD83D\uDD0A"
+                    iconText: blanky.appearanceMode === "monochrome" ? "♪" : "\uD83D\uDD0A"
                     labelText: t("repeatTts")
                     enabled: blanky.canRepeatTts
                     Layout.fillWidth: true
@@ -863,7 +883,7 @@ ApplicationWindow {
                 }
 
                 MenuActionButton {
-                    text: "\uD83E\uDDF9 " + t("clearInteraction")
+                    text: (blanky.appearanceMode === "monochrome" ? "× " : "\uD83E\uDDF9 ") + t("clearInteraction")
                     Layout.fillWidth: true
                     Layout.preferredWidth: 110
                     Layout.minimumWidth: 95
@@ -1146,6 +1166,7 @@ ApplicationWindow {
                     expandedView: root.activeView === "operation"
                     language: blanky.language
                     dark: root.dark
+                    monochrome: blanky.appearanceMode === "monochrome"
                     panelColor: root.panelColor
                     panelAltColor: root.panelAltColor
                     borderColor: root.borderColor
@@ -1233,8 +1254,8 @@ ApplicationWindow {
                 Row {
                     spacing: 7
                     MenuActionButton { id: appearanceMenuButton; iconText: root.appearanceIcon(); width: 48; height: 42; textPixelSize: 20; accentColor: root.accentColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; toolTip: t("tooltipAppearance"); KeyNavigation.tab: portugueseMenuButton; onClicked: appearancePanel.open() }
-                    MenuActionButton { id: portugueseMenuButton; text: "🇵🇹"; width: 50; height: 42; textPixelSize: 18; accentColor: blanky.language === "pt" ? root.successColor : root.inactiveColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; KeyNavigation.tab: englishMenuButton; onClicked: blanky.setLanguage("pt") }
-                    MenuActionButton { id: englishMenuButton; text: "🇬🇧"; width: 50; height: 42; textPixelSize: 18; accentColor: blanky.language === "en" ? root.successColor : root.inactiveColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; KeyNavigation.tab: helpMenuButton; onClicked: blanky.setLanguage("en") }
+                    MenuActionButton { id: portugueseMenuButton; text: blanky.appearanceMode === "monochrome" ? "PT" : "🇵🇹"; width: 50; height: 42; textPixelSize: 18; accentColor: blanky.language === "pt" ? root.successColor : root.inactiveColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; KeyNavigation.tab: englishMenuButton; onClicked: blanky.setLanguage("pt") }
+                    MenuActionButton { id: englishMenuButton; text: blanky.appearanceMode === "monochrome" ? "EN" : "🇬🇧"; width: 50; height: 42; textPixelSize: 18; accentColor: blanky.language === "en" ? root.successColor : root.inactiveColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; KeyNavigation.tab: helpMenuButton; onClicked: blanky.setLanguage("en") }
                 }
 
                 Item { Layout.fillWidth: true }
@@ -1274,12 +1295,6 @@ ApplicationWindow {
                             Layout.preferredHeight: Math.round(88 * root.textScale)
                             fillMode: Image.PreserveAspectFit
                             smooth: true
-
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: homeMenuFlickable.contentY = 0
-                            }
                         }
                         ColumnLayout {
                             spacing: 2
@@ -1442,7 +1457,7 @@ ApplicationWindow {
                                             anchors.left: parent.left
                                             anchors.leftMargin: parent.sideMargin
                                             anchors.verticalCenter: parent.verticalCenter
-                                            text: "🎙"
+                                            text: blanky.appearanceMode === "monochrome" ? "◉" : "🎙"
                                             color: voiceCard.strongHover ? voiceCard.hoverTextColor : voiceCard.cardAccent
                                             font.pixelSize: Math.round(42 * root.textScale)
                                             horizontalAlignment: Text.AlignHCenter
@@ -1580,7 +1595,7 @@ ApplicationWindow {
 
                                 Button {
                                     id: operationCard
-                                    readonly property color cardAccent: "#cf8cff"
+                                    readonly property color cardAccent: root.operationCardColor
                                     readonly property bool strongHover: hovered && blanky.hoverAnimationsEnabled
                                     readonly property color hoverTextColor: root.hoverForeground(cardAccent)
                                     Layout.fillWidth: true
@@ -1834,7 +1849,7 @@ ApplicationWindow {
                 width: parent.width
                 height: 12
                 radius: 6
-                color: root.dark ? "#0a1a26" : "#b4cad8"
+                color: root.panelAltColor
                 border.color: root.borderColor
                 border.width: 1
 
@@ -1842,7 +1857,7 @@ ApplicationWindow {
                     width: parent.width * root.systemTransitionProgress / 100
                     height: parent.height
                     radius: parent.radius
-                    color: root.systemTransitionAction === "shutdown" ? "#ff6b6b" : "#48d66b"
+                    color: root.systemTransitionAction === "shutdown" ? root.errorColor : root.successColor
                     Behavior on width { NumberAnimation { duration: 60 } }
                 }
             }
@@ -1910,7 +1925,7 @@ ApplicationWindow {
 
         Rectangle {
             anchors.fill: parent
-            color: root.dark ? "#000308" : "#18384d"
+            color: blanky.appearanceMode === "monochrome" ? "#000000" : (root.dark ? "#000308" : "#18384d")
             opacity: root.dark ? 0.45 : 0.28
         }
 
@@ -1963,10 +1978,10 @@ ApplicationWindow {
                 spacing: 8
 
                 MenuActionButton {
-                    text: "\uD83D\uDC22 " + t("slow")
+                    text: (blanky.appearanceMode === "monochrome" ? "◁ " : "\uD83D\uDC22 ") + t("slow")
                     Layout.fillWidth: true
                     Layout.preferredHeight: 36
-                    accentColor: blanky.ttsSpeed < 0.9 ? "#48d66b" : root.borderColor
+                    accentColor: blanky.ttsSpeed < 0.9 ? root.successColor : root.borderColor
                     textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor
                     onClicked: { blanky.setTtsSpeed(0.8); ttsSpeedPopover.close() }
                 }
@@ -1974,7 +1989,7 @@ ApplicationWindow {
                     text: "\u25B6 " + t("normal")
                     Layout.fillWidth: true
                     Layout.preferredHeight: 36
-                    accentColor: blanky.ttsSpeed >= 0.9 && blanky.ttsSpeed <= 1.1 ? "#48d66b" : root.borderColor
+                    accentColor: blanky.ttsSpeed >= 0.9 && blanky.ttsSpeed <= 1.1 ? root.successColor : root.borderColor
                     textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor
                     onClicked: { blanky.setTtsSpeed(1.0); ttsSpeedPopover.close() }
                 }
@@ -1982,7 +1997,7 @@ ApplicationWindow {
                     text: "\u26A1 " + t("fast")
                     Layout.fillWidth: true
                     Layout.preferredHeight: 36
-                    accentColor: blanky.ttsSpeed > 1.1 ? "#48d66b" : root.borderColor
+                    accentColor: blanky.ttsSpeed > 1.1 ? root.successColor : root.borderColor
                     textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor
                     onClicked: { blanky.setTtsSpeed(1.2); ttsSpeedPopover.close() }
                 }
@@ -2047,7 +2062,7 @@ ApplicationWindow {
                     textVerticalOffset: 1
                     Layout.preferredWidth: 34
                     Layout.preferredHeight: 34
-                    accentColor: blanky.soundEnabled ? "#63cbff" : "#ff6b6b"
+                    accentColor: blanky.soundEnabled ? root.accentColor : root.errorColor
                     textColor: root.textColor
                     mutedText: root.mutedText
                     borderColor: root.borderColor
@@ -2079,13 +2094,13 @@ ApplicationWindow {
                         implicitHeight: 6
                         height: implicitHeight
                         radius: 3
-                        color: root.dark ? "#40515e" : "#91a5b3"
+                        color: root.inactiveColor
 
                         Rectangle {
                             width: parent.width * volumePopoverSlider.visualPosition
                             height: parent.height
                             radius: parent.radius
-                            color: "#49bdf4"
+                            color: root.accentColor
                         }
                     }
 
@@ -2095,8 +2110,8 @@ ApplicationWindow {
                         width: 15
                         height: 15
                         radius: 7.5
-                        color: root.dark ? "#edf9ff" : "#145f88"
-                        border.color: "#49bdf4"
+                        color: root.textColor
+                        border.color: root.accentColor
                         border.width: 2
                     }
                 }
@@ -2168,7 +2183,7 @@ ApplicationWindow {
                                 Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: root.borderColor }
                                 Label {
                                     text: modelData.title
-                                    color: root.dark ? "#82d6ff" : "#0d5d8b"
+                                    color: root.accentColor
                                     font.pixelSize: 15
                                     font.bold: true
                                 }
@@ -2189,7 +2204,7 @@ ApplicationWindow {
                                         readonly property bool hovered: commandHelpCardMouse.containsMouse
                                         readonly property bool strongHover: hovered && blanky.hoverAnimationsEnabled
                                         readonly property real commandLuminance: 0.2126 * commandColor.r + 0.7152 * commandColor.g + 0.0722 * commandColor.b
-                                        readonly property color hoverTextColor: commandLuminance > 0.62 ? "#07111a" : "#f7fbff"
+                                        readonly property color hoverTextColor: commandLuminance > 0.62 ? "#101010" : "#ffffff"
                                         Layout.preferredWidth: (parent.width - parent.columnSpacing) / 2
                                         Layout.preferredHeight: 122
                                         radius: 11
@@ -2325,7 +2340,7 @@ ApplicationWindow {
                             readonly property bool hovered: appearanceModeMouse.containsMouse
                             readonly property bool strongHover: hovered && blanky.hoverAnimationsEnabled
                             readonly property real modeLuminance: 0.2126 * modeColor.r + 0.7152 * modeColor.g + 0.0722 * modeColor.b
-                            readonly property color hoverTextColor: modeLuminance > 0.62 ? "#07111a" : "#f7fbff"
+                            readonly property color hoverTextColor: modeLuminance > 0.62 ? "#101010" : "#ffffff"
                             Layout.fillWidth: true
                             Layout.preferredHeight: Math.round(74 * root.controlScale)
                             radius: 10
@@ -2587,7 +2602,7 @@ ApplicationWindow {
                         readonly property bool hovered: colorVisionProfileMouse.containsMouse
                         readonly property bool strongHover: hovered && blanky.hoverAnimationsEnabled
                         readonly property real profileLuminance: 0.2126 * modelData.tone.r + 0.7152 * modelData.tone.g + 0.0722 * modelData.tone.b
-                        readonly property color hoverTextColor: profileLuminance > 0.62 ? "#07111a" : "#f7fbff"
+                        readonly property color hoverTextColor: profileLuminance > 0.62 ? "#101010" : "#ffffff"
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         Layout.minimumHeight: 102
@@ -2837,10 +2852,10 @@ ApplicationWindow {
                         readonly property bool selectedVoice: modelData === blanky.ttsVoice
                         readonly property bool hovered: voiceCardMouse.containsMouse
                         readonly property bool strongHover: hovered && blanky.hoverAnimationsEnabled
-                        readonly property real successLuminance: 0.2126 * root.successColor.r + 0.7152 * root.successColor.g + 0.0722 * root.successColor.b
-                        readonly property color hoverTextColor: successLuminance > 0.62 ? "#07111a" : "#f7fbff"
-                        color: strongHover ? root.successColor : (hovered ? Qt.lighter(root.panelAltColor, 1.16) : (selectedVoice ? Qt.lighter(root.panelAltColor, 1.35) : root.panelAltColor))
-                        border.color: selectedVoice || strongHover ? root.successColor : root.borderColor
+                        readonly property color voiceAccent: root.voiceTone(modelData)
+                        readonly property color hoverTextColor: root.hoverForeground(voiceAccent)
+                        color: strongHover ? voiceAccent : (hovered ? Qt.lighter(root.panelAltColor, 1.16) : (selectedVoice ? Qt.lighter(root.panelAltColor, 1.35) : root.panelAltColor))
+                        border.color: selectedVoice || strongHover ? voiceAccent : root.borderColor
                         border.width: selectedVoice || strongHover ? 2 : 1
                         scale: strongHover ? 1.012 : 1.0
                         z: strongHover ? 1 : 0
@@ -2869,35 +2884,57 @@ ApplicationWindow {
 
                                 Label {
                                     text: selectedVoice ? "●" : "○"
-                                    color: strongHover ? hoverTextColor : (selectedVoice ? root.successColor : root.mutedText)
+                                    color: strongHover ? hoverTextColor : (selectedVoice ? voiceAccent : root.mutedText)
                                     font.pixelSize: 18
                                     font.bold: true
                                 }
 
-                                Label {
-                                    text: root.voiceName(modelData)
-                                    color: strongHover ? hoverTextColor : root.textColor
-                                    font.pixelSize: 17
-                                    font.bold: true
+                                Rectangle {
+                                    Layout.preferredWidth: 36
+                                    Layout.preferredHeight: 36
+                                    radius: 18
+                                    color: strongHover ? "transparent" : Qt.rgba(voiceAccent.r, voiceAccent.g, voiceAccent.b, 0.10)
+                                    border.color: strongHover ? hoverTextColor : voiceAccent
+                                    border.width: 1
+
+                                    Label {
+                                        anchors.centerIn: parent
+                                        text: root.voiceIcon(modelData)
+                                        color: strongHover ? hoverTextColor : voiceAccent
+                                        font.pixelSize: 19
+                                        font.bold: true
+                                    }
+                                }
+
+                                ColumnLayout {
                                     Layout.fillWidth: true
+                                    spacing: 1
+
+                                    Label {
+                                        Layout.fillWidth: true
+                                        text: root.voiceName(modelData)
+                                        color: strongHover ? hoverTextColor : root.textColor
+                                        font.pixelSize: 17
+                                        font.bold: true
+                                    }
+
+                                    Label {
+                                        Layout.fillWidth: true
+                                        text: root.voiceMood(modelData)
+                                        color: strongHover ? hoverTextColor : voiceAccent
+                                        font.pixelSize: 11
+                                        font.bold: true
+                                        elide: Text.ElideRight
+                                    }
                                 }
 
                                 Label {
                                     visible: selectedVoice
                                     text: t("selected")
-                                    color: strongHover ? hoverTextColor : root.successColor
+                                    color: strongHover ? hoverTextColor : voiceAccent
                                     font.pixelSize: 10
                                     font.bold: true
                                 }
-                            }
-
-                            Label {
-                                Layout.fillWidth: true
-                                text: root.voiceMood(modelData)
-                                color: strongHover ? hoverTextColor : root.mutedText
-                                font.pixelSize: 11
-                                font.bold: true
-                                elide: Text.ElideRight
                             }
 
                             Label {
@@ -2914,7 +2951,7 @@ ApplicationWindow {
                                 Layout.preferredWidth: 150
                                 Layout.preferredHeight: 34
                                 text: "\u25B6 " + t("previewVoice")
-                                        accentColor: root.accentColor
+                                accentColor: voiceAccent
                                 textColor: root.textColor
                                 mutedText: root.mutedText
                                 borderColor: root.borderColor
@@ -3003,7 +3040,7 @@ ApplicationWindow {
                                 text: "\u25CF " + t("automaticMode")
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 36
-                                accentColor: blanky.audioSettingsMode === "auto" ? "#48d66b" : root.borderColor
+                                accentColor: blanky.audioSettingsMode === "auto" ? root.successColor : root.borderColor
                                 textColor: root.textColor
                                 mutedText: root.mutedText
                                 borderColor: root.borderColor
@@ -3015,7 +3052,7 @@ ApplicationWindow {
                                 text: "\u270E " + t("manualMode")
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 36
-                                accentColor: blanky.audioSettingsMode === "manual" ? "#f8c25d" : root.borderColor
+                                accentColor: blanky.audioSettingsMode === "manual" ? root.warningColor : root.borderColor
                                 textColor: root.textColor
                                 mutedText: root.mutedText
                                 borderColor: root.borderColor
@@ -3041,7 +3078,7 @@ ApplicationWindow {
                                 text: t("simple")
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 34
-                                accentColor: blanky.audioSelectedProfile === "simple" ? "#48d66b" : root.borderColor
+                                accentColor: blanky.audioSelectedProfile === "simple" ? root.successColor : root.borderColor
                                 textColor: root.textColor
                                 mutedText: root.mutedText
                                 borderColor: root.borderColor
@@ -3053,7 +3090,7 @@ ApplicationWindow {
                                 text: t("balanced")
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 34
-                                accentColor: blanky.audioSelectedProfile === "balanced" ? "#63cbff" : root.borderColor
+                                accentColor: blanky.audioSelectedProfile === "balanced" ? root.accentColor : root.borderColor
                                 textColor: root.textColor
                                 mutedText: root.mutedText
                                 borderColor: root.borderColor
@@ -3065,7 +3102,7 @@ ApplicationWindow {
                                 text: t("noisy")
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 34
-                                accentColor: blanky.audioSelectedProfile === "noisy" ? "#f8c25d" : root.borderColor
+                                accentColor: blanky.audioSelectedProfile === "noisy" ? root.warningColor : root.borderColor
                                 textColor: root.textColor
                                 mutedText: root.mutedText
                                 borderColor: root.borderColor
@@ -3104,7 +3141,7 @@ ApplicationWindow {
                             }
                             Label {
                                 text: blanky.audioSettingsMode === "manual" ? t("manualMode") : t("automaticMode")
-                                color: blanky.audioSettingsMode === "manual" ? "#f8c25d" : "#48d66b"
+                                color: blanky.audioSettingsMode === "manual" ? root.warningColor : root.successColor
                                 font.pixelSize: 12
                                 font.bold: true
                             }
@@ -3121,7 +3158,7 @@ ApplicationWindow {
                                 RowLayout {
                                     width: parent.width
                                     Label { text: t("startSensitivity"); color: root.textColor; font.bold: true; Layout.fillWidth: true }
-                                    MenuActionButton { id: sensitivityUnlock; visible: !root.audioSettingIsEditable("sensitivity"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("sensitivity") }
+                                    MenuActionButton { id: sensitivityUnlock; visible: !root.audioSettingIsEditable("sensitivity"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: root.warningColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("sensitivity") }
                                     Label { text: Math.round(blanky.micSensitivity); color: root.mutedText; font.bold: true }
                                 }
                                 Slider { width: parent.width; from: 0; to: 100; stepSize: 1; value: blanky.micSensitivity; enabled: root.audioSettingIsEditable("sensitivity"); onMoved: blanky.setMicSensitivity(value) }
@@ -3139,7 +3176,7 @@ ApplicationWindow {
                                 RowLayout {
                                     width: parent.width
                                     Label { text: t("maxWait"); color: root.textColor; font.bold: true; Layout.fillWidth: true }
-                                    MenuActionButton { id: waitUnlock; visible: !root.audioSettingIsEditable("wait"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("wait") }
+                                    MenuActionButton { id: waitUnlock; visible: !root.audioSettingIsEditable("wait"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: root.warningColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("wait") }
                                     Label { text: formatFixed(blanky.micWaitForSpeech, 2) + " s"; color: root.mutedText; font.bold: true }
                                 }
                                 Slider { width: parent.width; from: 0.35; to: 2.50; stepSize: 0.05; value: blanky.micWaitForSpeech; enabled: root.audioSettingIsEditable("wait"); onMoved: blanky.setMicWaitForSpeech(value) }
@@ -3157,7 +3194,7 @@ ApplicationWindow {
                                 RowLayout {
                                     width: parent.width
                                     Label { text: t("minimumCommand"); color: root.textColor; font.bold: true; Layout.fillWidth: true }
-                                    MenuActionButton { id: minimumUnlock; visible: !root.audioSettingIsEditable("minimum"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("minimum") }
+                                    MenuActionButton { id: minimumUnlock; visible: !root.audioSettingIsEditable("minimum"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: root.warningColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("minimum") }
                                     Label { text: formatFixed(blanky.micMinCommand, 2) + " s"; color: root.mutedText; font.bold: true }
                                 }
                                 Slider { width: parent.width; from: 0.25; to: 1.80; stepSize: 0.05; value: blanky.micMinCommand; enabled: root.audioSettingIsEditable("minimum"); onMoved: blanky.setMicMinCommand(value) }
@@ -3175,7 +3212,7 @@ ApplicationWindow {
                                 RowLayout {
                                     width: parent.width
                                     Label { text: t("silenceHold"); color: root.textColor; font.bold: true; Layout.fillWidth: true }
-                                    MenuActionButton { id: silenceUnlock; visible: !root.audioSettingIsEditable("silence"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("silence") }
+                                    MenuActionButton { id: silenceUnlock; visible: !root.audioSettingIsEditable("silence"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: root.warningColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("silence") }
                                     Label { text: formatFixed(blanky.micSilenceHold, 2) + " s"; color: root.mutedText; font.bold: true }
                                 }
                                 Slider { width: parent.width; from: 0.18; to: 1.00; stepSize: 0.05; value: blanky.micSilenceHold; enabled: root.audioSettingIsEditable("silence"); onMoved: blanky.setMicSilenceHold(value) }
@@ -3193,7 +3230,7 @@ ApplicationWindow {
                                 RowLayout {
                                     width: parent.width
                                     Label { text: t("microphoneGain"); color: root.textColor; font.bold: true; Layout.fillWidth: true }
-                                    MenuActionButton { id: gainUnlock; visible: !root.audioSettingIsEditable("gain"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("gain") }
+                                    MenuActionButton { id: gainUnlock; visible: !root.audioSettingIsEditable("gain"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: root.warningColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("gain") }
                                     Label { text: formatFixed(blanky.micMaxGain, 2) + "x"; color: root.mutedText; font.bold: true }
                                 }
                                 Slider { width: parent.width; from: 1.0; to: 6.0; stepSize: 0.1; value: blanky.micMaxGain; enabled: root.audioSettingIsEditable("gain"); onMoved: blanky.setMicMaxGain(value) }
@@ -3209,7 +3246,7 @@ ApplicationWindow {
                             BlankyToolTip { visible: highPassHintHover.hovered && !highPassUnlock.hovered; text: t("highPassHelp"); surfaceColor: root.panelAltColor; outlineColor: root.borderColor; foregroundColor: root.textColor }
                             Switch { checked: blanky.micHighpassEnabled; enabled: root.audioSettingIsEditable("highpass"); onClicked: blanky.setMicHighpassEnabled(checked) }
                             Label { text: t("highPass"); color: root.textColor; Layout.fillWidth: true }
-                            MenuActionButton { id: highPassUnlock; visible: !root.audioSettingIsEditable("highpass"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("highpass") }
+                            MenuActionButton { id: highPassUnlock; visible: !root.audioSettingIsEditable("highpass"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: root.warningColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("highpass") }
                         }
                         RowLayout {
                             width: parent.width
@@ -3218,7 +3255,7 @@ ApplicationWindow {
                             BlankyToolTip { visible: noiseGateHintHover.hovered && !noiseGateUnlock.hovered; text: t("noiseGateHelp"); surfaceColor: root.panelAltColor; outlineColor: root.borderColor; foregroundColor: root.textColor }
                             Switch { checked: blanky.micNoiseGateEnabled; enabled: root.audioSettingIsEditable("gate"); onClicked: blanky.setMicNoiseGateEnabled(checked) }
                             Label { text: t("noiseGate"); color: root.textColor; Layout.fillWidth: true }
-                            MenuActionButton { id: noiseGateUnlock; visible: !root.audioSettingIsEditable("gate"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("gate") }
+                            MenuActionButton { id: noiseGateUnlock; visible: !root.audioSettingIsEditable("gate"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: root.warningColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("gate") }
                         }
                         RowLayout {
                             width: parent.width
@@ -3227,7 +3264,7 @@ ApplicationWindow {
                             BlankyToolTip { visible: noiseReductionHintHover.hovered && !noiseReductionUnlock.hovered; text: t("noiseReductionHelp"); surfaceColor: root.panelAltColor; outlineColor: root.borderColor; foregroundColor: root.textColor }
                             Switch { checked: blanky.micNoiseReductionEnabled; enabled: root.audioSettingIsEditable("reduction"); onClicked: blanky.setMicNoiseReductionEnabled(checked) }
                             Label { text: t("noiseReduction"); color: root.textColor; Layout.fillWidth: true }
-                            MenuActionButton { id: noiseReductionUnlock; visible: !root.audioSettingIsEditable("reduction"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("reduction") }
+                            MenuActionButton { id: noiseReductionUnlock; visible: !root.audioSettingIsEditable("reduction"); text: "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 25; Layout.preferredHeight: 24; accentColor: root.warningColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockAudioSetting"); onClicked: root.unlockAudioSetting("reduction") }
                         }
                     }
                 }
@@ -3239,7 +3276,7 @@ ApplicationWindow {
                         text: "\u266B " + t("testBeep")
                         Layout.preferredWidth: 150
                         Layout.preferredHeight: 36
-                        accentColor: "#63cbff"
+                        accentColor: root.accentColor
                         textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor
                         onClicked: blanky.testBeep()
                     }
@@ -3256,7 +3293,7 @@ ApplicationWindow {
                         text: "\u2261 " + t("viewAudioLogs")
                         Layout.preferredWidth: 135
                         Layout.preferredHeight: 36
-                        accentColor: "#f8c25d"
+                        accentColor: root.warningColor
                         textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor
                         onClicked: audioLogsPanel.open()
                     }
@@ -3320,7 +3357,7 @@ ApplicationWindow {
                                 color: Qt.darker(root.accentColor, 1.65)
                                 border.color: root.accentColor
                                 border.width: 1
-                                Label { anchors.centerIn: parent; text: "\uD83C\uDFA4"; color: root.textColor; font.pixelSize: 28 }
+                                Label { anchors.centerIn: parent; text: blanky.appearanceMode === "monochrome" ? "◉" : "\uD83C\uDFA4"; color: root.textColor; font.pixelSize: 28 }
                             }
                             Item { Layout.fillWidth: true }
                             Label { text: "\u203A"; color: root.accentColor; font.pixelSize: 34; font.bold: true }
@@ -3370,7 +3407,7 @@ ApplicationWindow {
                                 color: Qt.darker(root.successColor, 1.65)
                                 border.color: root.successColor
                                 border.width: 1
-                                Label { anchors.centerIn: parent; text: "\uD83D\uDD17"; color: root.textColor; font.pixelSize: 28 }
+                                Label { anchors.centerIn: parent; text: blanky.appearanceMode === "monochrome" ? "↔" : "\uD83D\uDD17"; color: root.textColor; font.pixelSize: 28 }
                             }
                             Item { Layout.fillWidth: true }
                             Label { text: "\u203A"; color: root.successColor; font.pixelSize: 34; font.bold: true }
@@ -3481,7 +3518,7 @@ ApplicationWindow {
                         Layout.fillWidth: true; Layout.preferredHeight: 88; radius: 12
                         color: root.panelAltColor; border.color: root.borderColor; border.width: 1
                         Column { anchors.fill: parent; anchors.margins: 11; spacing: 5
-                            Label { text: "\uD83C\uDFA4 " + t("microphone"); color: root.textColor; font.bold: true; font.pixelSize: 14 }
+                            Label { text: (blanky.appearanceMode === "monochrome" ? "◉ " : "\uD83C\uDFA4 ") + t("microphone"); color: root.textColor; font.bold: true; font.pixelSize: 14 }
                             Label { text: t("automaticMicrophoneInfo"); color: root.mutedText; wrapMode: Text.WordWrap; width: parent.width; font.pixelSize: 12 }
                         }
                     }
@@ -3489,7 +3526,7 @@ ApplicationWindow {
                         Layout.fillWidth: true; Layout.preferredHeight: 88; radius: 12
                         color: root.panelAltColor; border.color: root.borderColor; border.width: 1
                         Column { anchors.fill: parent; anchors.margins: 11; spacing: 5
-                            Label { text: "\uD83D\uDCF1 " + t("mqttPhone"); color: root.textColor; font.bold: true; font.pixelSize: 14 }
+                            Label { text: (blanky.appearanceMode === "monochrome" ? "▯ " : "\uD83D\uDCF1 ") + t("mqttPhone"); color: root.textColor; font.bold: true; font.pixelSize: 14 }
                             Label { text: t("automaticPhoneInfo"); color: root.mutedText; wrapMode: Text.WordWrap; width: parent.width; font.pixelSize: 12 }
                         }
                     }
@@ -3526,8 +3563,8 @@ ApplicationWindow {
                         anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 11
                         spacing: 8
                         RowLayout { width: parent.width
-                            Label { text: "\uD83D\uDCE1 " + t("mqttBrokerSettings"); color: root.textColor; font.bold: true; font.pixelSize: 14; Layout.fillWidth: true }
-                            MenuActionButton { text: communicationsSettingsPanel.mqttEditable ? "\u2713" : "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 28; Layout.preferredHeight: 26; accentColor: communicationsSettingsPanel.mqttEditable ? root.successColor : "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockCommunicationSetting"); onClicked: communicationsSettingsPanel.mqttEditable = !communicationsSettingsPanel.mqttEditable }
+                            Label { text: (blanky.appearanceMode === "monochrome" ? "↔ " : "\uD83D\uDCE1 ") + t("mqttBrokerSettings"); color: root.textColor; font.bold: true; font.pixelSize: 14; Layout.fillWidth: true }
+                            MenuActionButton { text: communicationsSettingsPanel.mqttEditable ? "\u2713" : "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 28; Layout.preferredHeight: 26; accentColor: communicationsSettingsPanel.mqttEditable ? root.successColor : root.warningColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockCommunicationSetting"); onClicked: communicationsSettingsPanel.mqttEditable = !communicationsSettingsPanel.mqttEditable }
                         }
                         Label { text: t("mqttBrokerHelp"); color: root.mutedText; width: parent.width; wrapMode: Text.WordWrap; font.pixelSize: 12 }
                         RowLayout { width: parent.width; spacing: 8
@@ -3551,8 +3588,8 @@ ApplicationWindow {
                         anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 11
                         spacing: 8
                         RowLayout { width: parent.width
-                            Label { text: "\uD83D\uDD17 " + t("opcuaSettings"); color: root.textColor; font.bold: true; font.pixelSize: 14; Layout.fillWidth: true }
-                            MenuActionButton { text: communicationsSettingsPanel.opcuaEditable ? "\u2713" : "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 28; Layout.preferredHeight: 26; accentColor: communicationsSettingsPanel.opcuaEditable ? root.successColor : "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockCommunicationSetting"); onClicked: communicationsSettingsPanel.opcuaEditable = !communicationsSettingsPanel.opcuaEditable }
+                            Label { text: (blanky.appearanceMode === "monochrome" ? "↔ " : "\uD83D\uDD17 ") + t("opcuaSettings"); color: root.textColor; font.bold: true; font.pixelSize: 14; Layout.fillWidth: true }
+                            MenuActionButton { text: communicationsSettingsPanel.opcuaEditable ? "\u2713" : "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 28; Layout.preferredHeight: 26; accentColor: communicationsSettingsPanel.opcuaEditable ? root.successColor : root.warningColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockCommunicationSetting"); onClicked: communicationsSettingsPanel.opcuaEditable = !communicationsSettingsPanel.opcuaEditable }
                         }
                         Label { text: t("opcuaHelp"); color: root.mutedText; width: parent.width; wrapMode: Text.WordWrap; font.pixelSize: 12 }
                         TextField { id: opcuaUrlField; width: parent.width; enabled: communicationsSettingsPanel.opcuaEditable; placeholderText: t("opcuaEndpoint"); color: root.textColor; placeholderTextColor: root.mutedText; background: Rectangle { radius: 7; color: opcuaUrlField.enabled ? root.panelColor : root.panelAltColor; border.color: opcuaUrlField.enabled ? root.warningColor : root.borderColor; border.width: 1 } }
@@ -3572,9 +3609,9 @@ ApplicationWindow {
                         anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 11
                         spacing: 8
                         RowLayout { width: parent.width
-                            Label { text: "\u2728 " + t("openAiSettings"); color: root.textColor; font.bold: true; font.pixelSize: 14; Layout.fillWidth: true }
+                            Label { text: (blanky.appearanceMode === "monochrome" ? "✦ " : "\u2728 ") + t("openAiSettings"); color: root.textColor; font.bold: true; font.pixelSize: 14; Layout.fillWidth: true }
                             Label { text: blanky.openAiKeyConfigured ? t("apiKeyConfigured") : t("apiKeyMissing"); color: blanky.openAiKeyConfigured ? root.successColor : root.warningColor; font.bold: true; font.pixelSize: 12 }
-                            MenuActionButton { text: communicationsSettingsPanel.aiEditable ? "\u2713" : "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 28; Layout.preferredHeight: 26; accentColor: communicationsSettingsPanel.aiEditable ? root.successColor : "#f8c25d"; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockCommunicationSetting"); onClicked: communicationsSettingsPanel.aiEditable = !communicationsSettingsPanel.aiEditable }
+                            MenuActionButton { text: communicationsSettingsPanel.aiEditable ? "\u2713" : "\u270E"; iconOnly: true; textPixelSize: 13; Layout.preferredWidth: 28; Layout.preferredHeight: 26; accentColor: communicationsSettingsPanel.aiEditable ? root.successColor : root.warningColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor; toolTip: t("unlockCommunicationSetting"); onClicked: communicationsSettingsPanel.aiEditable = !communicationsSettingsPanel.aiEditable }
                         }
                         Label { text: t("openAiKeyHelp"); color: root.mutedText; width: parent.width; wrapMode: Text.WordWrap; font.pixelSize: 12 }
                         RowLayout { width: parent.width; spacing: 8
