@@ -292,18 +292,6 @@ ApplicationWindow {
         systemTransitionAction = ""
     }
 
-    function volumeGlyph() {
-        if (blanky.appearanceMode === "monochrome")
-            return !blanky.soundEnabled || blanky.soundVolume <= 0.01 ? "∅" : "♪"
-        if (!blanky.soundEnabled || blanky.soundVolume <= 0.01)
-            return "\uD83D\uDD07"
-        if (blanky.soundVolume < 0.34)
-            return "\uD83D\uDD08"
-        if (blanky.soundVolume < 0.67)
-            return "\uD83D\uDD09"
-        return "\uD83D\uDD0A"
-    }
-
     function ttsSpeedLabel() {
         if (blanky.ttsSpeed < 0.9)
             return t("slow")
@@ -563,6 +551,7 @@ ApplicationWindow {
 
                 MenuActionButton {
                     iconText: root.appearanceIcon()
+                    iconKind: blanky.appearanceMode === "colorblind" ? "ring" : ""
                     width: 50
                     height: 44
                     textPixelSize: 22
@@ -646,12 +635,11 @@ ApplicationWindow {
                 spacing: 7
 
                 MenuActionButton {
-                    iconText: root.volumeGlyph()
+                    iconKind: "volume"
+                    iconMuted: !blanky.soundEnabled || blanky.soundVolume <= 0.01
                     width: 50
                     height: 44
                     textPixelSize: 22
-                    textHorizontalOffset: 1
-                    textVerticalOffset: 1
                     accentColor: blanky.soundEnabled ? root.accentColor : root.inactiveColor
                     textColor: root.textColor
                     mutedText: root.mutedText
@@ -690,18 +678,17 @@ ApplicationWindow {
                 }
 
                 MenuActionButton {
-                    iconText: "\u23FB"
+                    iconKind: "home"
                     width: 50
                     height: 44
                     textPixelSize: 21
-                    textVerticalOffset: 1
-                    accentColor: root.errorColor
+                    accentColor: root.accentColor
                     textColor: root.textColor
                     mutedText: root.mutedText
                     borderColor: root.borderColor
                     panelColor: root.panelAltColor
-                    toolTip: t("tooltipShutdown")
-                    onClicked: root.beginSystemTransition("shutdown")
+                    toolTip: blanky.language === "pt" ? "Voltar ao Menu Inicial" : "Return to Main Menu"
+                    onClicked: root.returnToHomeMenu()
                 }
             }
         }
@@ -830,7 +817,7 @@ ApplicationWindow {
                 }
 
                 MenuActionButton {
-                    iconText: blanky.appearanceMode === "monochrome" ? "◖" : "\uD83D\uDDE3"
+                    iconKind: "microphone"
                     labelText: t("voiceButton") + ": <b>" + root.voiceLabel() + "</b>"
                     Layout.fillWidth: true
                     Layout.preferredWidth: 170
@@ -865,7 +852,7 @@ ApplicationWindow {
                 }
 
                 MenuActionButton {
-                    iconText: blanky.appearanceMode === "monochrome" ? "♪" : "\uD83D\uDD0A"
+                    iconKind: "volume"
                     labelText: t("repeatTts")
                     enabled: blanky.canRepeatTts
                     Layout.fillWidth: true
@@ -1253,7 +1240,7 @@ ApplicationWindow {
 
                 Row {
                     spacing: 7
-                    MenuActionButton { id: appearanceMenuButton; iconText: root.appearanceIcon(); width: 48; height: 42; textPixelSize: 20; accentColor: root.accentColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; toolTip: t("tooltipAppearance"); KeyNavigation.tab: portugueseMenuButton; onClicked: appearancePanel.open() }
+                    MenuActionButton { id: appearanceMenuButton; iconText: root.appearanceIcon(); iconKind: blanky.appearanceMode === "colorblind" ? "ring" : ""; width: 48; height: 42; textPixelSize: 20; accentColor: root.accentColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; toolTip: t("tooltipAppearance"); KeyNavigation.tab: portugueseMenuButton; onClicked: appearancePanel.open() }
                     MenuActionButton { id: portugueseMenuButton; text: blanky.appearanceMode === "monochrome" ? "PT" : "🇵🇹"; width: 50; height: 42; textPixelSize: 18; accentColor: blanky.language === "pt" ? root.successColor : root.inactiveColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; KeyNavigation.tab: englishMenuButton; onClicked: blanky.setLanguage("pt") }
                     MenuActionButton { id: englishMenuButton; text: blanky.appearanceMode === "monochrome" ? "EN" : "🇬🇧"; width: 50; height: 42; textPixelSize: 18; accentColor: blanky.language === "en" ? root.successColor : root.inactiveColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; KeyNavigation.tab: helpMenuButton; onClicked: blanky.setLanguage("en") }
                 }
@@ -1264,7 +1251,7 @@ ApplicationWindow {
                     spacing: 7
                     MenuActionButton { id: helpMenuButton; text: "?"; width: 48; height: 42; textPixelSize: 20; accentColor: root.accentColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; toolTip: blanky.language === "pt" ? "Ajuda / Tutorial" : "Help / Tutorial"; KeyNavigation.tab: settingsMenuButton; onClicked: { helpPanel.showHome(); helpPanel.open() } }
                     MenuActionButton { id: settingsMenuButton; iconText: "⚙"; width: 48; height: 42; textPixelSize: 20; accentColor: root.accentColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; toolTip: t("tooltipSettings"); KeyNavigation.tab: shutdownMenuButton; onClicked: settingsPanel.open() }
-                    MenuActionButton { id: shutdownMenuButton; iconText: "⏻"; width: 48; height: 42; textPixelSize: 20; textVerticalOffset: 1; accentColor: root.errorColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; toolTip: t("tooltipShutdown"); KeyNavigation.tab: generalCard; onClicked: root.beginSystemTransition("shutdown") }
+                    MenuActionButton { id: shutdownMenuButton; iconKind: "power"; width: 48; height: 42; textPixelSize: 20; accentColor: root.errorColor; textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelAltColor; toolTip: t("tooltipShutdown"); KeyNavigation.tab: generalCard; onClicked: root.beginSystemTransition("shutdown") }
                 }
             }
 
@@ -1404,7 +1391,7 @@ ApplicationWindow {
                                         color: generalCard.strongHover ? generalCard.hoverTextColor : root.panelColor
                                         border.color: generalCard.strongHover ? generalCard.hoverTextColor : generalCard.cardAccent
                                         border.width: 2
-                                        Label { anchors.centerIn: parent; text: "›"; color: generalCard.cardAccent; font.pixelSize: Math.round(40 * root.textScale); font.bold: true }
+                                        SymbolIcon { anchors.centerIn: parent; width: parent.width * 0.48; height: width; kind: "arrow"; iconColor: generalCard.cardAccent }
                                     }
 
                                     Column {
@@ -1473,7 +1460,7 @@ ApplicationWindow {
                                             color: voiceCard.strongHover ? voiceCard.hoverTextColor : root.panelColor
                                             border.color: voiceCard.strongHover ? voiceCard.hoverTextColor : voiceCard.cardAccent
                                             border.width: 1
-                                            Label { anchors.centerIn: parent; text: "›"; color: voiceCard.cardAccent; font.pixelSize: Math.round(29 * root.textScale); font.bold: true }
+                                            SymbolIcon { anchors.centerIn: parent; width: parent.width * 0.48; height: width; kind: "arrow"; iconColor: voiceCard.cardAccent }
                                         }
                                         Column {
                                             anchors.left: voiceCardIcon.right
@@ -1563,7 +1550,7 @@ ApplicationWindow {
                                             color: textCard.strongHover ? textCard.hoverTextColor : root.panelColor
                                             border.color: textCard.strongHover ? textCard.hoverTextColor : textCard.cardAccent
                                             border.width: 1
-                                            Label { anchors.centerIn: parent; text: "›"; color: textCard.cardAccent; font.pixelSize: Math.round(29 * root.textScale); font.bold: true }
+                                            SymbolIcon { anchors.centerIn: parent; width: parent.width * 0.48; height: width; kind: "arrow"; iconColor: textCard.cardAccent }
                                         }
                                         Column {
                                             anchors.left: textCardIcon.right
@@ -1642,7 +1629,7 @@ ApplicationWindow {
                                             color: operationCard.strongHover ? operationCard.hoverTextColor : root.panelColor
                                             border.color: operationCard.strongHover ? operationCard.hoverTextColor : operationCard.cardAccent
                                             border.width: 1
-                                            Label { anchors.centerIn: parent; text: "›"; color: operationCard.cardAccent; font.pixelSize: Math.round(29 * root.textScale); font.bold: true }
+                                            SymbolIcon { anchors.centerIn: parent; width: parent.width * 0.48; height: width; kind: "arrow"; iconColor: operationCard.cardAccent }
                                         }
                                         Column {
                                             anchors.left: operationCardIcon.right
@@ -1725,7 +1712,7 @@ ApplicationWindow {
                                             color: phoneCard.strongHover ? phoneCard.hoverTextColor : root.panelColor
                                             border.color: phoneCard.strongHover ? phoneCard.hoverTextColor : phoneCard.cardAccent
                                             border.width: 1
-                                            Label { anchors.centerIn: parent; text: "›"; color: phoneCard.cardAccent; font.pixelSize: Math.round(29 * root.textScale); font.bold: true }
+                                            SymbolIcon { anchors.centerIn: parent; width: parent.width * 0.48; height: width; kind: "arrow"; iconColor: phoneCard.cardAccent }
                                         }
                                         Column {
                                             anchors.left: phoneCardIcon.right
@@ -2055,11 +2042,9 @@ ApplicationWindow {
                 spacing: 10
 
                 MenuActionButton {
-                    text: root.volumeGlyph()
-                    iconOnly: true
+                    iconKind: "volume"
+                    iconMuted: !blanky.soundEnabled || blanky.soundVolume <= 0.01
                     textPixelSize: 15
-                    textHorizontalOffset: 1
-                    textVerticalOffset: 1
                     Layout.preferredWidth: 34
                     Layout.preferredHeight: 34
                     accentColor: blanky.soundEnabled ? root.accentColor : root.errorColor
@@ -2628,7 +2613,8 @@ ApplicationWindow {
                                 color: strongHover ? hoverTextColor : Qt.darker(modelData.tone, root.dark ? 2.8 : 1.18)
                                 border.color: strongHover ? hoverTextColor : modelData.tone
                                 border.width: 1
-                                Label { anchors.centerIn: parent; text: modelData.icon; color: modelData.tone; font.bold: true; font.pixelSize: Math.round(17 * root.textScale) }
+                                SymbolIcon { anchors.centerIn: parent; visible: modelData.id === "universal"; width: Math.round(20 * root.textScale); height: width; kind: "ring"; iconColor: modelData.tone }
+                                Label { anchors.centerIn: parent; visible: modelData.id !== "universal"; text: modelData.icon; color: modelData.tone; font.bold: true; font.pixelSize: Math.round(17 * root.textScale) }
                             }
 
                             ColumnLayout {
