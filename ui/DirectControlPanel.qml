@@ -215,11 +215,11 @@ Rectangle {
                     StatusMonitor {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
+                        Layout.topMargin: Math.round(5 * panel.readabilityScale)
                         Layout.minimumHeight: Math.round((panel.compact ? 136 : 140) * panel.readabilityScale)
                         running: panel.systemStarted
                         textScale: panel.readabilityScale
                         title: panel.t("systemMonitor")
-                        subtitle: panel.t("monitoring")
                         modeLabel: panel.t("activeMode")
                         systemLabel: panel.t("systemState")
                         processLabel: panel.t("process")

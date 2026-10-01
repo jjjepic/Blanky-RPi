@@ -8,7 +8,6 @@ Rectangle {
     property bool running: false
     property real textScale: 1.0
     property string title: ""
-    property string subtitle: ""
     property string modeLabel: ""
     property string systemLabel: ""
     property string processLabel: ""
@@ -61,24 +60,14 @@ Rectangle {
         anchors.margins: Math.round(6 * monitor.textScale)
         spacing: Math.round(4 * monitor.textScale)
 
-        RowLayout {
+        Label {
             Layout.fillWidth: true
-            spacing: Math.round(6 * monitor.textScale)
-
-            Label {
-                text: monitor.title
-                color: monitor.accentColor
-                font.bold: true
-                font.pixelSize: Math.round(14 * monitor.textScale)
-                Layout.fillWidth: true
-                elide: Text.ElideRight
-            }
-            Label {
-                text: monitor.subtitle
-                color: monitor.mutedText
-                font.pixelSize: Math.round(8 * monitor.textScale)
-                font.italic: true
-            }
+            text: monitor.title
+            color: monitor.accentColor
+            font.bold: true
+            font.pixelSize: Math.round(14 * monitor.textScale)
+            horizontalAlignment: Text.AlignHCenter
+            elide: Text.ElideRight
         }
 
         Rectangle {

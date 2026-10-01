@@ -1286,7 +1286,7 @@ ApplicationWindow {
                         ColumnLayout {
                             spacing: 2
                             Label { text: "Blanky"; color: root.accentColor; font.pixelSize: Math.round(48 * root.textScale); font.bold: true }
-                            Label { text: blanky.language === "pt" ? "Escolha a forma de interação" : "Choose an interaction method"; color: root.mutedText; font.pixelSize: Math.round(17 * root.textScale) }
+                            Label { text: blanky.language === "pt" ? "Escolhe a forma de interação" : "Choose how to interact"; color: root.mutedText; font.pixelSize: Math.round(17 * root.textScale) }
                         }
                     }
 
@@ -1306,7 +1306,7 @@ ApplicationWindow {
 
                             Label {
                                 Layout.fillWidth: true
-                                text: blanky.language === "pt" ? "Escolha uma vista" : "Choose a view"
+                                text: blanky.language === "pt" ? "Como queres interagir?" : "How would you like to interact?"
                                 color: root.textColor
                                 font.pixelSize: Math.round(28 * root.textScale)
                                 font.bold: true
@@ -1314,7 +1314,7 @@ ApplicationWindow {
                             }
                             Label {
                                 Layout.fillWidth: true
-                                text: blanky.language === "pt" ? "Todas usam o mesmo sistema, eventos e comunicações." : "All views use the same system, events and communications."
+                                text: blanky.language === "pt" ? "Todas as opções utilizam o mesmo sistema e mantêm os eventos e as comunicações ativas." : "All options use the same system and keep events and communications active."
                                 color: root.mutedText
                                 font.pixelSize: Math.round(14 * root.textScale)
                                 horizontalAlignment: Text.AlignHCenter
@@ -1402,8 +1402,8 @@ ApplicationWindow {
                                         anchors.verticalCenter: parent.verticalCenter
                                         spacing: 3
                                         Label { width: parent.width; text: blanky.language === "pt" ? "Geral" : "General"; color: generalCard.strongHover ? generalCard.hoverTextColor : root.textColor; font.pixelSize: Math.round(34 * root.textScale); font.bold: true }
-                                        Label { width: parent.width; text: blanky.language === "pt" ? "Vista completa do sistema" : "Complete system view"; color: generalCard.strongHover ? generalCard.hoverTextColor : root.textColor; font.pixelSize: Math.round(18 * root.textScale) }
-                                        Label { width: parent.width; text: blanky.language === "pt" ? "VISÃO GLOBAL  •  MONITORIZAÇÃO  •  CONTROLO" : "GLOBAL VIEW  •  MONITORING  •  CONTROL"; color: generalCard.strongHover ? generalCard.hoverTextColor : generalCard.cardAccent; font.pixelSize: Math.round(11 * root.textScale); font.bold: true; font.letterSpacing: 1.4; elide: Text.ElideRight }
+                                        Label { width: parent.width; text: blanky.language === "pt" ? "Visão completa do sistema" : "Complete system overview"; color: generalCard.strongHover ? generalCard.hoverTextColor : root.textColor; font.pixelSize: Math.round(18 * root.textScale) }
+                                        Label { width: parent.width; text: blanky.language === "pt" ? "MONITORIZAÇÃO  •  CONTROLO  •  COMUNICAÇÕES" : "MONITORING  •  CONTROL  •  COMMUNICATIONS"; color: generalCard.strongHover ? generalCard.hoverTextColor : generalCard.cardAccent; font.pixelSize: Math.round(11 * root.textScale); font.bold: true; font.letterSpacing: 1.4; elide: Text.ElideRight }
                                     }
                                 }
                             }
@@ -1478,7 +1478,7 @@ ApplicationWindow {
                                             }
                                             Label {
                                                 width: parent.width
-                                                text: blanky.language === "pt" ? "Comandos de voz e resposta falada" : "Voice commands and spoken response"
+                                                text: blanky.language === "pt" ? "Interação por voz com resposta em áudio" : "Voice interaction with an audio response"
                                                 color: voiceCard.strongHover ? voiceCard.hoverTextColor : root.mutedText
                                                 font.pixelSize: Math.round(14 * root.textScale)
                                                 lineHeight: 0.95
@@ -1647,7 +1647,7 @@ ApplicationWindow {
                                             }
                                             Label {
                                                 width: parent.width
-                                                text: blanky.language === "pt" ? "Controlo direto dos modos e atuadores" : "Direct control of modes and actuators"
+                                                text: blanky.language === "pt" ? "Controlo direto do sistema e dos atuadores" : "Direct control of the system and actuators"
                                                 color: operationCard.strongHover ? operationCard.hoverTextColor : root.mutedText
                                                 font.pixelSize: Math.round(14 * root.textScale)
                                                 lineHeight: 0.95
@@ -1730,7 +1730,7 @@ ApplicationWindow {
                                             }
                                             Label {
                                                 width: parent.width
-                                                text: blanky.language === "pt" ? "Atividade e comunicação MQTT" : "Activity and MQTT communication"
+                                                text: blanky.language === "pt" ? "Interação remota e comunicação via MQTT" : "Remote interaction and communication via MQTT"
                                                 color: phoneCard.strongHover ? phoneCard.hoverTextColor : root.mutedText
                                                 font.pixelSize: Math.round(14 * root.textScale)
                                                 lineHeight: 0.95
@@ -1750,7 +1750,7 @@ ApplicationWindow {
                         spacing: 13
                         Rectangle { Layout.preferredWidth: 112; Layout.preferredHeight: 1; color: root.accentColor; opacity: 0.55 }
                         Rectangle { Layout.preferredWidth: 8; Layout.preferredHeight: 8; radius: 4; color: root.accentColor }
-                        Label { text: blanky.language === "pt" ? "Todas as vistas mantêm Eventos e Comunicações ativas." : "All views keep Events and Communications active."; color: root.mutedText; font.pixelSize: Math.round(13 * root.textScale); horizontalAlignment: Text.AlignHCenter }
+                        Label { text: blanky.language === "pt" ? "Qualquer opção mantém o sistema ligado e sincronizado." : "Any option keeps the system connected and synchronized."; color: root.mutedText; font.pixelSize: Math.round(13 * root.textScale); horizontalAlignment: Text.AlignHCenter }
                         Rectangle { Layout.preferredWidth: 8; Layout.preferredHeight: 8; radius: 4; color: root.accentColor }
                         Rectangle { Layout.preferredWidth: 112; Layout.preferredHeight: 1; color: root.accentColor; opacity: 0.55 }
                     }
