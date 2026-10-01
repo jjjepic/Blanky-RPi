@@ -215,7 +215,7 @@ Rectangle {
                     StatusMonitor {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        Layout.minimumHeight: Math.round((panel.compact ? 108 : 132) * panel.readabilityScale)
+                        Layout.minimumHeight: Math.round((panel.compact ? 136 : 140) * panel.readabilityScale)
                         running: panel.systemStarted
                         textScale: panel.readabilityScale
                         title: panel.t("systemMonitor")
