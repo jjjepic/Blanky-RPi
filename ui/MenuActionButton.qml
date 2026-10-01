@@ -8,6 +8,8 @@ Rectangle {
     property string text: ""
     property string subText: ""
     property string iconText: ""
+    property string iconKind: ""
+    property bool iconMuted: false
     property string labelText: ""
     property color accentColor: "#63cbff"
     property color textColor: "#def2ff"
@@ -21,7 +23,7 @@ Rectangle {
     property real textVerticalOffset: 0
     property bool iconOnly: false
     readonly property real readabilityScale: typeof blanky !== "undefined" ? blanky.appearanceTextScale : 1.0
-    readonly property bool hasStructuredContent: iconText.length > 0 || labelText.length > 0
+    readonly property bool hasStructuredContent: iconText.length > 0 || iconKind.length > 0 || labelText.length > 0
     readonly property bool glyphButton: iconOnly || (hasStructuredContent && labelText.length === 0)
     readonly property string displayText: hasStructuredContent
         ? iconText + (labelText.length > 0 ? " " + labelText : "")
@@ -31,7 +33,7 @@ Rectangle {
     readonly property bool hoverAnimationsEnabled: typeof blanky === "undefined" || blanky.hoverAnimationsEnabled
     readonly property bool strongHover: hovered && enabled && hoverAnimationsEnabled
     readonly property real accentLuminance: 0.2126 * accentColor.r + 0.7152 * accentColor.g + 0.0722 * accentColor.b
-    readonly property color hoverTextColor: accentLuminance > 0.62 ? "#07111a" : "#f7fbff"
+    readonly property color hoverTextColor: accentLuminance > 0.62 ? "#101010" : "#ffffff"
 
     signal clicked()
 
@@ -79,7 +81,7 @@ Rectangle {
             spacing: control.labelText.length > 0 ? 4 : 0
 
             Text {
-                visible: control.iconText.length > 0
+                visible: control.iconText.length > 0 && control.iconKind.length === 0
                 height: parent.height
                 text: control.iconText
                 color: control.strongHover ? control.hoverTextColor : control.textColor
@@ -88,6 +90,16 @@ Rectangle {
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
                 transform: Translate { x: control.textHorizontalOffset; y: control.textVerticalOffset }
+            }
+
+            SymbolIcon {
+                visible: control.iconKind.length > 0
+                kind: control.iconKind
+                muted: control.iconMuted
+                width: Math.round(control.textPixelSize * control.readabilityScale)
+                height: width
+                y: (parent.height - height) / 2
+                iconColor: control.strongHover ? control.hoverTextColor : control.textColor
             }
 
             Text {
@@ -138,7 +150,7 @@ Rectangle {
     }
 
     Text {
-        visible: control.glyphButton
+        visible: control.glyphButton && control.iconKind.length === 0
         anchors.fill: parent
         text: control.iconText.length > 0 ? control.iconText : control.text
         color: control.strongHover ? control.hoverTextColor : control.textColor
@@ -147,6 +159,16 @@ Rectangle {
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         transform: Translate { x: control.textHorizontalOffset; y: control.textVerticalOffset }
+    }
+
+    SymbolIcon {
+        visible: control.glyphButton && control.iconKind.length > 0
+        anchors.centerIn: parent
+        width: Math.round(control.textPixelSize * control.readabilityScale)
+        height: width
+        kind: control.iconKind
+        muted: control.iconMuted
+        iconColor: control.strongHover ? control.hoverTextColor : control.textColor
     }
 
     MouseArea {

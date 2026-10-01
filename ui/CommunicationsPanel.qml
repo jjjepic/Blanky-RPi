@@ -203,7 +203,17 @@ Rectangle {
                                 border.color: panel.stateColor(communicationStatus)
                                 border.width: 1
 
+                                SymbolIcon {
+                                    anchors.centerIn: parent
+                                    visible: modelData.key === "microphone"
+                                    width: Math.round((panel.compact ? 18 : 21) * panel.readabilityScale)
+                                    height: width
+                                    kind: "microphone"
+                                    iconColor: panel.stateColor(communicationStatus)
+                                }
+
                                 Label {
+                                    visible: modelData.key !== "microphone"
                                     anchors.centerIn: parent
                                     text: modelData.icon
                                     color: panel.stateColor(communicationStatus)
