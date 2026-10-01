@@ -184,6 +184,7 @@ Rectangle {
                         Layout.preferredHeight: panel.actionButtonHeight
                         label: panel.stateValue("start") === 1 ? panel.t("stopAction") : panel.t("startAction")
                         singleLineTitle: true
+                        centeredContent: true
                         iconText: panel.stateValue("start") === 1 ? "\u23F9" : "\u25B6"
                         command: panel.toggleCommand("start", "START", "STOP")
                         active: panel.stateValue("start") === 1
@@ -208,40 +209,32 @@ Rectangle {
                             ManualCommandButton { width: (parent.width - parent.spacing * 2) / 3; height: panel.actionButtonHeight; commandEnabled: panel.canSelectMode; label: panel.t("manual"); iconText: panel.monochrome ? "☷" : "\uD83D\uDD79"; command: "MODE_MANUAL"; active: panel.stateValue("mode_manual") === 1; stateText: active ? "ON" : "OFF"; iconColor: panel.manualModeColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
                         }
 
-                        ManualCommandButton { Layout.fillWidth: true; Layout.preferredHeight: panel.actionButtonHeight; commandEnabled: panel.canRequestModeChange; label: panel.t("change"); iconText: "\u21C4"; command: "MODE_UNSPEC"; active: panel.modeChangeActive; stateText: active ? "ON" : "OFF"; iconColor: panel.changeModeColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
+                        ManualCommandButton { Layout.fillWidth: true; Layout.preferredHeight: panel.actionButtonHeight; commandEnabled: panel.canRequestModeChange; centeredContent: true; label: panel.t("change"); iconText: "\u21C4"; command: "MODE_UNSPEC"; active: panel.modeChangeActive; stateText: active ? "ON" : "OFF"; iconColor: panel.changeModeColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
                     }
 
-                    Label { text: panel.t("currentState"); color: panel.mutedText; font.bold: true; font.pixelSize: Math.round((panel.compact ? 11 : 12) * panel.readabilityScale); horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
-                    Rectangle {
+                    StatusMonitor {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        Layout.minimumHeight: panel.compact ? 80 : 112
-                        color: panel.panelColor
-                        border.color: panel.borderColor
-                        border.width: 1
-                        radius: 8
-
-                        ColumnLayout {
-                            anchors.fill: parent
-                            anchors.margins: panel.compact ? 7 : 10
-                            spacing: panel.compact ? 2 : 5
-
-                            RowLayout {
-                                Layout.fillWidth: true
-                                Label { text: panel.t("activeMode"); color: panel.textColor; font.pixelSize: Math.round(12 * panel.readabilityScale); Layout.fillWidth: true }
-                                Label { text: panel.modeInfo().text; color: panel.modeInfo().color; font.pixelSize: Math.round(12 * panel.readabilityScale); font.bold: true }
-                            }
-                            RowLayout {
-                                Layout.fillWidth: true
-                                Label { text: panel.t("systemState"); color: panel.textColor; font.pixelSize: Math.round(12 * panel.readabilityScale); Layout.fillWidth: true }
-                                Label { text: panel.systemInfo().text; color: panel.systemInfo().color; font.pixelSize: Math.round(12 * panel.readabilityScale); font.bold: true; elide: Text.ElideRight; Layout.preferredWidth: Math.round(parent.width * 0.58); Layout.minimumWidth: 0; horizontalAlignment: Text.AlignRight }
-                            }
-                            RowLayout {
-                                Layout.fillWidth: true
-                                Label { text: panel.t("currentProcess"); color: panel.textColor; font.pixelSize: Math.round(12 * panel.readabilityScale); Layout.fillWidth: true }
-                                Label { text: panel.processInfo().text; color: panel.processInfo().color; font.pixelSize: Math.round(12 * panel.readabilityScale); elide: Text.ElideRight; Layout.preferredWidth: Math.round(parent.width * 0.58); Layout.minimumWidth: 0; horizontalAlignment: Text.AlignRight }
-                            }
-                        }
+                        Layout.minimumHeight: Math.round((panel.compact ? 108 : 132) * panel.readabilityScale)
+                        running: panel.systemStarted
+                        textScale: panel.readabilityScale
+                        title: panel.t("systemMonitor")
+                        subtitle: panel.t("monitoring")
+                        modeLabel: panel.t("activeMode")
+                        systemLabel: panel.t("systemState")
+                        processLabel: panel.t("process")
+                        modeText: panel.modeInfo().text
+                        systemText: panel.systemInfo().text
+                        processText: panel.processInfo().text
+                        modeTone: panel.modeInfo().color
+                        systemTone: panel.systemInfo().color
+                        processTone: panel.processInfo().color
+                        panelColor: panel.panelColor
+                        accentColor: panel.accentColor
+                        successColor: panel.successColor
+                        inactiveColor: panel.inactiveColor
+                        textColor: panel.textColor
+                        mutedText: panel.mutedText
                     }
                 }
             }

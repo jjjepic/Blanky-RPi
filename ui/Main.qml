@@ -2251,6 +2251,7 @@ ApplicationWindow {
     HelpDialog {
         id: helpPanel
         language: blanky.language
+        monochrome: blanky.appearanceMode === "monochrome"
         panelColor: root.panelColor
         panelAltColor: root.panelAltColor
         borderColor: root.borderColor
@@ -2270,12 +2271,8 @@ ApplicationWindow {
 
     FloatingPanel {
         id: appearancePanel
-        // Grow with the reading scale while keeping the panel compact at normal size.
-        width: Math.min(Math.round(680 * 1.14), Math.max(360, root.width - 24))
-        height: Math.min(
-            Math.round(610 + (blanky.appearanceTextScale - 1.0) * 360),
-            Math.max(360, root.height - 24)
-        )
+        width: Math.min(1000, Math.max(360, root.width - 16))
+        height: Math.min(Math.max(360, root.height - 24), appearanceContent.implicitHeight + 104)
         panelTitle: t("appearanceAccessibility")
         panelColor: root.panelColor
         borderColor: root.borderColor
@@ -2286,17 +2283,21 @@ ApplicationWindow {
         onOpenedForBackdrop: modalBackdrop.scheduleSnapshot()
         onClosedForBackdrop: root.popupBackdropVisible = customAppearancePanel.visible || colorVisionProfilesPanel.visible
 
-        ScrollView {
-            id: appearanceScroll
+        Item {
             anchors.fill: parent
             clip: true
-            contentWidth: availableWidth
-            rightPadding: Math.round(16 * root.textScale)
-            ScrollBar.vertical.policy: ScrollBar.AsNeeded
 
-            ColumnLayout {
-                width: Math.max(0, appearanceScroll.availableWidth - 4)
+            RowLayout {
+                id: appearanceContent
+                anchors.fill: parent
+                anchors.margins: 12
                 spacing: Math.round(12 * root.spacingScale)
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: appearancePanel.width * 0.58
+                    Layout.fillHeight: true
+                    spacing: Math.round(8 * root.spacingScale)
 
                 Label {
                     Layout.fillWidth: true
@@ -2309,11 +2310,12 @@ ApplicationWindow {
                 }
 
                 GridLayout {
+                    id: appearanceModeGrid
                     Layout.fillWidth: true
-                    Layout.preferredHeight: Math.round(3 * 74 * root.controlScale + 2 * 10 * root.spacingScale)
+                    Layout.preferredHeight: Math.round(3 * 64 * root.controlScale + 2 * 8 * root.spacingScale)
                     columns: 2
                     columnSpacing: Math.round(10 * root.spacingScale)
-                    rowSpacing: Math.round(10 * root.spacingScale)
+                    rowSpacing: Math.round(8 * root.spacingScale)
 
                     Repeater {
                         model: root.appearanceOptions()
@@ -2327,7 +2329,7 @@ ApplicationWindow {
                             readonly property real modeLuminance: 0.2126 * modeColor.r + 0.7152 * modeColor.g + 0.0722 * modeColor.b
                             readonly property color hoverTextColor: modeLuminance > 0.62 ? "#101010" : "#ffffff"
                             Layout.fillWidth: true
-                            Layout.preferredHeight: Math.round(74 * root.controlScale)
+                            Layout.preferredHeight: Math.round(64 * root.controlScale)
                             radius: 10
                             color: strongHover ? modeColor : (hovered ? Qt.lighter(root.panelAltColor, 1.16) : (selected ? Qt.lighter(root.panelAltColor, root.dark ? 1.16 : 1.03) : root.panelAltColor))
                             border.color: selected || strongHover ? modeColor : Qt.darker(modeColor, root.dark ? 1.65 : 1.18)
@@ -2340,8 +2342,8 @@ ApplicationWindow {
 
                             RowLayout {
                                 anchors.fill: parent
-                                anchors.margins: 10
-                                spacing: 10
+                                anchors.margins: 6
+                                spacing: 5
 
                                 Rectangle {
                                     Layout.preferredWidth: 4
@@ -2354,9 +2356,9 @@ ApplicationWindow {
                                     Layout.fillWidth: true
                                     spacing: 3
                                     Label { text: modelData.title; color: strongHover ? hoverTextColor : (selected ? modeColor : root.textColor); font.bold: true; font.pixelSize: Math.round(14 * root.textScale); Layout.fillWidth: true }
-                                    Label { text: modelData.description; color: strongHover ? hoverTextColor : root.mutedText; font.pixelSize: Math.round(10 * root.textScale); Layout.fillWidth: true; elide: Text.ElideRight }
+                                    Label { text: modelData.description; color: strongHover ? hoverTextColor : root.mutedText; font.pixelSize: Math.round(10 * root.textScale); Layout.fillWidth: true; wrapMode: Text.WordWrap; maximumLineCount: 2 }
                                 }
-                                Label { text: selected ? "✓" : "○"; color: strongHover ? hoverTextColor : (selected ? modeColor : root.inactiveColor); font.pixelSize: Math.round(18 * root.textScale); font.bold: true }
+                                Label { visible: appearanceModeGrid.width > 470; text: selected ? "✓" : "○"; color: strongHover ? hoverTextColor : (selected ? modeColor : root.inactiveColor); font.pixelSize: Math.round(18 * root.textScale); font.bold: true }
                             }
 
                             MouseArea {
@@ -2380,9 +2382,18 @@ ApplicationWindow {
                     }
                 }
 
+                Item { Layout.fillHeight: true }
+                }
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: appearancePanel.width * 0.42
+                    Layout.fillHeight: true
+                    spacing: Math.round(8 * root.spacingScale)
+
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: Math.round(72 * root.controlScale)
+                    Layout.preferredHeight: Math.round(60 * root.controlScale)
                     radius: 9
                     color: root.panelAltColor
                     border.color: root.borderColor
@@ -2426,7 +2437,7 @@ ApplicationWindow {
 
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: Math.round(112 * root.controlScale)
+                    Layout.preferredHeight: Math.round(110 * root.controlScale)
                     radius: 9
                     color: root.panelAltColor
                     border.color: root.borderColor
@@ -2448,11 +2459,8 @@ ApplicationWindow {
                                 Layout.fillWidth: true
                             }
                             Label {
-                                text: t("displayDetected", {
-                                    width: Math.round(root.width),
-                                    height: Math.round(root.height),
-                                    scale: Math.round(root.interfaceScale * 100)
-                                })
+                                text: Math.round(root.width) + "×" + Math.round(root.height)
+                                    + " · " + Math.round(root.interfaceScale * 100) + "%"
                                 color: root.mutedText
                                 font.pixelSize: Math.round(9 * root.textScale)
                             }
@@ -2465,12 +2473,13 @@ ApplicationWindow {
                                 color: root.mutedText
                                 font.pixelSize: Math.round(9 * root.textScale)
                                 Layout.fillWidth: true
+                                wrapMode: Text.WordWrap
                             }
                         }
 
                         GridLayout {
                             Layout.fillWidth: true
-                            columns: 5
+                            columns: 3
                             columnSpacing: 6
 
                             Repeater {
@@ -2497,7 +2506,7 @@ ApplicationWindow {
 
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: Math.round(60 * root.controlScale)
+                    Layout.preferredHeight: Math.round(42 * root.controlScale)
                     radius: 9
                     color: root.panelAltColor
                     border.color: root.borderColor
@@ -2525,7 +2534,7 @@ ApplicationWindow {
 
                 Rectangle {
                 Layout.fillWidth: true
-                Layout.preferredHeight: Math.round(74 * root.controlScale)
+                Layout.preferredHeight: Math.round(60 * root.controlScale)
                 radius: 9
                 color: root.panelAltColor
                 border.color: root.borderColor
@@ -2537,9 +2546,11 @@ ApplicationWindow {
                     anchors.rightMargin: 12
                     spacing: 4
                     Label { text: t("appearancePreview"); color: root.textColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale); Layout.fillWidth: true }
-                    Flow {
+                    GridLayout {
                         Layout.fillWidth: true
-                        spacing: 14
+                        columns: 3
+                        columnSpacing: 4
+                        rowSpacing: 2
                         Label { text: "✓ " + t("connected"); color: root.successColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
                         Label { text: "! " + t("warning"); color: root.warningColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
                         Label { text: "✕ " + t("error"); color: root.errorColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
@@ -2548,6 +2559,8 @@ ApplicationWindow {
                         Label { text: "○ OFF"; color: root.inactiveColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale) }
                     }
                 }
+                }
+                Item { Layout.fillHeight: true }
                 }
             }
         }

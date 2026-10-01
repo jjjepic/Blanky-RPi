@@ -17,13 +17,16 @@ Rectangle {
     property bool active: false
     property bool commandEnabled: true
     property bool singleLineTitle: false
+    property bool centeredContent: false
     readonly property real readabilityScale: typeof blanky !== "undefined" ? blanky.appearanceTextScale : 1.0
     readonly property int titlePixelSize: Math.round((singleLineTitle ? 11 : 12) * readabilityScale)
     readonly property int statePixelSize: Math.round(10 * readabilityScale)
     readonly property string titleText: iconText.length > 0 ? iconText + " " + label : label
     readonly property string formattedStateText: (active ? "✓ " : "○ ") + stateText
     readonly property bool hasState: stateText.length > 0
-    readonly property real requiredHorizontalWidth: titleMetrics.advanceWidth + stateMetrics.advanceWidth
+    readonly property real stateBadgeWidth: Math.ceil(stateMetrics.advanceWidth + 12 * readabilityScale)
+    readonly property real requiredHorizontalWidth: titleMetrics.advanceWidth
+        + (centeredContent ? 2 * stateBadgeWidth : stateBadgeWidth)
         + Math.round(34 * readabilityScale)
     readonly property bool stackedContent: hasState && (
         width < requiredHorizontalWidth || width < Math.round(180 * readabilityScale)
@@ -76,7 +79,16 @@ Rectangle {
         id: horizontalButtonContent
 
         RowLayout {
+            anchors.centerIn: parent
+            width: parent.width
+            height: parent.height
             spacing: Math.round(7 * control.readabilityScale)
+
+            Item {
+                visible: control.centeredContent && control.hasState
+                Layout.preferredWidth: control.stateBadgeWidth
+                Layout.fillHeight: true
+            }
 
             Text {
                 Layout.fillWidth: true
@@ -96,7 +108,7 @@ Rectangle {
 
             Rectangle {
                 visible: control.hasState
-                Layout.preferredWidth: Math.ceil(stateMetrics.advanceWidth + 12 * control.readabilityScale)
+                Layout.preferredWidth: control.stateBadgeWidth
                 Layout.preferredHeight: Math.ceil(stateMetrics.boundingRect.height + 5 * control.readabilityScale)
                 radius: height / 2
                 color: control.strongHover ? "transparent" : Qt.rgba(control.iconColor.r, control.iconColor.g, control.iconColor.b, control.active ? 0.16 : 0.07)

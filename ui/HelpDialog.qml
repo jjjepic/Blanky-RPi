@@ -14,6 +14,7 @@ FloatingPanel {
     property color errorColor: "#ff6b6b"
     property color inactiveColor: "#8fa8b8"
     property real textScale: 1.0
+    property bool monochrome: false
     property string sectionId: ""
 
     width: Math.min(1060, Math.max(360, parent ? parent.width - 24 : 1060))
@@ -30,12 +31,12 @@ FloatingPanel {
             { id: "interaction", icon: "✦", tone: "accent", title: tr("Interação com o Blanky", "Interacting with Blanky"), summary: tr("Estado, Resposta e barra de ações.", "Status, Response and action bar.") },
             { id: "communications", icon: "⌁", tone: "accent", title: tr("Comunicações", "Communications"), summary: tr("Os quatro cartões de ligação.", "The four connection cards.") },
             { id: "operation", icon: "⚙", tone: "success", title: tr("Painel de Operação", "Operation Panel"), summary: tr("Controlo Geral e Controlo Manual.", "General and Manual Control.") },
-            { id: "general", icon: "◉", tone: "warning", title: tr("Controlo Geral", "General Control"), summary: tr("Sistema, modos e estado atual.", "System, modes and current state.") },
+            { id: "general", icon: "◉", tone: "warning", title: tr("Controlo Geral", "General Control"), summary: tr("Sistema, modos e monitor de estado.", "System, modes and status monitor.") },
             { id: "manual", icon: "☝", tone: "success", title: tr("Controlo Manual", "Manual Control"), summary: tr("Luzes, cilindros, motores e robô.", "Lights, cylinders, motors and robot.") },
             { id: "events", icon: "≡", tone: "accent", title: tr("Eventos", "Events"), summary: tr("Histórico e resultado dos pedidos.", "Request history and results.") },
             { id: "textbot", icon: "⌨", tone: "accent", title: "Text-Bot", summary: tr("Um ou vários comandos escritos.", "One or more written commands.") },
-            { id: "voice", icon: "🎙", tone: "success", title: tr("Comandos de voz", "Voice commands"), summary: tr("Pedidos naturais, pelas tuas palavras.", "Natural requests in your own words.") },
-            { id: "audio", icon: "🔊", tone: "warning", title: tr("Definições e áudio", "Settings and audio"), summary: tr("Som, microfone e acessibilidade.", "Sound, microphone and accessibility.") },
+            { id: "voice", icon: monochrome ? "◉" : "🎙", tone: "success", title: tr("Comandos de voz", "Voice commands"), summary: tr("Pedidos naturais, pelas tuas palavras.", "Natural requests in your own words.") },
+            { id: "audio", icon: monochrome ? "♪" : "🔊", tone: "warning", title: tr("Definições e áudio", "Settings and audio"), summary: tr("Som, microfone e acessibilidade.", "Sound, microphone and accessibility.") },
             { id: "alerts", icon: "!", tone: "error", title: tr("Erros e avisos", "Errors and warnings"), summary: tr("O que fazer quando algo não é aceite.", "What to do when a request is not accepted.") },
             { id: "tutorial", icon: "✓", tone: "success", title: tr("Tutorial completo", "Full tutorial"), summary: tr("Um percurso guiado pela interface.", "A guided route through the interface.") }
         ]
@@ -224,6 +225,7 @@ FloatingPanel {
                     HelpTutorialContent {
                         width: parent.width
                         language: dialog.language
+                        monochrome: dialog.monochrome
                         sectionId: dialog.sectionId
                         panelColor: dialog.panelColor; panelAltColor: dialog.panelAltColor; borderColor: dialog.borderColor
                         textColor: dialog.textColor; mutedText: dialog.mutedText
