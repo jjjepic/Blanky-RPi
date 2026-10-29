@@ -1,5 +1,7 @@
 import os
 
+from blanky.opcua_nodes import PHYSICAL_SENSOR_INPUTS, RECEIVE_NAMESPACE_URI
+
 
 def load_local_environment() -> bool:
     """Load the optional local OpenAI key without executing a shell file."""
@@ -63,6 +65,14 @@ MQTT_PULSE_SECONDS = 3.0
 OPCUA_ENABLED = True
 OPCUA_URL = "opc.tcp://192.168.30.3:4840"
 OPCUA_PULSE_SECONDS = 0.3
+OPCUA_RECEIVE_NAMESPACE_URI = os.environ.get(
+    "BLANKY_OPCUA_RECEIVE_NAMESPACE_URI", RECEIVE_NAMESPACE_URI
+)
+OPCUA_SENSOR_NODE_IDS = {
+    name: node_id
+    for name in PHYSICAL_SENSOR_INPUTS
+    if (node_id := os.environ.get(f"BLANKY_OPCUA_{name.upper()}_NODE", "").strip())
+}
 
 # A wake word esta desativada no prototipo; fica documentada para trabalho futuro.
 WAKEWORD_ENABLED = False

@@ -683,7 +683,7 @@ class MQTTBridge:
         self._events.append(event)
 
         if accepted:
-            self._opcua.enqueue_command(command)
+            self._opcua.enqueue_command(command, source=source)
 
     def reset_system(self, lang: str, source: str = "button") -> Tuple[bool, str]:
         with self._lock:
@@ -732,12 +732,21 @@ class MQTTBridge:
             "opcua_connected": bool(opcua_health.get("connected")),
             "opcua_last_error": str(opcua_health.get("last_error") or ""),
             "opcua_last_write": str(opcua_health.get("last_write") or ""),
+            "opcua_feedback_active": bool(opcua_health.get("feedback_active")),
+            "opcua_feedback_error": str(opcua_health.get("feedback_error") or ""),
+            "opcua_last_feedback": str(opcua_health.get("last_feedback") or ""),
+            "opcua_last_write_ms": opcua_health.get("last_write_ms"),
+            "opcua_last_ack_ms": opcua_health.get("last_ack_ms"),
+            "opcua_received": opcua_health.get("received", {}),
             "opcua_url": str(opcua_health.get("url") or ""),
             "mqtt_host": self._broker_host,
             "mqtt_port": self._broker_port,
             "mqtt_topic_prefix": self._topic_prefix,
             "mqtt_client_id": self._client_id,
         }
+
+    def opcua_timing_records(self) -> list[dict]:
+        return self._opcua.timing_records()
 
     def set_ui_lang(self, lang: str):
         with self._lock:

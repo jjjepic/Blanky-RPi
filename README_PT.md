@@ -53,7 +53,32 @@ O botão de engrenagem abre duas áreas independentes:
 - `Áudio e Microfone`: perfis, captação, filtros, ajustes manuais e diagnóstico.
 - `Comunicações e IA`: estado das ligações automáticas, endereço MQTT, porta, prefixo de tópicos, endpoint OPC UA e chave OpenAI temporária.
 
-Os campos que podem alterar uma ligação começam bloqueados. Use o ícone de lápis para os desbloquear e aplique as alterações quando terminar. MQTT reconecta automaticamente; um novo endereço OPC UA é usado no próximo comando enviado ao PLC.
+Os campos que podem alterar uma ligação começam bloqueados. Use o ícone de lápis para os desbloquear e aplique as alterações quando terminar. MQTT reconecta automaticamente; ao mudar o endereço OPC UA, a ligação persistente é restabelecida no novo servidor.
+
+## OPC UA: envio e receção
+
+O Blanky usa `asyncua` para enviar os comandos existentes do mapa `ns=4` e observar os 25 sinais de retorno do mapa `OPC UA Receber` (atualmente `ns=5`, identificadores `i=2` a `i=26`). O índice do espaço de nomes de receção é resolvido pelo URI `http://OPC UA Receber`; pode ser alterado com `BLANKY_OPCUA_RECEIVE_NAMESPACE_URI` se o PLC usar outro URI. A ligação é mantida mesmo sem comandos, com subscrição dos sinais e leitura periódica como alternativa quando a subscrição não está disponível.
+
+Os sinais de retorno ficam separados do estado local da operação. Alguns são pulsos ou confirmações de processamento, não provas de posição física. Em particular, os nós atuais de C/D indicam o comando de avanço, não os sensores magnéticos `S_C0`/`S_C1`/`S_D0`/`S_D1` (`%I2.0` a `%I2.3`). Não se deve assumir os seus IDs OPC UA: ainda têm de ser publicados/mapeados no PLC. Quando existirem, podem ser indicados por `BLANKY_OPCUA_CYL_C_RETRACTED_NODE`, `BLANKY_OPCUA_CYL_C_ADVANCED_NODE`, `BLANKY_OPCUA_CYL_D_RETRACTED_NODE` e `BLANKY_OPCUA_CYL_D_ADVANCED_NODE` (valores no formato `ns=N;i=ID`). Sem estas variáveis, os sensores não são lidos. O temporizador de atuação de 1 segundo de C/D pertence à lógica do PLC Maquete, não ao cliente OPC UA do Blanky.
+
+O cartão OPC UA mostra a última duração de escrita ou de chegada de um sinal de retorno. A escrita concluída significa resposta do servidor OPC UA; a chegada do sinal significa retorno observado no Blanky. Nenhuma das duas medidas confirma, por si só, o fim de curso físico.
+
+### Comparar `opcua` com `asyncua`
+
+Para comparar as duas bibliotecas no mesmo Raspberry Pi e servidor, instale também a dependência de desenvolvimento antiga e execute a medição **apenas de leitura**:
+
+```bash
+pip install -r requirements-dev.txt
+python tools/benchmark_opcua.py --url opc.tcp://192.168.30.3:4840 --samples 30 --csv tempos_opcua.csv
+```
+
+O resultado contém tempos de ligação e amostras individuais de leitura (`read_ms`), com mediana e percentil 95. As amostras alternam a ordem das bibliotecas. Repita o ensaio com `--connect-first asyncua` para inverter também a ordem de ligação. Para medir escrita e retorno (`write_ms`, `return_ms`), use **exclusivamente nós de diagnóstico sem ligação a atuadores**, criados para o ensaio; o script recusa os nós de comando conhecidos do Blanky:
+
+```bash
+python tools/benchmark_opcua.py --url opc.tcp://192.168.30.3:4840 --write-node 'ns=5;i=100' --return-node 'ns=5;i=101' --allow-write --samples 30 --csv tempos_comandos.csv
+```
+
+Os IDs `i=100` e `i=101` são apenas exemplos; **não existem no mapa fornecido**. O nó de retorno deve começar em `FALSE`, passar a `TRUE` após a receção do teste e voltar a `FALSE` antes da amostra seguinte. Se o mesmo nó for usado para escrita e retorno, mede-se apenas a leitura de volta do servidor, não o percurso pelos PLCs. Registe também a versão das bibliotecas, a resolução do temporizador/intervalo de polling, a carga do Raspberry Pi e a rede utilizada. Não há resultados do PLC real nesta branch.
 
 ## MQTT e telemóvel
 

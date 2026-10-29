@@ -1301,13 +1301,22 @@ class BlankyController(QObject):
             "microphone": "A aguardar voz" if is_pt else "Waiting for voice",
             "mqtt_base": "Ligação ao servidor" if is_pt else "Server connection",
             "mqtt_phone": mqtt_phone,
-            "opcua": (
-                "Ligação ao PLC" if health.get("opcua_connected") else "Sem ligação ao PLC"
-            ) if is_pt else (
-                "PLC connection" if health.get("opcua_connected") else "No PLC connection"
-            ),
+            "opcua": self._opcua_card_detail(health, is_pt),
         }
         return "|".join(f"{key}={value}" for key, value in details.items())
+
+    def _opcua_card_detail(self, health: dict, is_pt: bool) -> str:
+        if not health.get("opcua_connected"):
+            return "Sem ligação ao PLC" if is_pt else "No PLC connection"
+        if health.get("opcua_feedback_error"):
+            return "Receção indisponível" if is_pt else "Feedback unavailable"
+        ack_ms = health.get("opcua_last_ack_ms")
+        if ack_ms is not None and health.get("opcua_feedback_active"):
+            return (f"Sinal PLC: {ack_ms:.0f} ms" if is_pt else f"PLC signal: {ack_ms:.0f} ms")
+        write_ms = health.get("opcua_last_write_ms")
+        if write_ms is not None:
+            return (f"Escrita OPC UA: {write_ms:.0f} ms" if is_pt else f"OPC UA write: {write_ms:.0f} ms")
+        return "Ligação ao PLC" if is_pt else "PLC connection"
 
     def _event_visual_color(self, command: str, accepted: bool) -> str:
         if self._appearance_mode == "high_contrast":
