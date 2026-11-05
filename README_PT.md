@@ -55,7 +55,7 @@ O botão de engrenagem abre duas áreas independentes:
 
 Os campos que podem alterar uma ligação começam bloqueados. Use o ícone de lápis para os desbloquear e aplique as alterações quando terminar. MQTT reconecta automaticamente; ao mudar o endereço OPC UA, a ligação persistente é restabelecida no novo servidor.
 
-Nos cartões de Comunicações, `OpenAI` substitui apenas a apresentação de `MQTT Base`; o serviço MQTT continua ativo. O cartão OpenAI não faz pedidos de teste: indica chave por configurar, espera, pedido em curso ou resultado do último pedido. O tempo mostrado é a duração do último pedido STT, interpretação IA ou geração/descarregamento TTS, não o tempo total de fala ou uma latência de ligação permanente. O cartão Microfone verifica a entrada de captura e desativa `Falar` quando não está disponível. Num adaptador USB com jack analógico, o sistema pode não detetar se a ficha do microfone está inserida: `Entrada pronta` não confirma a ligação física nem áudio captado.
+Nos cartões de Comunicações, `OpenAI` substitui apenas a apresentação de `MQTT Base`; o serviço MQTT continua ativo. O cartão OpenAI não faz pedidos de teste: indica chave por configurar, espera, pedido em curso ou resultado do último pedido. O tempo mostrado é a duração do último pedido STT, interpretação IA ou geração/descarregamento TTS, não o tempo total de fala ou uma latência de ligação permanente. Após um pedido por voz, o cartão Microfone apresenta a duração da última gravação, com o mesmo valor de captação dos logs de áudio. A indicação `Ligado` mantém o significado anterior de áudio inicializado; não confirma se a ficha jack está inserida.
 
 ## OPC UA: envio e receção
 

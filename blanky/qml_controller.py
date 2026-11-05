@@ -5,7 +5,6 @@ import threading
 import html
 import textwrap
 import re
-import time
 from datetime import datetime
 
 from PySide6.QtCore import QCoreApplication, QObject, Property, QSettings, QTimer, QUrl, Signal, Slot
@@ -13,7 +12,6 @@ from PySide6.QtCore import QCoreApplication, QObject, Property, QSettings, QTime
 from blanky.audio_service import (
     apply_audio_input_preset,
     audio_info,
-    input_available,
     get_audio_input_preset,
     get_audio_input_settings,
     get_audio_output_volume,
@@ -62,7 +60,6 @@ class BlankyController(QObject):
     customAppearanceChanged = Signal()
     monitorEventsTextChanged = Signal()
     listeningChanged = Signal()
-    microphoneAvailableChanged = Signal()
     languageChanged = Signal()
     ttsVoiceChanged = Signal()
     ttsVoiceOptionsChanged = Signal()
@@ -245,8 +242,7 @@ class BlankyController(QObject):
         self._mqtt_topic_prefix = str(self._settings.value("mqttTopicPrefix", MQTT_TOPIC_PREFIX) or MQTT_TOPIC_PREFIX).strip("/")
         self._opcua_url = str(self._settings.value("opcuaUrl", OPCUA_URL) or OPCUA_URL)
         self._openai_key_configured = bool(os.environ.get("OPENAI_API_KEY"))
-        self._microphone_available = False
-        self._next_microphone_check = 0.0
+        self._last_capture_duration_s = None
         saved_appearance = str(self._settings.value("appearanceMode", "dark") or "dark").lower()
         legacy_large_readability = saved_appearance == "large_readability"
         self._appearance_mode = saved_appearance if saved_appearance in {
@@ -515,10 +511,6 @@ class BlankyController(QObject):
     @Property(bool, notify=openAiKeyConfiguredChanged)
     def openAiKeyConfigured(self):
         return self._openai_key_configured
-
-    @Property(bool, notify=microphoneAvailableChanged)
-    def microphoneAvailable(self):
-        return self._microphone_available
 
     @Property(str, notify=audioDiagnosticLogTextChanged)
     def audioDiagnosticLogText(self):
@@ -1076,15 +1068,6 @@ class BlankyController(QObject):
         if self._listening:
             return
 
-        if not input_available():
-            if self._microphone_available:
-                self._microphone_available = False
-                self.microphoneAvailableChanged.emit()
-            self._next_microphone_check = 0.0
-            self._set_status("Entrada de microfone indisponível" if self._language == "pt" else "Microphone input unavailable")
-            self._refresh()
-            return
-
         try:
             self._stop_and_flush_audio()
             self._wakeword.set_paused(True)
@@ -1233,7 +1216,9 @@ class BlankyController(QObject):
         item.setdefault("duration", 0.0)
         item["text"] = self._repair_display_text(item["text"])
         self._audio_diagnostic_entries.append(item)
+        self._last_capture_duration_s = float(item["capture"])
         self.audioDiagnosticLogTextChanged.emit()
+        self._refresh()
 
     def _on_done(self):
         self._worker = None
@@ -1294,7 +1279,7 @@ class BlankyController(QObject):
     def _build_comm_status_compact(self, health: dict) -> str:
         wake = self._wakeword.health()
         states = {
-            "microphone": ("communicating" if self._listening else "standby") if health.get("microphone_ready") else "offline",
+            "microphone": "connected" if health.get("microphone_ready") else "offline",
             "openai": self._openai_card_state(health),
             "mqtt_phone": "communicating" if health.get("mqtt_panel_active") else "silent",
             "opcua": "connected" if health.get("opcua_connected") else "offline",
@@ -1330,10 +1315,10 @@ class BlankyController(QObject):
             )
         details = {
             "microphone": (
-                (("A captar voz" if is_pt else "Capturing voice") if self._listening else
-                 ("Entrada pronta; jack incerto" if is_pt else "Input ready; jack unverified"))
-                if health.get("microphone_ready") else
-                ("Sem entrada de captura" if is_pt else "No capture input")
+                (f"Última gravação: {self._last_capture_duration_s:.2f} s" if is_pt
+                 else f"Last recording: {self._last_capture_duration_s:.2f} s")
+                if self._last_capture_duration_s is not None
+                else ("A aguardar voz" if is_pt else "Waiting for voice")
             ),
             "openai": self._openai_card_detail(health, is_pt),
             "mqtt_phone": mqtt_phone,
@@ -1776,14 +1761,8 @@ class BlankyController(QObject):
 
         snapshot = self._bridge.get_snapshot()
         health = self._bridge.health()
-        now = time.monotonic()
-        if now >= self._next_microphone_check:
-            available = input_available()
-            if available != self._microphone_available:
-                self._microphone_available = available
-                self.microphoneAvailableChanged.emit()
-            self._next_microphone_check = now + 2.0
-        health["microphone_ready"] = self._microphone_available
+        mic = audio_info()
+        health["microphone_ready"] = bool(mic.get("ready"))
         health["openai_activity"] = activity_snapshot()
         self._update_state_compact(snapshot.get("state", {}))
 

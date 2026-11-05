@@ -50,7 +50,7 @@ The gear button opens two areas:
 
 Connection fields start locked. Use the pencil icon to unlock them, then apply your changes. MQTT reconnects automatically; changing the OPC UA endpoint reconnects the persistent client to the new server.
 
-In the Communications cards, `OpenAI` replaces only the `MQTT Base` display; the MQTT service remains active. The OpenAI card makes no probe requests: it reports an unconfigured key, standby, a request in progress or the last request result. Its time is the duration of the last STT, AI interpretation or TTS generation/download request, not total speech time or a permanent connection latency. The Microphone card checks the capture input and disables `Speak` when it is unavailable. A USB adapter with an analog jack may not detect whether the microphone plug is inserted: `Input ready` does not confirm a physical microphone connection or captured audio.
+In the Communications cards, `OpenAI` replaces only the `MQTT Base` display; the MQTT service remains active. The OpenAI card makes no probe requests: it reports an unconfigured key, standby, a request in progress or the last request result. Its time is the duration of the last STT, AI interpretation or TTS generation/download request, not total speech time or a permanent connection latency. After a voice request, the Microphone card displays the last recording duration, using the same capture value as the audio logs. `Connected` retains its previous meaning of initialized audio; it does not confirm that an analog microphone plug is inserted.
 
 ## OPC UA: sending and receiving
 

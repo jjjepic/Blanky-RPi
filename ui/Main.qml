@@ -800,7 +800,7 @@ ApplicationWindow {
                     text: blanky.listening
                         ? (blanky.appearanceMode === "monochrome" ? "● " : "\uD83D\uDD34 ") + t("listening")
                         : (blanky.appearanceMode === "monochrome" ? "◉ " : "\uD83C\uDFA4 ") + t("listen")
-                    enabled: !blanky.listening && blanky.microphoneAvailable
+                    enabled: !blanky.listening
                     Layout.fillWidth: true
                     Layout.preferredWidth: 155
                     Layout.minimumWidth: 135
@@ -812,7 +812,7 @@ ApplicationWindow {
                     mutedText: root.mutedText
                     borderColor: root.borderColor
                     panelColor: root.panelAltColor
-                    toolTip: blanky.microphoneAvailable ? t("tooltipListen") : t("tooltipNoMic")
+                    toolTip: t("tooltipListen")
                     onClicked: blanky.startVoice()
                 }
 
