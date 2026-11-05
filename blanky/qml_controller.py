@@ -5,6 +5,7 @@ import threading
 import html
 import textwrap
 import re
+import time
 from datetime import datetime
 
 from PySide6.QtCore import QCoreApplication, QObject, Property, QSettings, QTimer, QUrl, Signal, Slot
@@ -12,6 +13,7 @@ from PySide6.QtCore import QCoreApplication, QObject, Property, QSettings, QTime
 from blanky.audio_service import (
     apply_audio_input_preset,
     audio_info,
+    input_available,
     get_audio_input_preset,
     get_audio_input_settings,
     get_audio_output_volume,
@@ -41,6 +43,7 @@ from blanky.speech_service import (
 from blanky.voice_worker import VoiceWorker
 from blanky.wakeword_service import get_wakeword_service
 from blanky.command_parser import interpret_online_commands, parse_command
+from blanky.openai_activity import activity_snapshot
 from blanky.color_vision_profiles import get_profile_tokens
 
 
@@ -59,6 +62,7 @@ class BlankyController(QObject):
     customAppearanceChanged = Signal()
     monitorEventsTextChanged = Signal()
     listeningChanged = Signal()
+    microphoneAvailableChanged = Signal()
     languageChanged = Signal()
     ttsVoiceChanged = Signal()
     ttsVoiceOptionsChanged = Signal()
@@ -241,6 +245,8 @@ class BlankyController(QObject):
         self._mqtt_topic_prefix = str(self._settings.value("mqttTopicPrefix", MQTT_TOPIC_PREFIX) or MQTT_TOPIC_PREFIX).strip("/")
         self._opcua_url = str(self._settings.value("opcuaUrl", OPCUA_URL) or OPCUA_URL)
         self._openai_key_configured = bool(os.environ.get("OPENAI_API_KEY"))
+        self._microphone_available = False
+        self._next_microphone_check = 0.0
         saved_appearance = str(self._settings.value("appearanceMode", "dark") or "dark").lower()
         legacy_large_readability = saved_appearance == "large_readability"
         self._appearance_mode = saved_appearance if saved_appearance in {
@@ -510,6 +516,10 @@ class BlankyController(QObject):
     def openAiKeyConfigured(self):
         return self._openai_key_configured
 
+    @Property(bool, notify=microphoneAvailableChanged)
+    def microphoneAvailable(self):
+        return self._microphone_available
+
     @Property(str, notify=audioDiagnosticLogTextChanged)
     def audioDiagnosticLogText(self):
         if not self._audio_diagnostic_entries:
@@ -714,6 +724,7 @@ class BlankyController(QObject):
         if not self._openai_key_configured:
             self._openai_key_configured = True
             self.openAiKeyConfiguredChanged.emit()
+        self._refresh()
 
     @Slot(str)
     def setLanguage(self, lang: str):
@@ -1065,6 +1076,15 @@ class BlankyController(QObject):
         if self._listening:
             return
 
+        if not input_available():
+            if self._microphone_available:
+                self._microphone_available = False
+                self.microphoneAvailableChanged.emit()
+            self._next_microphone_check = 0.0
+            self._set_status("Entrada de microfone indisponível" if self._language == "pt" else "Microphone input unavailable")
+            self._refresh()
+            return
+
         try:
             self._stop_and_flush_audio()
             self._wakeword.set_paused(True)
@@ -1274,14 +1294,25 @@ class BlankyController(QObject):
     def _build_comm_status_compact(self, health: dict) -> str:
         wake = self._wakeword.health()
         states = {
-            "microphone": "connected" if health.get("microphone_ready") else "offline",
-            "mqtt_base": "connected" if health.get("mqtt_base_connected") else "offline",
+            "microphone": ("communicating" if self._listening else "standby") if health.get("microphone_ready") else "offline",
+            "openai": self._openai_card_state(health),
             "mqtt_phone": "communicating" if health.get("mqtt_panel_active") else "silent",
             "opcua": "connected" if health.get("opcua_connected") else "offline",
         }
         if WAKEWORD_ENABLED:
             states["wakeword"] = "connected" if wake.get("enabled") and wake.get("running") else "offline"
         return "|".join(f"{key}={value}" for key, value in states.items())
+
+    def _openai_card_state(self, health: dict) -> str:
+        if not self._openai_key_configured:
+            return "offline"
+        activity = health.get("openai_activity") or {}
+        if activity.get("active"):
+            return "communicating"
+        last = activity.get("last")
+        if not last:
+            return "standby"
+        return "completed" if last.get("ok") else "error"
 
     def _build_comm_details_compact(self, health: dict) -> str:
         is_pt = self._language == "pt"
@@ -1298,12 +1329,30 @@ class BlankyController(QObject):
                 else f"Last message {whole_seconds} s ago"
             )
         details = {
-            "microphone": "A aguardar voz" if is_pt else "Waiting for voice",
-            "mqtt_base": "Ligação ao servidor" if is_pt else "Server connection",
+            "microphone": (
+                (("A captar voz" if is_pt else "Capturing voice") if self._listening else
+                 ("Entrada pronta; jack incerto" if is_pt else "Input ready; jack unverified"))
+                if health.get("microphone_ready") else
+                ("Sem entrada de captura" if is_pt else "No capture input")
+            ),
+            "openai": self._openai_card_detail(health, is_pt),
             "mqtt_phone": mqtt_phone,
             "opcua": self._opcua_card_detail(health, is_pt),
         }
         return "|".join(f"{key}={value}" for key, value in details.items())
+
+    def _openai_card_detail(self, health: dict, is_pt: bool) -> str:
+        if not self._openai_key_configured:
+            return "Configura a chave em Definições" if is_pt else "Set the key in Settings"
+        activity = health.get("openai_activity") or {}
+        if activity.get("active"):
+            return "A processar pedido" if is_pt else "Processing request"
+        last = activity.get("last")
+        if not last:
+            return "À espera do primeiro pedido" if is_pt else "Waiting for first request"
+        if not last.get("ok"):
+            return "Último pedido falhou" if is_pt else "Last request failed"
+        return f"{last['operation']}: {last['ms']} ms"
 
     def _opcua_card_detail(self, health: dict, is_pt: bool) -> str:
         if not health.get("opcua_connected"):
@@ -1727,8 +1776,15 @@ class BlankyController(QObject):
 
         snapshot = self._bridge.get_snapshot()
         health = self._bridge.health()
-        mic = audio_info()
-        health["microphone_ready"] = bool(mic.get("ready"))
+        now = time.monotonic()
+        if now >= self._next_microphone_check:
+            available = input_available()
+            if available != self._microphone_available:
+                self._microphone_available = available
+                self.microphoneAvailableChanged.emit()
+            self._next_microphone_check = now + 2.0
+        health["microphone_ready"] = self._microphone_available
+        health["openai_activity"] = activity_snapshot()
         self._update_state_compact(snapshot.get("state", {}))
 
         self._set_comm_status_compact(self._build_comm_status_compact(health))

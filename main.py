@@ -9,7 +9,11 @@ from blanky.qml_app import run_app_qml
 
 def main():
     ensure_dirs()
-    init_audio()
+    try:
+        init_audio()
+    except Exception as exc:
+        # The interface and text controls remain usable without an input device.
+        print(f"Microphone input unavailable: {exc}")
     run_app_qml()
 
 

@@ -50,6 +50,8 @@ The gear button opens two areas:
 
 Connection fields start locked. Use the pencil icon to unlock them, then apply your changes. MQTT reconnects automatically; changing the OPC UA endpoint reconnects the persistent client to the new server.
 
+In the Communications cards, `OpenAI` replaces only the `MQTT Base` display; the MQTT service remains active. The OpenAI card makes no probe requests: it reports an unconfigured key, standby, a request in progress or the last request result. Its time is the duration of the last STT, AI interpretation or TTS generation/download request, not total speech time or a permanent connection latency. The Microphone card checks the capture input and disables `Speak` when it is unavailable. A USB adapter with an analog jack may not detect whether the microphone plug is inserted: `Input ready` does not confirm a physical microphone connection or captured audio.
+
 ## OPC UA: sending and receiving
 
 Blanky uses `asyncua` to send the existing `ns=4` commands and observe all 25 return signals in the `OPC UA Receber` map (currently `ns=5`, identifiers `i=2` through `i=26`). The receive namespace index is resolved from the URI `http://OPC UA Receber`; set `BLANKY_OPCUA_RECEIVE_NAMESPACE_URI` if the PLC uses another URI. The connection stays active without commands, using subscriptions or periodic reads if subscriptions are unavailable.

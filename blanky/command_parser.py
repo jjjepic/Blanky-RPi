@@ -6,6 +6,7 @@ from difflib import SequenceMatcher
 from typing import Tuple
 
 from openai import OpenAI
+from blanky.openai_activity import measure_request
 
 BASE_DIR = os.path.dirname(__file__)
 JSON_PATH = os.path.join(BASE_DIR, "commands.json")
@@ -102,15 +103,16 @@ def interpret_online_commands(raw_text: str, lang: str) -> list[str]:
         f"{guide}"
     )
     client = OpenAI()
-    response = client.chat.completions.create(
-        model=os.getenv("BLANKY_TEXTBOT_MODEL", "gpt-4o-mini"),
-        messages=[
-            {"role": "system", "content": instructions},
-            {"role": "user", "content": raw_text},
-        ],
-        response_format={"type": "json_object"},
-        temperature=0,
-    )
+    with measure_request("IA"):
+        response = client.chat.completions.create(
+            model=os.getenv("BLANKY_TEXTBOT_MODEL", "gpt-4o-mini"),
+            messages=[
+                {"role": "system", "content": instructions},
+                {"role": "user", "content": raw_text},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0,
+        )
     content = response.choices[0].message.content or "{}"
     payload = json.loads(content)
     commands = payload.get("commands", [])

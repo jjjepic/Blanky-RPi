@@ -55,6 +55,8 @@ O botão de engrenagem abre duas áreas independentes:
 
 Os campos que podem alterar uma ligação começam bloqueados. Use o ícone de lápis para os desbloquear e aplique as alterações quando terminar. MQTT reconecta automaticamente; ao mudar o endereço OPC UA, a ligação persistente é restabelecida no novo servidor.
 
+Nos cartões de Comunicações, `OpenAI` substitui apenas a apresentação de `MQTT Base`; o serviço MQTT continua ativo. O cartão OpenAI não faz pedidos de teste: indica chave por configurar, espera, pedido em curso ou resultado do último pedido. O tempo mostrado é a duração do último pedido STT, interpretação IA ou geração/descarregamento TTS, não o tempo total de fala ou uma latência de ligação permanente. O cartão Microfone verifica a entrada de captura e desativa `Falar` quando não está disponível. Num adaptador USB com jack analógico, o sistema pode não detetar se a ficha do microfone está inserida: `Entrada pronta` não confirma a ligação física nem áudio captado.
+
 ## OPC UA: envio e receção
 
 O Blanky usa `asyncua` para enviar os comandos existentes do mapa `ns=4` e observar os 25 sinais de retorno do mapa `OPC UA Receber` (atualmente `ns=5`, identificadores `i=2` a `i=26`). O índice do espaço de nomes de receção é resolvido pelo URI `http://OPC UA Receber`; pode ser alterado com `BLANKY_OPCUA_RECEIVE_NAMESPACE_URI` se o PLC usar outro URI. A ligação é mantida mesmo sem comandos, com subscrição dos sinais e leitura periódica como alternativa quando a subscrição não está disponível.

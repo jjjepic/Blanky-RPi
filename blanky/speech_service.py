@@ -1,6 +1,7 @@
 import os
 
 from openai import OpenAI
+from blanky.openai_activity import measure_request
 
 from blanky.config import (
     STT_MODEL,
@@ -95,7 +96,8 @@ def _transcribe_once(wav_path: str, lang: str, use_server_vad: bool):
 
     with open(wav_path, "rb") as f:
         kwargs["file"] = f
-        return _get_client().audio.transcriptions.create(**kwargs)
+        with measure_request("STT"):
+            return _get_client().audio.transcriptions.create(**kwargs)
 
 
 def stt_transcribe(wav_path: str, lang: str) -> str:
@@ -129,30 +131,23 @@ def tts_speak_to_wav(
     lang: str = "pt",
 ):
     playback_speed = max(0.25, min(4.0, float(speed if speed is not None else 1.0)))
-    if playback_speed < 0.95:
-        instructions = (
-            "Fala mais devagar e com pausas claras."
-            if lang == "pt"
-            else "Speak slowly with clear pauses."
-        )
-    elif playback_speed > 1.05:
-        instructions = (
-            "Fala mais depressa, mantendo os comandos claros."
-            if lang == "pt"
-            else "Speak faster while keeping commands clear."
-        )
-    else:
-        instructions = (
-            "Fala num ritmo natural e claro para comandos industriais."
-            if lang == "pt"
-            else "Speak at a natural, clear pace for industrial commands."
-        )
-    speech = _get_client().audio.speech.create(
-        model=TTS_MODEL,
-        voice=voice or _ACTIVE_VOICE,
-        input=text,
-        response_format="wav",
-        instructions=instructions,
+    instructions = (
+        "Fala em português europeu, de forma natural e próxima. Usa entoação suave, "
+        "pausas breves na pontuação e dicção clara para nomes e estados da máquina. "
+        "Evita um tom robótico ou dramático; não acrescentes palavras."
+        if lang == "pt" else
+        "Speak naturally and warmly, with gentle intonation and brief pauses at punctuation. "
+        "Keep machine names and states clear, without sounding robotic or adding words."
     )
+    with measure_request("TTS"):
+        speech = _get_client().audio.speech.create(
+            model=TTS_MODEL,
+            voice=voice or _ACTIVE_VOICE,
+            input=text,
+            response_format="wav",
+            instructions=instructions,
+            speed=playback_speed,
+        )
+        audio_bytes = speech.read()
     with open(out_wav_path, "wb") as f:
-        f.write(speech.read())
+        f.write(audio_bytes)

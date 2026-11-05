@@ -33,6 +33,7 @@ from blanky.config import (
 )
 
 _ACTIVE_INPUT_DEVICE: Optional[int] = None
+_ACTIVE_INPUT_NAME: Optional[str] = None
 _ACTIVE_FS: Optional[int] = None
 _FALLBACK_SAMPLE_RATES = (16000, 48000, 44100, 32000, 22050, 8000)
 _LAST_RECORD_DIAG: dict = {}
@@ -352,11 +353,31 @@ def _choose_sample_rate(device: Optional[int]) -> int:
 
 
 def init_audio():
-    global _ACTIVE_INPUT_DEVICE, _ACTIVE_FS
-    _ACTIVE_INPUT_DEVICE = _resolve_input_device()
-    _ACTIVE_FS = _choose_sample_rate(_ACTIVE_INPUT_DEVICE)
-    sd.default.device = (_ACTIVE_INPUT_DEVICE, None)
-    sd.default.samplerate = _ACTIVE_FS
+    global _ACTIVE_INPUT_DEVICE, _ACTIVE_INPUT_NAME, _ACTIVE_FS
+    device = _resolve_input_device()
+    sample_rate = _choose_sample_rate(device)
+    info = sd.query_devices(device, "input")
+    _ACTIVE_INPUT_DEVICE = device
+    _ACTIVE_INPUT_NAME = str(info.get("name") or "")
+    _ACTIVE_FS = sample_rate
+    sd.default.device = (device, None)
+    sd.default.samplerate = sample_rate
+
+
+def input_available() -> bool:
+    """Check the capture endpoint, not an analog microphone plug or audio level."""
+    try:
+        if _ACTIVE_FS is None:
+            init_audio()
+        info = sd.query_devices(_ACTIVE_INPUT_DEVICE, "input")
+        if str(info.get("name") or "") != _ACTIVE_INPUT_NAME:
+            return False
+        sd.check_input_settings(
+            device=_ACTIVE_INPUT_DEVICE, samplerate=_ACTIVE_FS, channels=1, dtype="float32"
+        )
+        return True
+    except Exception:
+        return False
 
 
 def record_wav(path: str, seconds: int = SECONDS, fs: Optional[int] = None):
@@ -658,7 +679,7 @@ def is_audio_ready() -> bool:
 
 def audio_info() -> dict:
     return {
-        "ready": is_audio_ready(),
+        "ready": input_available(),
         "input_device": _ACTIVE_INPUT_DEVICE,
         "sample_rate": _ACTIVE_FS,
         "last_record_diag": dict(_LAST_RECORD_DIAG),
