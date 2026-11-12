@@ -98,7 +98,7 @@ Configure o prefixo do dashboard como `blanky` e introduza apenas o sufixo indic
 
 | Grupo | Widget | Topic (com prefixo `blanky` no dashboard) | Configuração |
 | --- | --- | --- | --- |
-| Disponibilidade | Node Status | `monitor/availability` | Valores `online` / `offline`. Se o widget não permitir estes valores, use Multi-State Indicator. |
+| Disponibilidade | Multi-State Indicator | `monitor/availability` | `online` = Blanky disponível; `offline` = Blanky indisponível. Widget apenas de subscrição, sem pedido de sincronização. |
 | Sistema | LED Indicator | `state/start` | Payload on `1`, off `0`; nome fixo `Sistema`. O LED não altera o nome dinamicamente. |
 | Sistema | Text Output | `monitor/pt/system` | Mostra `Iniciado` ou `Parado`; colocar ao lado do LED. |
 | Modo atual | Multi-State Indicator | `monitor/mode` | `stopped` = Parado; `choose_mode` = Escolher modo; `fast` = Rápido; `ideal` = Ideal; `manual` = Manual; `changing` = A escolher novo modo. |
@@ -112,7 +112,7 @@ Configure o prefixo do dashboard como `blanky` e introduza apenas o sufixo indic
 | Tempos OPC UA | Text Output | `monitor/pt/opcua_write_time`, `monitor/pt/opcua_ack_time` | Última escrita e última confirmação do PLC, em ms; ausência indicada por texto. Não são tempos MQTT. |
 | Última atividade | Text Output | `monitor/pt/last_message` | Última resposta ou recusa legível; não é um histórico completo. |
 
-Os equivalentes em inglês estão em `monitor/en/...`. Todos os tópicos `monitor/*` são retidos, salvo se o broker ainda não tiver recebido a primeira publicação. Use texto, símbolo e posição além da cor; evite usar só vermelho/verde para estados críticos. O Node Status indica a **presença do processo Blanky no broker**, não que o sistema foi iniciado nem que o PLC está ligado. O valor `offline` é publicado ao sair normalmente e pelo Last Will se a ligação cair inesperadamente; pode haver um pequeno atraso até o broker detetar a perda. Ignore os últimos estados retidos quando a disponibilidade estiver `offline`.
+Os equivalentes em inglês estão em `monitor/en/...`. Todos os tópicos `monitor/*` são retidos, salvo se o broker ainda não tiver recebido a primeira publicação. Use texto, símbolo e posição além da cor; evite usar só vermelho/verde para estados críticos. **Não use o widget Node Status** com `monitor/availability`: a versão da app que pede `Payload sync request` publica um pedido, mas o Blanky não implementa esse protocolo de pedido/resposta. Nunca publique nesse tópico, pois pode substituir o valor retido. O Multi-State Indicator subscreve a disponibilidade do **processo Blanky no broker**, não o arranque do sistema ou a ligação ao PLC. O valor `offline` é publicado ao sair normalmente e pelo Last Will se a ligação cair inesperadamente; pode haver um pequeno atraso até o broker detetar a perda. Ignore os últimos estados retidos quando a disponibilidade estiver `offline`.
 
 Os tópicos `state/*` e `monitor/*` representam o estado interno do Blanky. A ligação OPC UA e o feedback indicam comunicação, **não confirmam individualmente a posição física de cada atuador**. Os sensores/estados recebidos do PLC ainda não são publicados em MQTT como estados físicos por componente.
 
