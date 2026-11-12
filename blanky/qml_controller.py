@@ -43,6 +43,7 @@ from blanky.wakeword_service import get_wakeword_service
 from blanky.command_parser import interpret_online_commands, parse_command
 from blanky.openai_activity import activity_snapshot
 from blanky.color_vision_profiles import get_profile_tokens
+from blanky.command_messages import rejection_for_event, rejection_message
 
 
 class BlankyController(QObject):
@@ -126,8 +127,6 @@ class BlankyController(QObject):
             "awaiting_interaction": "Pode começar.",
             "text_received_response": "A perceber...",
             "voice_prompt": "Fale agora.",
-            "no_command_response": "Tente novamente.",
-            "no_speech_response": "Fale novamente.",
             "system_reset_status": "Sistema reiniciado",
             "shutting_down_status": "A desligar...",
             "starting_status": "A preparar...",
@@ -156,16 +155,6 @@ class BlankyController(QObject):
             "voice_preview": "Ol\u00e1, eu sou {voice}.",
             "system_reset": "Sistema reiniciado.",
             "system_shutdown": "A desligar.",
-            "no_change_stop": "Sem alteração: sistema já estava parado.",
-            "no_change_inactive": "Sem alteração: {command} já estava desativado.",
-            "no_change_active": "Sem alteração: {command} já estava ativo.",
-            "invalid_unknown": "Comando não reconhecido.",
-            "invalid_audio": "Não foi detetado áudio.",
-            "workflow_before_mode": "Não pode ainda. Depois de START deve escolher um modo: rápido, ideal ou manual. Pode também dizer STOP.",
-            "workflow_change_mode": "Modo de troca ativo. Escolha agora: rápido, ideal ou manual. Ou STOP.",
-            "workflow_direct_mode": "Não pode mudar diretamente de modo. Use MODE_CHANGE e depois escolha o novo modo, ou diga STOP.",
-            "workflow_components": "Neste modo não pode comandar componentes. Use MODE_CHANGE ou STOP.",
-            "workflow_manual": "No modo manual não pode escolher rápido/ideal diretamente. Use MODE_CHANGE primeiro.",
         },
         "en": {
             "language_status": "🇬🇧 Ready — English (EN)",
@@ -186,8 +175,6 @@ class BlankyController(QObject):
             "awaiting_interaction": "You can start.",
             "text_received_response": "Understanding...",
             "voice_prompt": "Speak now.",
-            "no_command_response": "Try again.",
-            "no_speech_response": "Please speak again.",
             "system_reset_status": "System reset",
             "shutting_down_status": "Shutting down...",
             "starting_status": "Getting ready...",
@@ -216,16 +203,6 @@ class BlankyController(QObject):
             "voice_preview": "Hello, I am {voice}.",
             "system_reset": "System reset.",
             "system_shutdown": "Shutting down.",
-            "no_change_stop": "No change: system was already stopped.",
-            "no_change_inactive": "No change: {command} was already inactive.",
-            "no_change_active": "No change: {command} was already active.",
-            "invalid_unknown": "Command not recognized.",
-            "invalid_audio": "No audio was detected.",
-            "workflow_before_mode": "Not allowed yet. After START, choose a mode: fast, ideal or manual. You can also say STOP.",
-            "workflow_change_mode": "Mode change is active. Choose now: fast, ideal or manual. Or STOP.",
-            "workflow_direct_mode": "Direct mode switch is not allowed. Use MODE_CHANGE and then select the new mode, or say STOP.",
-            "workflow_components": "In this mode you cannot control components. Use MODE_CHANGE or STOP.",
-            "workflow_manual": "In manual mode you cannot switch directly to fast or ideal. Use MODE_CHANGE first.",
         },
     }
 
@@ -964,17 +941,18 @@ class BlankyController(QObject):
                 command, _ = parse_command(phrase, self._language)
                 commands.append(command)
         self._queue_text_commands(commands, raw)
-        # Keep the fallback explanation visible even after local commands are queued.
-        self._set_status(self._tr("text_offline_status"))
-        self._set_recognized(self._tr("text_online_fallback"))
+        # Keep the fallback notice without replacing a command rejection.
+        self._set_status(self._tr("text_online_fallback"))
         self.textOnlineFallbackRequested.emit()
 
     @Slot(object, str)
     def _queue_text_commands(self, commands, raw: str):
         valid_commands = [str(command).upper() for command in commands if str(command).strip()]
         if not valid_commands:
+            _, response = self._bridge.process_command("UNKNOWN", self._language, source="text")
             self._set_status(self._tr("text_no_commands"))
-            self._set_recognized(self._tr("no_command_response"))
+            self._set_recognized(response)
+            self._enqueue_tts(response)
             return
 
         self._stop_and_flush_audio()
@@ -991,12 +969,14 @@ class BlankyController(QObject):
         if command in {"UNKNOWN", "NO_AUDIO"}:
             _, response = self._bridge.process_command(command, self._language, source="text")
             self._set_status(self._tr("text_no_commands"))
-            self._set_recognized(self._tr("no_command_response"))
+            self._set_recognized(response)
             if response:
                 self._enqueue_tts(response)
             return
-        _, response = self._bridge.process_command(command, self._language, source="text")
+        accepted, response = self._bridge.process_command(command, self._language, source="text")
         self._set_command_interaction("text_status", command)
+        if not accepted and response:
+            self._set_recognized(response)
         if response:
             self._enqueue_tts(response)
         if self._text_command_queue:
@@ -1014,6 +994,8 @@ class BlankyController(QObject):
         )
         response = mqtt_message or (self._bridge.response_for_command(command, self._language) if accepted else "")
         self._set_command_interaction("button_status", command)
+        if not accepted and response:
+            self._set_recognized(response)
         if response:
             self._enqueue_tts(response)
 
@@ -1082,6 +1064,7 @@ class BlankyController(QObject):
             self._worker.commandRecognized.connect(self._on_voice_command)
             self._worker.diagnostic.connect(self._append_audio_diagnostic)
             self._worker.spoken.connect(self._remember_tts_text)
+            self._worker.spoken.connect(self._set_recognized)
             self._worker.done.connect(self._on_done)
             self._worker.start()
         except Exception as exc:
@@ -1170,7 +1153,7 @@ class BlankyController(QObject):
                 return f"{'Avançar' if action == 'EXTEND' else 'Recuar'} Cilindro {letter}."
             return f"{'Extend' if action == 'EXTEND' else 'Retract'} Cylinder {letter}."
 
-        return self._tr("no_command_response", lang=lang)
+        return rejection_message("unknown", lang or self._language)
 
     def _set_command_interaction(self, status_key: str, command: str):
         self._set_status(self._tr(status_key))
@@ -1180,11 +1163,11 @@ class BlankyController(QObject):
         canonical = (command or "").strip().upper()
         if canonical == "NO_AUDIO":
             self._set_status(self._tr("voice_no_speech_status"))
-            self._set_recognized(self._tr("no_speech_response"))
+            self._set_recognized(rejection_message("no_audio", self._language))
             return
         if canonical in {"UNKNOWN", ""}:
             self._set_status(self._tr("text_no_commands"))
-            self._set_recognized(self._tr("no_command_response"))
+            self._set_recognized(rejection_message("unknown", self._language))
             return
         self._set_command_interaction("voice_command_status", canonical)
 
@@ -1468,28 +1451,7 @@ class BlankyController(QObject):
             response = self._bridge.response_for_command(command, self._language)
             return response if response != command else original
 
-        normalized = original.lower()
-        if command == "UNKNOWN":
-            return self._tr("invalid_unknown")
-        if command == "NO_AUDIO":
-            return self._tr("invalid_audio")
-        if "sem alteracao" in normalized or "no change" in normalized:
-            if command == "STOP":
-                return self._tr("no_change_stop")
-            if command.endswith("_OFF") or command.endswith("_RETRACT"):
-                return self._tr("no_change_inactive", command=command)
-            return self._tr("no_change_active", command=command)
-        if "nao pode ainda" in normalized or "not allowed yet" in normalized:
-            return self._tr("workflow_before_mode")
-        if "modo de troca" in normalized or "mode change is active" in normalized:
-            return self._tr("workflow_change_mode")
-        if "nao pode mudar diretamente" in normalized or "direct mode switch" in normalized:
-            return self._tr("workflow_direct_mode")
-        if "neste modo nao pode" in normalized or "cannot control components" in normalized:
-            return self._tr("workflow_components")
-        if "no modo manual" in normalized or "in manual mode" in normalized:
-            return self._tr("workflow_manual")
-        return original
+        return rejection_for_event(event, self._language)
 
     def _source_label(self, source: str) -> str:
         if self._language == "en":
@@ -1787,6 +1749,8 @@ class BlankyController(QObject):
                 self._stop_and_flush_audio()
                 self._set_command_interaction("mqtt_status", str(ev.get("command") or ""))
                 detail = self._localized_event_detail(ev)
+                if not ev.get("accepted"):
+                    self._set_recognized(detail)
                 if detail:
                     self._enqueue_tts(detail)
 

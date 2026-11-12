@@ -1,10 +1,10 @@
 {
   "pt": {
     "activate": ["ativar", "ativa", "ligar", "liga", "trabalhar", "trabalha", "avancar", "avanca", "subir", "sobe", "colocar a funcionar", "poe a funcionar"],
-    "deactivate": ["desativar", "desativa", "desligar", "desliga", "parar", "para", "descer", "desce", "cortar", "interromper"],
+    "deactivate": ["desativar", "desativa", "desligar", "desliga", "parar", "descer", "desce", "cortar", "interromper"],
 
-    "start": ["comeca", "comecar", "avanca", "avancar", "start", "star", "starte", "estarte", "salte", "marcha", "marchar", "inicia", "iniciar", "inicializar", "arranca", "arrancar", "inicia o sistema", "iniciar sistema", "poe o sistema a trabalhar"],
-    "stop": ["para", "parar", "stop", "stope", "estop", "solte", "pausa", "pausar", "parou", "termina", "terminar", "interrompe", "interromper", "desliga o sistema", "para o sistema"],
+    "start": ["comeca", "comecar", "start", "star", "starte", "estarte", "salte", "marcha", "marchar", "inicia", "iniciar", "inicializar", "arranca", "arrancar", "inicia o sistema", "iniciar sistema", "poe o sistema a trabalhar"],
+    "stop": ["para", "parar", "stop", "stope", "estop", "solte", "pausa", "pausar", "parou", "termina", "terminar", "interrompe", "interromper", "desliga o sistema"],
 
     "motor_word": ["motor"],
 
@@ -18,7 +18,7 @@
     "light_red": ["luz vermelha", "vermelha", "luz de cor vermelha"],
 
     "robot_word": ["robo"],
-    "robot_go": ["avanca", "avancar", "trabalha", "trabalhar", "vai", "manda", "mandar"],
+    "robot_go": ["trabalha", "trabalhar", "vai", "manda", "mandar"],
     "metal": ["metal", "metais", "metalica", "metalicas", "metalico", "metalicos"],
     "nonmetal": ["nao metal", "nao-metal"],
 

@@ -22,6 +22,7 @@ from blanky.mqtt_topics import (
     should_use_pulse,
 )
 from blanky.opcua_service import get_opcua_bridge
+from blanky.command_messages import no_change_message, rejection_message
 
 
 class MQTTBridge:
@@ -227,21 +228,24 @@ class MQTTBridge:
             )
 
             if command in {"UNKNOWN", "NO_AUDIO"}:
-                self._add_event(command=command, source=source, accepted=False, detail=self._workflow_message_invalid(command, lang))
-                return False, None
+                reason = "no_audio" if command == "NO_AUDIO" else "unknown"
+                msg = rejection_message(reason, lang)
+                self._add_event(command=command, source=source, accepted=False, detail=msg, reason=reason)
+                return False, msg
 
             if not bypass_workflow:
-                invalid_msg = self._workflow_message_invalid(command, lang)
-                if invalid_msg:
+                invalid_reason = self._workflow_rejection_reason(command)
+                if invalid_reason:
+                    invalid_msg = rejection_message(invalid_reason, lang)
                     self._publish_rejected(command, "workflow_blocked")
-                    self._add_event(command=command, source=source, accepted=False, detail=invalid_msg)
+                    self._add_event(command=command, source=source, accepted=False, detail=invalid_msg, reason=invalid_reason)
                     return False, invalid_msg
 
             if command == "START":
                 if self.state["start"] == 1:
                     msg = self._no_change_message(command, lang)
                     self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg)
+                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
                     return False, msg
                 self._emit_for_command(command, emit_pulse)
                 self.state["start"] = 1
@@ -253,7 +257,7 @@ class MQTTBridge:
                 if self._is_everything_reset():
                     msg = self._no_change_message(command, lang)
                     self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg)
+                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
                     return False, msg
                 self._emit_for_command(command, emit_pulse)
                 self._reset_all_state()
@@ -265,7 +269,7 @@ class MQTTBridge:
                 if self.state["mode_fast"] == 1:
                     msg = self._no_change_message(command, lang)
                     self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg)
+                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
                     return False, msg
                 self._emit_for_command(command, emit_pulse)
                 self._set_modes(fast=1, ideal=0, manual=0, change=0)
@@ -275,7 +279,7 @@ class MQTTBridge:
                 if self.state["mode_ideal"] == 1:
                     msg = self._no_change_message(command, lang)
                     self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg)
+                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
                     return False, msg
                 self._emit_for_command(command, emit_pulse)
                 self._set_modes(fast=0, ideal=1, manual=0, change=0)
@@ -285,7 +289,7 @@ class MQTTBridge:
                 if self.state["mode_manual"] == 1:
                     msg = self._no_change_message(command, lang)
                     self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg)
+                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
                     return False, msg
                 self._emit_for_command(command, emit_pulse)
                 self._set_modes(fast=0, ideal=0, manual=1, change=0)
@@ -295,7 +299,7 @@ class MQTTBridge:
                 if self.state["mode_change"] == 1:
                     msg = self._no_change_message(command, lang)
                     self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg)
+                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
                     return False, msg
                 if self.state["mode_manual"] == 1:
                     self._deactivate_manual_components(lang)
@@ -312,7 +316,7 @@ class MQTTBridge:
                 if self.state[key] == value:
                     msg = self._no_change_message(command, lang)
                     self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg)
+                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
                     return False, msg
                 self._emit_for_command(command, emit_pulse)
                 self.state[key] = value
@@ -328,7 +332,7 @@ class MQTTBridge:
                 if self.state[key] == value:
                     msg = self._no_change_message(command, lang)
                     self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg)
+                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
                     return False, msg
                 self._emit_for_command(command, emit_pulse)
                 self.state[key] = value
@@ -340,7 +344,7 @@ class MQTTBridge:
                 if self.state["light_green"] == 1:
                     msg = self._no_change_message(command, lang)
                     self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg)
+                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
                     return False, msg
                 self._emit_for_command(command, emit_pulse)
                 self.state["light_green"] = 1
@@ -351,7 +355,7 @@ class MQTTBridge:
                 if self.state["light_green"] == 0:
                     msg = self._no_change_message(command, lang)
                     self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg)
+                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
                     return False, msg
                 self._emit_for_command(command, emit_pulse)
                 self.state["light_green"] = 0
@@ -363,7 +367,7 @@ class MQTTBridge:
                 if self.state["light_red"] == 1:
                     msg = self._no_change_message(command, lang)
                     self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg)
+                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
                     return False, msg
                 self._emit_for_command(command, emit_pulse)
                 self.state["light_red"] = 1
@@ -373,7 +377,7 @@ class MQTTBridge:
             if command == "RED_OFF":
                 if self.state["light_red"] == 0:
                     msg = self._no_change_message(command, lang)
-                    self._add_event(command=command, source=source, accepted=False, detail=msg)
+                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
                     return False, msg
                 self._emit_for_command(command, emit_pulse)
                 self.state["light_red"] = 0
@@ -384,7 +388,7 @@ class MQTTBridge:
             if command == "ROBOT_TO_METAL":
                 if self.state["robot_metal"] == 1 and self.state["robot_nonmetal"] == 0:
                     msg = self._no_change_message(command, lang)
-                    self._add_event(command=command, source=source, accepted=False, detail=msg)
+                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
                     return False, msg
                 self._emit_for_command(command, emit_pulse)
                 self.state["robot_metal"] = 1
@@ -398,7 +402,7 @@ class MQTTBridge:
             if command == "ROBOT_TO_NONMETAL":
                 if self.state["robot_metal"] == 0 and self.state["robot_nonmetal"] == 1:
                     msg = self._no_change_message(command, lang)
-                    self._add_event(command=command, source=source, accepted=False, detail=msg)
+                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
                     return False, msg
                 self._emit_for_command(command, emit_pulse)
                 self.state["robot_metal"] = 0
@@ -539,16 +543,12 @@ class MQTTBridge:
             or command in {"GREEN_ON", "GREEN_OFF", "RED_ON", "RED_OFF", "ROBOT_TO_METAL", "ROBOT_TO_NONMETAL"}
         )
 
-    def _workflow_message_invalid(self, command: str, lang: str) -> Optional[str]:
+    def _workflow_rejection_reason(self, command: str) -> Optional[str]:
         if command in {"UNKNOWN", "NO_AUDIO"}:
             return None
 
         if self.state["start"] == 0 and command not in {"START", "STOP"}:
-            return (
-                "Nao pode executar esse comando agora. Primeiro diga START."
-                if lang == "pt"
-                else "You cannot run that command now. Please set START first."
-            )
+            return "before_start"
 
         if command in {"START", "STOP"}:
             return None
@@ -558,20 +558,12 @@ class MQTTBridge:
         if mode == "none":
             if command in {"MODE_FAST", "MODE_IDEAL", "MODE_MANUAL"}:
                 return None
-            return (
-                "Nao pode ainda. Depois de START deve escolher um modo: rapido, ideal ou manual. Pode tambem dizer STOP."
-                if lang == "pt"
-                else "Not allowed yet. After START, choose a mode: fast, ideal or manual. You can also say STOP."
-            )
+            return "choose_mode"
 
         if mode == "change":
             if command in {"MODE_FAST", "MODE_IDEAL", "MODE_MANUAL"}:
                 return None
-            return (
-                "Modo de troca ativo. Escolha agora: rapido, ideal ou manual. Ou STOP."
-                if lang == "pt"
-                else "Mode change is active. Choose now: fast, ideal or manual. Or STOP."
-            )
+            return "choose_new_mode"
 
         if mode in {"fast", "ideal"}:
             if command == "MODE_UNSPEC":
@@ -579,46 +571,26 @@ class MQTTBridge:
             if command in {"MODE_FAST", "MODE_IDEAL", "MODE_MANUAL"}:
                 if (mode == "fast" and command == "MODE_FAST") or (mode == "ideal" and command == "MODE_IDEAL"):
                     return None
-                return (
-                    "Nao pode mudar diretamente de modo. Use MODE_CHANGE e depois escolha o novo modo, ou diga STOP."
-                    if lang == "pt"
-                    else "Direct mode switch is not allowed. Use MODE_CHANGE and then select the new mode, or say STOP."
-                )
+                return "change_mode_first"
             if self._is_component_command(command):
-                return (
-                    "Neste modo nao pode comandar componentes. Use MODE_CHANGE ou STOP."
-                    if lang == "pt"
-                    else "In this mode you cannot control components. Use MODE_CHANGE or STOP."
-                )
+                return "manual_only"
             return None
 
         if mode == "manual":
             if command == "MODE_UNSPEC":
                 return None
             if command in {"MODE_FAST", "MODE_IDEAL"}:
-                return (
-                    "No modo manual nao pode escolher rapido/ideal diretamente. Use MODE_CHANGE primeiro."
-                    if lang == "pt"
-                    else "In manual mode you cannot switch directly to fast/ideal. Use MODE_CHANGE first."
-                )
+                return "change_mode_first"
             return None
 
         return None
 
+    def _workflow_message_invalid(self, command: str, lang: str) -> Optional[str]:
+        reason = self._workflow_rejection_reason(command)
+        return rejection_message(reason, lang) if reason else None
+
     def _no_change_message(self, command: str, lang: str) -> str:
-        if command == "STOP":
-            return "Sem alteracao: sistema ja estava parado." if lang == "pt" else "No change: system was already stopped."
-        if command.endswith("_OFF") or command.endswith("_RETRACT"):
-            return (
-                f"Sem alteracao: {command} ja estava desativado."
-                if lang == "pt"
-                else f"No change: {command} was already inactive."
-            )
-        return (
-            f"Sem alteracao: {command} ja estava ativo."
-            if lang == "pt"
-            else f"No change: {command} was already active."
-        )
+        return no_change_message(command, lang)
 
     def _response_for_command(self, command: str, lang: str) -> str:
         pt = {
@@ -669,7 +641,7 @@ class MQTTBridge:
         mapping = pt if lang == "pt" else en
         return mapping.get(command, command)
 
-    def _add_event(self, command: str, source: str, accepted: bool, detail: Optional[str]):
+    def _add_event(self, command: str, source: str, accepted: bool, detail: Optional[str], reason: str = ""):
         event = {
             "id": self._next_event_id,
             "time": datetime.now().strftime("%H:%M:%S"),
@@ -677,6 +649,7 @@ class MQTTBridge:
             "command": command,
             "accepted": accepted,
             "detail": detail or "",
+            "reason": reason,
             "generation": self._event_generation,
         }
         self._next_event_id += 1

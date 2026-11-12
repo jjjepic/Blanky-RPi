@@ -39,6 +39,8 @@ Text-Bot starts in `Online` mode. AI interprets natural language and returns onl
 
 `Offline` can also be selected manually. It accepts variants in the local command list and applies the same safety rules.
 
+In Offline recognition, "advance cylinder A" selects the cylinder rather than starting the system; the Portuguese word "para" means stop only when used alone or at the start of a phrase. Rejections and no-change requests use natural PT/EN sentences shared by the Response area, Events and spoken reply, without internal command identifiers in the message text. Use the `Change mode` button before selecting another mode.
+
 Voice recognition uses the Online flow to interpret natural phrases. Without the AI service, voice does not execute commands; direct controls, MQTT and Text-Bot Offline stay available.
 
 ## Settings

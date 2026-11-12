@@ -44,6 +44,8 @@ O Text-Bot inicia em modo `Online`. Neste modo, a IA interpreta frases naturais 
 
 O modo `Offline` também pode ser escolhido manualmente. Aceita as variantes previstas na lista local e continua a aplicar as mesmas regras de segurança.
 
+No reconhecimento Offline, "avança o cilindro A" seleciona o cilindro, não o arranque do sistema; "para" só significa parar quando surge sozinho ou no início da frase. As recusas e pedidos sem alteração usam frases naturais em PT/EN, iguais na Resposta, nos Eventos e na resposta falada, sem identificadores internos no texto da mensagem. Para escolher outro modo, usa o botão `Mudar de modo`.
+
 O reconhecimento por voz utiliza o fluxo Online para interpretar frases naturais. Sem acesso ao serviço de IA, a voz não executa comandos; os controlos diretos, MQTT e Text-Bot Offline continuam disponíveis.
 
 ## Definições
