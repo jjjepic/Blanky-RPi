@@ -156,7 +156,7 @@ mosquitto_pub -h localhost -t blanky/mqtt_start -m 1
 
 You should see the command in Blanky Events and in `blanky/events/last_command` and `blanky/state/*` topics.
 To inspect only the new presentation topics, run `mosquitto_sub -h localhost -v -t 'blanky/monitor/#'`.
-To test phone Text-Bot without the app, run `mosquitto_pub -h localhost -t blanky/textbot/offline -m 'start'`. Check `blanky/monitor/en/phone_textbot_response` and Events.
+To test phone Text-Bot without operating the machine, run `mosquitto_pub -h localhost -t blanky/textbot/offline -m 'hello'`. An unrecognized-request response should appear in `blanky/monitor/en/phone_textbot_response` and Events, without sending a command to the PLC. Only then test operational commands under safe conditions.
 
 ## 6. Common issues
 
