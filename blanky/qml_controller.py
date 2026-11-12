@@ -1476,7 +1476,7 @@ class BlankyController(QObject):
             labels = {
                 "voice": "VOICE",
                 "text": "TEXT-BOT",
-                "mqtt_text": "PHONE TEXT-BOT",
+                "mqtt_text": "PHONE",
                 "mqtt_panel": "PHONE",
                 "button": "BUTTON",
             }
@@ -1484,7 +1484,7 @@ class BlankyController(QObject):
             labels = {
                 "voice": "VOZ",
                 "text": "TEXT-BOT",
-                "mqtt_text": "TEXT-BOT TELEMOVEL",
+                "mqtt_text": "TELEMOVEL",
                 "mqtt_panel": "TELEMOVEL",
                 "button": "BOTAO",
             }

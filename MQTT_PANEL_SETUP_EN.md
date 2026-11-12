@@ -138,7 +138,7 @@ IoT MQTT Panel can send complete phrases rather than only button codes. Add a **
 
 In Text Input, publish **plain text**, with JSON off, `retain` **off** and QoS `0`. The topic selects the mode; interpretation uses Blanky's active UI language. Separate multiple requests with semicolons, for example `start; manual mode; turn on motor 1`. Retained input messages are never executed, even if saved by mistake. Messages are limited to 1000 characters.
 
-The phone Text-Bot follows the same safety rules, Events and TTS flow as the local Text-Bot; audio plays on the Raspberry Pi, **not on the phone speaker**. Events identify the source as `PHONE TEXT-BOT`. The phone response has its own topic so voice and button activity does not overwrite it. Protect the broker: an accepted phrase can operate real actuators.
+The phone Text-Bot follows the same safety rules, Events and TTS flow as the local Text-Bot; audio plays on the Raspberry Pi, **not on the phone speaker**. Events identify the source as `PHONE`, just like the app buttons. The phone response has its own topic so voice and button activity does not overwrite it. Protect the broker: an accepted phrase can operate real actuators.
 
 ## 5. Test the connection
 
