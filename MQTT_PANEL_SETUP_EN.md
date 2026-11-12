@@ -110,11 +110,14 @@ Set the dashboard prefix to `blanky` and enter only the suffix below in Topic, f
 | Communications | Multi-State Indicator | `monitor/opcua` | `connected` / `disconnected`: OPC UA connection, not actuator confirmation. |
 | Communications | Text Output | `monitor/en/opcua_feedback` | `Active` or `Unavailable`: OPC UA feedback reception. |
 | OPC UA timings | Text Output | `monitor/en/opcua_write_time`, `monitor/en/opcua_ack_time` | Latest write and PLC signal acknowledgement in ms; unavailable values use text. These are not MQTT timings. |
-| Latest activity | Text Output | `monitor/en/last_message` | Latest readable response or refusal; not a full event history. |
+| Latest event: description | Text Output | `monitor/en/last_message` | Description of the latest Event, whether from voice, button, Text-Bot or phone. Not a full event history. |
+| Latest event: status | Multi-State Indicator | `monitor/last_event_status` | `none` = No events; `ok` = Accepted (OK); `rejected` = Rejected (REJECT). This does not confirm PLC actuation. |
 
 Portuguese equivalents are available under `monitor/pt/...`. All `monitor/*` topics are retained once first published. Use text, symbols and position in addition to color; do not rely only on red/green for critical states. **Do not use Node Status** with `monitor/availability`: the app version that requires a `Payload sync request` publishes a request, but Blanky does not implement that request/response protocol. Never publish to this topic, as doing so may overwrite its retained value. A subscribe-only Multi-State Indicator shows **Blanky's presence on the broker**, not that the system has started or that the PLC is connected. A clean exit publishes `offline`, and the Last Will publishes it after an unexpected disconnect; the broker may take some time to detect a lost connection. Disregard retained state values while availability is `offline`.
 
 `state/*` and `monitor/*` represent Blanky's internal state. The OPC UA connection and feedback indicate communication; they **do not individually confirm the physical position of each actuator**. PLC sensor/receive data is not yet published as per-component physical state over MQTT.
+
+`monitor/last_event_status` is language-independent and accompanies `monitor/en/last_message`. Configure both widgets as subscribe-only; do not publish to these topics.
 
 For advanced diagnostics, the existing topics remain available:
 

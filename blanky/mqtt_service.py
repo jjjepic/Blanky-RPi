@@ -155,6 +155,7 @@ class MQTTBridge:
             else:
                 self._publish("monitor/pt/last_message", "Sem atividade.")
                 self._publish("monitor/en/last_message", "No activity yet.")
+                self._publish("monitor/last_event_status", "none")
             phone_events = (event for event in reversed(self._events) if event["source"] == "mqtt_text")
             last_phone_event = next(phone_events, None)
             if last_phone_event is None:
@@ -775,6 +776,7 @@ class MQTTBridge:
             self._publish(f"monitor/{lang}/last_message", message)
             if event["source"] == "mqtt_text":
                 self._publish(f"monitor/{lang}/phone_textbot_response", message)
+        self._publish("monitor/last_event_status", "ok" if event["accepted"] else "rejected")
 
     def _publish_phone_event(self, event: dict):
         for lang in ("pt", "en"):

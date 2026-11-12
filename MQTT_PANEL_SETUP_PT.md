@@ -110,11 +110,14 @@ Configure o prefixo do dashboard como `blanky` e introduza apenas o sufixo indic
 | Comunicações | Multi-State Indicator | `monitor/opcua` | `connected` / `disconnected`: ligação OPC UA, não confirmação de atuação. |
 | Comunicações | Text Output | `monitor/pt/opcua_feedback` | `Ativo` ou `Indisponível`: receção de feedback OPC UA. |
 | Tempos OPC UA | Text Output | `monitor/pt/opcua_write_time`, `monitor/pt/opcua_ack_time` | Última escrita e última confirmação do PLC, em ms; ausência indicada por texto. Não são tempos MQTT. |
-| Última atividade | Text Output | `monitor/pt/last_message` | Última resposta ou recusa legível; não é um histórico completo. |
+| Último evento: descrição | Text Output | `monitor/pt/last_message` | Descrição do Evento mais recente, venha ele de voz, botão, Text-Bot ou telemóvel. Não é um histórico completo. |
+| Último evento: estado | Multi-State Indicator | `monitor/last_event_status` | `none` = Sem eventos; `ok` = Aceite (OK); `rejected` = Recusado (REJECT). Não significa confirmação de atuação pelo PLC. |
 
 Os equivalentes em inglês estão em `monitor/en/...`. Todos os tópicos `monitor/*` são retidos, salvo se o broker ainda não tiver recebido a primeira publicação. Use texto, símbolo e posição além da cor; evite usar só vermelho/verde para estados críticos. **Não use o widget Node Status** com `monitor/availability`: a versão da app que pede `Payload sync request` publica um pedido, mas o Blanky não implementa esse protocolo de pedido/resposta. Nunca publique nesse tópico, pois pode substituir o valor retido. O Multi-State Indicator subscreve a disponibilidade do **processo Blanky no broker**, não o arranque do sistema ou a ligação ao PLC. O valor `offline` é publicado ao sair normalmente e pelo Last Will se a ligação cair inesperadamente; pode haver um pequeno atraso até o broker detetar a perda. Ignore os últimos estados retidos quando a disponibilidade estiver `offline`.
 
 Os tópicos `state/*` e `monitor/*` representam o estado interno do Blanky. A ligação OPC UA e o feedback indicam comunicação, **não confirmam individualmente a posição física de cada atuador**. Os sensores/estados recebidos do PLC ainda não são publicados em MQTT como estados físicos por componente.
+
+`monitor/last_event_status` é independente do idioma e acompanha `monitor/pt/last_message`. Configure ambos os widgets apenas para subscrição, sem publicar nesses tópicos.
 
 Para diagnóstico avançado, continuam disponíveis:
 

@@ -130,6 +130,12 @@ class MonitorBridgeTests(unittest.TestCase):
         published = {topic: value for topic, value, _ in bridge.client.messages}
         self.assertEqual(published["blanky/monitor/pt/last_message"], "Primeiro, inicie o sistema.")
         self.assertEqual(published["blanky/monitor/en/last_message"], "First, start the system.")
+        self.assertEqual(published["blanky/monitor/last_event_status"], "rejected")
+
+        bridge._add_event("START", "voice", True, "Iniciado.")
+        published = {topic: value for topic, value, _ in bridge.client.messages}
+        self.assertEqual(published["blanky/monitor/pt/last_message"], "Iniciado.")
+        self.assertEqual(published["blanky/monitor/last_event_status"], "ok")
 
     def test_connect_publishes_presence_and_only_subscribes_commands(self):
         bridge = self._bridge()
@@ -138,6 +144,7 @@ class MonitorBridgeTests(unittest.TestCase):
         published = {topic: value for topic, value, _ in bridge.client.messages}
         self.assertEqual(published["blanky/monitor/availability"], "online")
         self.assertEqual(published["blanky/monitor/pt/last_message"], "Sem atividade.")
+        self.assertEqual(published["blanky/monitor/last_event_status"], "none")
         self.assertEqual(published["blanky/monitor/opcua"], "disconnected")
         self.assertTrue(all(topic.startswith(("blanky/mqtt_", "blanky/textbot/")) for topic in bridge.client.subscriptions))
         self.assertIn("blanky/textbot/online", bridge.client.subscriptions)
@@ -189,6 +196,7 @@ class MonitorBridgeTests(unittest.TestCase):
         bridge._on_connect(bridge.client, None, None, 0)
         published = {topic: value for topic, value, _ in bridge.client.messages}
         self.assertEqual(published["blanky/monitor/pt/last_message"], "Iniciado.")
+        self.assertEqual(published["blanky/monitor/last_event_status"], "ok")
         self.assertEqual(published["blanky/monitor/pt/phone_textbot_response"], "Primeiro, inicie o sistema.")
 
     def test_health_updates_only_when_changed(self):
