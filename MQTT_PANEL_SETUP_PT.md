@@ -40,7 +40,7 @@ Configure cada um como botão no IoT MQTT Panel. Envie o payload `1`.
 | Modo rápido | `blanky/mqtt_mode_fast` |
 | Modo ideal | `blanky/mqtt_mode_ideal` |
 | Modo manual | `blanky/mqtt_mode_manual` |
-| Trocar modo | `blanky/mqtt_mode_change` |
+| Mudar de modo | `blanky/mqtt_mode_change` |
 | Robô para metal | `blanky/mqtt_robot_to_metal` |
 | Robô para não metal | `blanky/mqtt_robot_to_nonmetal` |
 
@@ -90,14 +90,40 @@ blanky/state/robot_metal
 blanky/state/robot_nonmetal
 ```
 
-Adicione também widgets de texto para:
+Estes tópicos legados continuam disponíveis para os interruptores e indicadores existentes. Para um painel **apenas de leitura**, o Blanky publica agora também `blanky/monitor/*`. Nunca configure um painel de monitorização para publicar em `monitor/*` ou para enviar comandos por `mqtt_*`.
+
+### Organização recomendada no IoT MQTT Panel
+
+Configure o prefixo do dashboard como `blanky` e introduza apenas o sufixo indicado abaixo no campo Topic, por exemplo `state/start`. Em alternativa, use `blanky/state/start` e marque **Disable dashboard prefix topic**. Não combine o prefixo do dashboard com o caminho completo, ou pode subscrever `blanky/blanky/state/start` por engano.
+
+| Grupo | Widget | Topic (com prefixo `blanky` no dashboard) | Configuração |
+| --- | --- | --- | --- |
+| Disponibilidade | Node Status | `monitor/availability` | Valores `online` / `offline`. Se o widget não permitir estes valores, use Multi-State Indicator. |
+| Sistema | LED Indicator | `state/start` | Payload on `1`, off `0`; nome fixo `Sistema`. O LED não altera o nome dinamicamente. |
+| Sistema | Text Output | `monitor/pt/system` | Mostra `Iniciado` ou `Parado`; colocar ao lado do LED. |
+| Modo atual | Multi-State Indicator | `monitor/mode` | `stopped` = Parado; `choose_mode` = Escolher modo; `fast` = Rápido; `ideal` = Ideal; `manual` = Manual; `changing` = A escolher novo modo. |
+| Modo atual | Text Output (alternativa) | `monitor/pt/mode` | Mostra a frase em português, caso o Multi-State não permita rótulos legíveis. |
+| Motores | LED Indicator + Text Output | `state/motor_1` + `monitor/pt/motor_1` (também `_2`, `_3`) | `0` = Desligado; `1` = Ligado. |
+| Cilindros | LED Indicator + Text Output | `state/cyl_a` + `monitor/pt/cyl_a` (também `_b`, `_c`, `_d`) | `0` = Recuo solicitado; `1` = Avanço solicitado. Não indica posição medida. |
+| Luzes | LED Indicator + Text Output | `state/light_green` + `monitor/pt/light_green` (também `light_red`) | `0` = Apagada; `1` = Acesa. |
+| Robô | Text Output | `monitor/pt/robot` | Sem destino ativo, Destino: peças metálicas ou Destino: peças não metálicas. A seleção é temporária. |
+| Comunicações | Multi-State Indicator | `monitor/opcua` | `connected` / `disconnected`: ligação OPC UA, não confirmação de atuação. |
+| Comunicações | Text Output | `monitor/pt/opcua_feedback` | `Ativo` ou `Indisponível`: receção de feedback OPC UA. |
+| Tempos OPC UA | Text Output | `monitor/pt/opcua_write_time`, `monitor/pt/opcua_ack_time` | Última escrita e última confirmação do PLC, em ms; ausência indicada por texto. Não são tempos MQTT. |
+| Última atividade | Text Output | `monitor/pt/last_message` | Última resposta ou recusa legível; não é um histórico completo. |
+
+Os equivalentes em inglês estão em `monitor/en/...`. Todos os tópicos `monitor/*` são retidos, salvo se o broker ainda não tiver recebido a primeira publicação. Use texto, símbolo e posição além da cor; evite usar só vermelho/verde para estados críticos. O Node Status indica a **presença do processo Blanky no broker**, não que o sistema foi iniciado nem que o PLC está ligado. O valor `offline` é publicado ao sair normalmente e pelo Last Will se a ligação cair inesperadamente; pode haver um pequeno atraso até o broker detetar a perda. Ignore os últimos estados retidos quando a disponibilidade estiver `offline`.
+
+Os tópicos `state/*` e `monitor/*` representam o estado interno do Blanky. A ligação OPC UA e o feedback indicam comunicação, **não confirmam individualmente a posição física de cada atuador**. Os sensores/estados recebidos do PLC ainda não são publicados em MQTT como estados físicos por componente.
+
+Para diagnóstico avançado, continuam disponíveis:
 
 | Tópico | Conteúdo |
 | --- | --- |
 | `blanky/events/last_command` | Último comando e origem, em JSON |
 | `blanky/events/rejected` | Comando rejeitado e motivo, em JSON |
 
-O cartão `MQTT Telemóvel` na interface Blanky mostra atividade durante 30 segundos depois de receber uma mensagem válida.
+O cartão `MQTT Telemóvel` na interface Blanky mostra atividade durante 30 segundos depois de receber uma mensagem válida. `events/last_command` contém a última tentativa, mesmo que seja recusada; `events/rejected` não substitui `monitor/pt/last_message` para leitura acessível.
 
 ## 5. Testar a ligação
 
@@ -114,6 +140,7 @@ mosquitto_pub -h localhost -t blanky/mqtt_start -m 1
 ```
 
 Deve ver o comando nos Eventos do Blanky e nos tópicos `blanky/events/last_command` e `blanky/state/*`.
+Para observar apenas os novos tópicos de apresentação, use `mosquitto_sub -h localhost -v -t 'blanky/monitor/#'`.
 
 ## 6. Problemas frequentes
 

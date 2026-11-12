@@ -22,7 +22,8 @@ from blanky.mqtt_topics import (
     should_use_pulse,
 )
 from blanky.opcua_service import get_opcua_bridge
-from blanky.command_messages import no_change_message, rejection_message
+from blanky.command_messages import no_change_message, rejection_for_event, rejection_message
+from blanky.mqtt_monitor import health_monitor_updates, state_monitor_updates
 
 
 class MQTTBridge:
@@ -46,6 +47,7 @@ class MQTTBridge:
         self._ui_lang = "pt"
         self._opcua = get_opcua_bridge()
         self._last_mqtt_panel_rx = 0.0
+        self._monitor_health_cache: dict[str, str] = {}
 
         self.state = {
             "start": 0,
@@ -81,6 +83,7 @@ class MQTTBridge:
 
     def _create_client(self):
         client = self._mqtt.Client(client_id=self._client_id, clean_session=True)
+        client.will_set(self._topic("monitor/availability"), payload="offline", qos=1, retain=True)
         if self._username:
             client.username_pw_set(self._username, self._password)
         client.on_connect = self._on_connect
@@ -113,8 +116,9 @@ class MQTTBridge:
             return
 
         previous_client = self.client
-        self._connected = False
         if previous_client is not None:
+            self._publish_offline(previous_client)
+            self._connected = False
             try:
                 previous_client.disconnect()
             except Exception:
@@ -138,8 +142,16 @@ class MQTTBridge:
     def _on_connect(self, client, userdata, flags, rc):
         self._connected = (rc == 0)
         if self._connected:
+            self._monitor_health_cache = {}
             self._subscribe_command_topics()
             self.publish_all_state()
+            self._publish("monitor/availability", "online")
+            if self._events:
+                self._publish_monitor_event(self._events[-1])
+            else:
+                self._publish("monitor/pt/last_message", "Sem atividade.")
+                self._publish("monitor/en/last_message", "No activity yet.")
+            self.publish_monitor_health(self.health())
 
     def _on_disconnect(self, client, userdata, rc):
         self._connected = False
@@ -163,10 +175,10 @@ class MQTTBridge:
         self.process_command(command=command, lang=self._ui_lang, source="mqtt_panel", emit_pulse=False)
 
     def _connect(self):
+        self._connected = False
         try:
             self.client.connect(self._broker_host, self._broker_port, 30)
             self.client.loop_start()
-            self._connected = False
         except Exception:
             self.enabled = False
             self._connected = False
@@ -182,6 +194,43 @@ class MQTTBridge:
         if suppress_echo:
             self._echo_suppression[(topic, payload_str)] = time.monotonic() + 2.0
         self.client.publish(topic, payload_str, qos=1, retain=retain)
+        if topic_suffix.startswith("state/"):
+            key = topic_suffix.removeprefix("state/")
+            for monitor_suffix, monitor_payload in state_monitor_updates(self.state, key).items():
+                self._publish(monitor_suffix, monitor_payload)
+
+    def _publish_offline(self, client):
+        if not self._connected:
+            return
+        try:
+            info = client.publish(self._topic("monitor/availability"), "offline", qos=1, retain=True)
+            info.wait_for_publish(timeout=1.0)
+        except Exception:
+            pass
+
+    def close(self):
+        """Mark a clean exit offline; the broker's Will covers unexpected exits."""
+        client = self.client
+        if client is None:
+            return
+        self._publish_offline(client)
+        self._connected = False
+        try:
+            client.disconnect()
+        except Exception:
+            pass
+        try:
+            client.loop_stop()
+        except Exception:
+            pass
+
+    def publish_monitor_health(self, health: dict):
+        if not self.enabled or not self._connected:
+            return
+        for suffix, payload in health_monitor_updates(health).items():
+            if self._monitor_health_cache.get(suffix) != payload:
+                self._publish(suffix, payload)
+                self._monitor_health_cache[suffix] = payload
 
     def _subscribe_command_topics(self):
         if not self.enabled or self.client is None:
@@ -654,9 +703,24 @@ class MQTTBridge:
         }
         self._next_event_id += 1
         self._events.append(event)
+        self._publish_monitor_event(event)
 
         if accepted:
             self._opcua.enqueue_command(command, source=source)
+
+    def _publish_monitor_event(self, event: dict):
+        for lang in ("pt", "en"):
+            if not event["accepted"]:
+                message = rejection_for_event(event, lang)
+            elif event["command"] == "SYSTEM_RESET":
+                message = "Sistema reiniciado." if lang == "pt" else "System reset."
+            elif event["command"] == "SYSTEM_SHUTDOWN":
+                message = "Sistema a desligar." if lang == "pt" else "System shutting down."
+            else:
+                message = self._response_for_command(event["command"], lang)
+                if message == event["command"]:
+                    message = "Pedido executado." if lang == "pt" else "Request completed."
+            self._publish(f"monitor/{lang}/last_message", message)
 
     def reset_system(self, lang: str, source: str = "button") -> Tuple[bool, str]:
         with self._lock:

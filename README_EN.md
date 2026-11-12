@@ -81,7 +81,7 @@ The `i=100` and `i=101` IDs are examples only; **they are not present in the sup
 
 ## MQTT and mobile phone
 
-Read the complete Mosquitto and IoT MQTT Panel guide in [MQTT_PANEL_SETUP_EN.md](MQTT_PANEL_SETUP_EN.md). It covers command topics, state topics, mobile configuration and connection tests.
+Read the complete Mosquitto and IoT MQTT Panel guide in [MQTT_PANEL_SETUP_EN.md](MQTT_PANEL_SETUP_EN.md). It covers command topics, state topics, the new read-only MQTT monitoring topics, mobile setup and connection tests.
 
 ## Project structure
 

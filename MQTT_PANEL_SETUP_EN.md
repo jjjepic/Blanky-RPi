@@ -90,14 +90,40 @@ blanky/state/robot_metal
 blanky/state/robot_nonmetal
 ```
 
-Also add text widgets for:
+These legacy topics remain available for existing switches and indicators. For a **read-only** dashboard, Blanky now also publishes `blanky/monitor/*`. Never configure a monitoring widget to publish to `monitor/*` or to send commands through `mqtt_*`.
+
+### Recommended IoT MQTT Panel layout
+
+Set the dashboard prefix to `blanky` and enter only the suffix below in Topic, for example `state/start`. Alternatively, enter `blanky/state/start` and check **Disable dashboard prefix topic**. Do not combine a dashboard prefix with a full topic path, which could subscribe to `blanky/blanky/state/start`.
+
+| Group | Widget | Topic (with dashboard prefix `blanky`) | Setup |
+| --- | --- | --- | --- |
+| Availability | Node Status | `monitor/availability` | Values `online` / `offline`. If the widget cannot map these values, use Multi-State Indicator. |
+| System | LED Indicator | `state/start` | Payload on `1`, off `0`; fixed panel name `System`. The LED does not change its name dynamically. |
+| System | Text Output | `monitor/en/system` | Displays `Started` or `Stopped`; place next to the LED. |
+| Current mode | Multi-State Indicator | `monitor/mode` | `stopped` = Stopped; `choose_mode` = Choose mode; `fast` = Fast; `ideal` = Ideal; `manual` = Manual; `changing` = Choose new mode. |
+| Current mode | Text Output (alternative) | `monitor/en/mode` | Readable text if Multi-State cannot show labels. |
+| Motors | LED Indicator + Text Output | `state/motor_1` + `monitor/en/motor_1` (also `_2`, `_3`) | `0` = Off; `1` = On. |
+| Cylinders | LED Indicator + Text Output | `state/cyl_a` + `monitor/en/cyl_a` (also `_b`, `_c`, `_d`) | `0` = Retract requested; `1` = Extend requested. Not a measured position. |
+| Lights | LED Indicator + Text Output | `state/light_green` + `monitor/en/light_green` (also `light_red`) | `0` = Off; `1` = On. |
+| Robot | Text Output | `monitor/en/robot` | No active target, Target: metal pieces or Target: non-metal pieces. The selection is temporary. |
+| Communications | Multi-State Indicator | `monitor/opcua` | `connected` / `disconnected`: OPC UA connection, not actuator confirmation. |
+| Communications | Text Output | `monitor/en/opcua_feedback` | `Active` or `Unavailable`: OPC UA feedback reception. |
+| OPC UA timings | Text Output | `monitor/en/opcua_write_time`, `monitor/en/opcua_ack_time` | Latest write and PLC signal acknowledgement in ms; unavailable values use text. These are not MQTT timings. |
+| Latest activity | Text Output | `monitor/en/last_message` | Latest readable response or refusal; not a full event history. |
+
+Portuguese equivalents are available under `monitor/pt/...`. All `monitor/*` topics are retained once first published. Use text, symbols and position in addition to color; do not rely only on red/green for critical states. Node Status indicates **Blanky's presence on the broker**, not that the system has started or that the PLC is connected. A clean exit publishes `offline`, and the Last Will publishes it after an unexpected disconnect; the broker may take some time to detect a lost connection. Disregard retained state values while availability is `offline`.
+
+`state/*` and `monitor/*` represent Blanky's internal state. The OPC UA connection and feedback indicate communication; they **do not individually confirm the physical position of each actuator**. PLC sensor/receive data is not yet published as per-component physical state over MQTT.
+
+For advanced diagnostics, the existing topics remain available:
 
 | Topic | Content |
 | --- | --- |
 | `blanky/events/last_command` | Latest command and origin, as JSON |
 | `blanky/events/rejected` | Rejected command and reason, as JSON |
 
-The `MQTT Phone` card in Blanky's interface shows activity for 30 seconds after receiving a valid message.
+The `MQTT Phone` card in Blanky's interface shows activity for 30 seconds after receiving a valid message. `events/last_command` contains the latest attempt even if rejected; `events/rejected` is not a substitute for the accessible `monitor/en/last_message`.
 
 ## 5. Test the connection
 
@@ -114,6 +140,7 @@ mosquitto_pub -h localhost -t blanky/mqtt_start -m 1
 ```
 
 You should see the command in Blanky Events and in `blanky/events/last_command` and `blanky/state/*` topics.
+To inspect only the new presentation topics, run `mosquitto_sub -h localhost -v -t 'blanky/monitor/#'`.
 
 ## 6. Common issues
 

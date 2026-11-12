@@ -1723,6 +1723,7 @@ class BlankyController(QObject):
 
         snapshot = self._bridge.get_snapshot()
         health = self._bridge.health()
+        self._bridge.publish_monitor_health(health)
         mic = audio_info()
         health["microphone_ready"] = bool(mic.get("ready"))
         health["openai_activity"] = activity_snapshot()
@@ -1760,4 +1761,5 @@ class BlankyController(QObject):
             self._wakeword.stop()
         except Exception:
             pass
+        self._bridge.close()
 
