@@ -83,8 +83,9 @@ class BlankyController(QObject):
     stateCompactChanged = Signal()
     communicationSettingsChanged = Signal()
     openAiKeyConfiguredChanged = Signal()
-    textCommandsResolved = Signal(object, str)
-    textCommandsFailed = Signal(str)
+    textCommandsResolved = Signal(object, str, str, str)
+    textCommandsFailed = Signal(str, str, str)
+    mobileTextReceived = Signal(str, str)
     textOnlineFallbackRequested = Signal()
 
     _SENSITIVITY_FACTOR_MIN = 1.20
@@ -272,6 +273,8 @@ class BlankyController(QObject):
         self._audio_selected_profile = get_audio_input_preset()
 
         self._bridge = get_mqtt_bridge()
+        self.mobileTextReceived.connect(self._on_mobile_text)
+        self._bridge.set_mobile_text_handler(self.mobileTextReceived.emit)
         self._bridge.configure_connection(
             self._mqtt_broker_host, self._mqtt_broker_port, self._mqtt_topic_prefix
         )
@@ -283,7 +286,7 @@ class BlankyController(QObject):
         self._last_event_id_seen = 0
 
         self._tts_queue: queue.Queue[object] = queue.Queue()
-        self._text_command_queue: list[str] = []
+        self._text_command_queue: list[tuple[str, str, str]] = []
         self._text_command_timer = QTimer(self)
         self._text_command_timer.setSingleShot(True)
         self._text_command_timer.timeout.connect(self._execute_next_text_command)
@@ -906,50 +909,63 @@ class BlankyController(QObject):
 
     @Slot(str, str)
     def submitTextCommands(self, text: str, mode: str):
+        self._submit_text_commands(text, mode, "text")
+
+    @Slot(str, str)
+    def _on_mobile_text(self, text: str, mode: str):
+        self._submit_text_commands(text, mode, "mqtt_text")
+
+    def _submit_text_commands(self, text: str, mode: str, source: str):
         raw = (text or "").strip()
         if not raw:
             return
         self._set_recognized(self._tr("text_received_response"))
+        language = self._language
+        selected_mode = "online" if (mode or "offline").strip().lower() == "online" else "offline"
+        if source == "mqtt_text":
+            self._bridge.publish_phone_text_path(selected_mode)
 
-        if (mode or "offline").strip().lower() == "online":
+        if selected_mode == "online":
             self._set_status(self._tr("text_online_interpreting"))
-            threading.Thread(target=self._resolve_online_text, args=(raw,), daemon=True).start()
+            threading.Thread(target=self._resolve_online_text, args=(raw, language, source), daemon=True).start()
             return
 
         commands = []
         for phrase in re.split(r"[\n;]+", raw):
             phrase = phrase.strip()
             if phrase:
-                command, _ = parse_command(phrase, self._language)
+                command, _ = parse_command(phrase, language)
                 commands.append(command)
-        self._queue_text_commands(commands, raw)
+        self._queue_text_commands(commands, raw, source, language)
 
-    def _resolve_online_text(self, raw: str):
+    def _resolve_online_text(self, raw: str, language: str, source: str):
         try:
-            commands = interpret_online_commands(raw, self._language)
+            commands = interpret_online_commands(raw, language)
         except Exception:
-            self.textCommandsFailed.emit(raw)
+            self.textCommandsFailed.emit(raw, source, language)
             return
-        self.textCommandsResolved.emit(commands, raw)
+        self.textCommandsResolved.emit(commands, raw, source, language)
 
-    @Slot()
-    def _handle_text_online_error(self, raw: str):
+    @Slot(str, str, str)
+    def _handle_text_online_error(self, raw: str, source: str, language: str):
         commands = []
         for phrase in re.split(r"[\n;]+", raw or ""):
             phrase = phrase.strip()
             if phrase:
-                command, _ = parse_command(phrase, self._language)
+                command, _ = parse_command(phrase, language)
                 commands.append(command)
-        self._queue_text_commands(commands, raw)
+        self._queue_text_commands(commands, raw, source, language)
         # Keep the fallback notice without replacing a command rejection.
         self._set_status(self._tr("text_online_fallback"))
+        if source == "mqtt_text":
+            self._bridge.publish_phone_text_path("offline", fallback=True)
         self.textOnlineFallbackRequested.emit()
 
-    @Slot(object, str)
-    def _queue_text_commands(self, commands, raw: str):
+    @Slot(object, str, str, str)
+    def _queue_text_commands(self, commands, raw: str, source: str, language: str):
         valid_commands = [str(command).upper() for command in commands if str(command).strip()]
         if not valid_commands:
-            _, response = self._bridge.process_command("UNKNOWN", self._language, source="text")
+            _, response = self._bridge.process_command("UNKNOWN", language, source=source)
             self._set_status(self._tr("text_no_commands"))
             self._set_recognized(response)
             self._enqueue_tts(response)
@@ -957,7 +973,7 @@ class BlankyController(QObject):
 
         self._stop_and_flush_audio()
         self._set_recognized(self._tr("text_received_response"))
-        self._text_command_queue.extend(valid_commands)
+        self._text_command_queue.extend((command, source, language) for command in valid_commands)
         if not self._text_command_timer.isActive():
             self._execute_next_text_command()
 
@@ -965,15 +981,17 @@ class BlankyController(QObject):
         if not self._text_command_queue:
             return
 
-        command = self._text_command_queue.pop(0)
+        command, source, language = self._text_command_queue.pop(0)
         if command in {"UNKNOWN", "NO_AUDIO"}:
-            _, response = self._bridge.process_command(command, self._language, source="text")
+            _, response = self._bridge.process_command(command, language, source=source)
             self._set_status(self._tr("text_no_commands"))
             self._set_recognized(response)
             if response:
                 self._enqueue_tts(response)
+            if self._text_command_queue:
+                self._text_command_timer.start(300)
             return
-        accepted, response = self._bridge.process_command(command, self._language, source="text")
+        accepted, response = self._bridge.process_command(command, language, source=source)
         self._set_command_interaction("text_status", command)
         if not accepted and response:
             self._set_recognized(response)
@@ -1458,6 +1476,7 @@ class BlankyController(QObject):
             labels = {
                 "voice": "VOICE",
                 "text": "TEXT-BOT",
+                "mqtt_text": "PHONE TEXT-BOT",
                 "mqtt_panel": "PHONE",
                 "button": "BUTTON",
             }
@@ -1465,6 +1484,7 @@ class BlankyController(QObject):
             labels = {
                 "voice": "VOZ",
                 "text": "TEXT-BOT",
+                "mqtt_text": "TEXT-BOT TELEMOVEL",
                 "mqtt_panel": "TELEMOVEL",
                 "button": "BOTAO",
             }
@@ -1761,5 +1781,6 @@ class BlankyController(QObject):
             self._wakeword.stop()
         except Exception:
             pass
+        self._bridge.set_mobile_text_handler(None)
         self._bridge.close()
 

@@ -86,7 +86,7 @@ Os IDs `i=100` e `i=101` são apenas exemplos; **não existem no mapa fornecido*
 
 ## MQTT e telemóvel
 
-O guia completo para Mosquitto e IoT MQTT Panel está em [MQTT_PANEL_SETUP_PT.md](MQTT_PANEL_SETUP_PT.md). Inclui tópicos de comando, tópicos de estado, a nova monitorização MQTT apenas de leitura, configuração no telemóvel e testes de ligação.
+O guia completo para Mosquitto e IoT MQTT Panel está em [MQTT_PANEL_SETUP_PT.md](MQTT_PANEL_SETUP_PT.md). Inclui tópicos de comando, tópicos de estado, monitorização MQTT apenas de leitura e Text-Bot no telemóvel com modos Online/Offline, configuração e testes de ligação.
 
 ## Estrutura do projeto
 

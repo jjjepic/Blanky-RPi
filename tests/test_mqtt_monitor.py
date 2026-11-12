@@ -103,6 +103,8 @@ class MonitorBridgeTests(unittest.TestCase):
         bridge._username = ""
         bridge._password = ""
         bridge._monitor_health_cache = {}
+        bridge._echo_suppression = {}
+        bridge._mobile_text_handler = None
         bridge._events = []
         bridge._next_event_id = 1
         bridge._event_generation = 0
@@ -137,7 +139,57 @@ class MonitorBridgeTests(unittest.TestCase):
         self.assertEqual(published["blanky/monitor/availability"], "online")
         self.assertEqual(published["blanky/monitor/pt/last_message"], "Sem atividade.")
         self.assertEqual(published["blanky/monitor/opcua"], "disconnected")
-        self.assertTrue(all(topic.startswith("blanky/mqtt_") for topic in bridge.client.subscriptions))
+        self.assertTrue(all(topic.startswith(("blanky/mqtt_", "blanky/textbot/")) for topic in bridge.client.subscriptions))
+        self.assertIn("blanky/textbot/online", bridge.client.subscriptions)
+        self.assertIn("blanky/textbot/offline", bridge.client.subscriptions)
+
+    def test_phone_text_is_dispatched_without_replaying_retained_requests(self):
+        bridge = self._bridge()
+        received = []
+        bridge.set_mobile_text_handler(lambda text, mode: received.append((text, mode)))
+        message = types.SimpleNamespace(topic="blanky/textbot/online", payload="iniciar".encode(), retain=False)
+        bridge._on_message(bridge.client, None, message)
+        self.assertEqual(received, [("iniciar", "online")])
+        published = {topic: value for topic, value, _ in bridge.client.messages}
+        self.assertEqual(published["blanky/monitor/pt/phone_textbot_response"], "A interpretar...")
+        self.assertGreater(bridge._last_mqtt_panel_rx, 0)
+        self.assertFalse(any(topic.startswith("blanky/mqtt_") for topic in published))
+
+        message.retain = True
+        bridge._on_message(bridge.client, None, message)
+        self.assertEqual(len(received), 1)
+        message.retain = False
+        message.topic = "blanky/textbot/offline"
+        message.payload = b"modo manual"
+        bridge._on_message(bridge.client, None, message)
+        self.assertEqual(received[-1], ("modo manual", "offline"))
+        message.payload = b"  "
+        bridge._on_message(bridge.client, None, message)
+        self.assertEqual(len(received), 2)
+        message.payload = b"\xff"
+        bridge._on_message(bridge.client, None, message)
+        self.assertEqual(len(received), 2)
+        message.payload = b"x" * 1001
+        bridge._on_message(bridge.client, None, message)
+        self.assertEqual(len(received), 2)
+        self.assertEqual(bridge.client.messages[-2][1], "Escreve um pedido até 1000 caracteres.")
+
+    def test_phone_route_reports_online_fallback(self):
+        bridge = self._bridge()
+        bridge.publish_phone_text_path("online")
+        bridge.publish_phone_text_path("offline", fallback=True)
+        published = {topic: value for topic, value, _ in bridge.client.messages}
+        self.assertEqual(published["blanky/monitor/pt/phone_textbot_path"], "Online indisponível; usado Offline")
+
+    def test_phone_event_has_its_own_response_and_does_not_replace_global_on_reconnect(self):
+        bridge = self._bridge()
+        bridge._add_event("MOTOR_1_ON", "mqtt_text", False, "Primeiro, inicie o sistema.", "before_start")
+        bridge._add_event("START", "button", True, "Iniciado.")
+        bridge.client.messages.clear()
+        bridge._on_connect(bridge.client, None, None, 0)
+        published = {topic: value for topic, value, _ in bridge.client.messages}
+        self.assertEqual(published["blanky/monitor/pt/last_message"], "Iniciado.")
+        self.assertEqual(published["blanky/monitor/pt/phone_textbot_response"], "Primeiro, inicie o sistema.")
 
     def test_health_updates_only_when_changed(self):
         bridge = self._bridge()

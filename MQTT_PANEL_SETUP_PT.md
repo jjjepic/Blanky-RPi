@@ -125,6 +125,21 @@ Para diagnóstico avançado, continuam disponíveis:
 
 O cartão `MQTT Telemóvel` na interface Blanky mostra atividade durante 30 segundos depois de receber uma mensagem válida. `events/last_command` contém a última tentativa, mesmo que seja recusada; `events/rejected` não substitui `monitor/pt/last_message` para leitura acessível.
 
+### Text-Bot no telemóvel
+
+O IoT MQTT Panel pode enviar frases completas, e não apenas os códigos dos botões. Acrescente um **Text Input** para cada modo que quiser utilizar:
+
+| Widget | Topic de publicação (com prefixo `blanky` no dashboard) | Funcionamento |
+| --- | --- | --- |
+| Text Input: Text-Bot Online | `textbot/online` | Interpreta linguagem natural pela IA; se estiver indisponível, tenta o parser Offline. |
+| Text Input: Text-Bot Offline | `textbot/offline` | Usa diretamente as variantes locais, sem IA. |
+| Text Output: Resposta | `monitor/pt/phone_textbot_response` | Mostra apenas a última resposta aos pedidos de texto do telemóvel. |
+| Text Output: Via utilizada | `monitor/pt/phone_textbot_path` | Online, Offline ou fallback Online para Offline. |
+
+Nos Text Input, envie a frase como **texto simples**, sem JSON, `retain` **desativado** e QoS `0`. O modo é escolhido pelo tópico; o idioma de interpretação acompanha o idioma ativo no Blanky. Pode enviar vários pedidos separados por ponto e vírgula, por exemplo `iniciar; modo manual; ligar motor 1`. Uma mensagem retida nunca é executada, mesmo que tenha sido guardada por engano. O limite é de 1000 caracteres por mensagem.
+
+O Text-Bot do telemóvel usa as mesmas regras de segurança, Eventos e TTS do Text-Bot local; a fala sai no Raspberry Pi, **não no altifalante do telemóvel**. Os Eventos identificam a origem como `TEXT-BOT TELEMOVEL`. A resposta do telemóvel tem um tópico próprio para não ser substituída por ações de voz ou dos botões. Mantenha o broker protegido: uma frase aceite pode comandar atuadores reais.
+
 ## 5. Testar a ligação
 
 No Raspberry Pi, abra dois terminais:
@@ -141,6 +156,7 @@ mosquitto_pub -h localhost -t blanky/mqtt_start -m 1
 
 Deve ver o comando nos Eventos do Blanky e nos tópicos `blanky/events/last_command` e `blanky/state/*`.
 Para observar apenas os novos tópicos de apresentação, use `mosquitto_sub -h localhost -v -t 'blanky/monitor/#'`.
+Para testar o Text-Bot do telemóvel sem a app: `mosquitto_pub -h localhost -t blanky/textbot/offline -m 'iniciar'`. Confirme a resposta em `blanky/monitor/pt/phone_textbot_response` e nos Eventos.
 
 ## 6. Problemas frequentes
 

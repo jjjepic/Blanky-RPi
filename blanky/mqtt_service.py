@@ -3,7 +3,7 @@ import re
 import threading
 import time
 from datetime import datetime
-from typing import Any, Optional, Tuple
+from typing import Any, Callable, Optional, Tuple
 
 from blanky.config import (
     MQTT_BROKER_HOST,
@@ -27,6 +27,9 @@ from blanky.mqtt_monitor import health_monitor_updates, state_monitor_updates
 
 
 class MQTTBridge:
+    _PHONE_TEXT_TOPICS = {"textbot/online": "online", "textbot/offline": "offline"}
+    _MAX_PHONE_TEXT_LENGTH = 1000
+
     def __init__(self):
         self.enabled = bool(MQTT_ENABLED)
         self._lock = threading.Lock()
@@ -48,6 +51,7 @@ class MQTTBridge:
         self._opcua = get_opcua_bridge()
         self._last_mqtt_panel_rx = 0.0
         self._monitor_health_cache: dict[str, str] = {}
+        self._mobile_text_handler: Optional[Callable[[str, str], None]] = None
 
         self.state = {
             "start": 0,
@@ -151,6 +155,14 @@ class MQTTBridge:
             else:
                 self._publish("monitor/pt/last_message", "Sem atividade.")
                 self._publish("monitor/en/last_message", "No activity yet.")
+            phone_events = (event for event in reversed(self._events) if event["source"] == "mqtt_text")
+            last_phone_event = next(phone_events, None)
+            if last_phone_event is None:
+                self._publish_phone_text_response("Sem pedidos.", "No requests yet.")
+                self._publish("monitor/pt/phone_textbot_path", "Sem pedidos")
+                self._publish("monitor/en/phone_textbot_path", "No requests yet")
+            else:
+                self._publish_phone_event(last_phone_event)
             self.publish_monitor_health(self.health())
 
     def _on_disconnect(self, client, userdata, rc):
@@ -158,14 +170,44 @@ class MQTTBridge:
 
     def _on_message(self, client, userdata, msg):
         topic = str(msg.topic or "")
-        payload = msg.payload.decode("utf-8", errors="ignore").strip()
-        if self._is_suppressed_echo(topic, payload):
-            return
-
         topic_suffix = self._extract_suffix(topic)
         if not topic_suffix:
             return
 
+        mode = self._PHONE_TEXT_TOPICS.get(topic_suffix)
+        if mode:
+            if getattr(msg, "retain", False):
+                return
+            self._last_mqtt_panel_rx = time.monotonic()
+            try:
+                payload = msg.payload.decode("utf-8").strip() if len(msg.payload) <= 4000 else ""
+            except UnicodeDecodeError:
+                payload = ""
+            if not payload or len(payload) > self._MAX_PHONE_TEXT_LENGTH:
+                self._publish_phone_text_response(
+                    "Escreve um pedido até 1000 caracteres.",
+                    "Enter a request of up to 1000 characters.",
+                )
+                return
+            if self._mobile_text_handler is None:
+                self._publish_phone_text_response(
+                    "Text-Bot indisponível. Tenta novamente.",
+                    "Text-Bot unavailable. Please try again.",
+                )
+                return
+            self._publish_phone_text_response("A interpretar...", "Interpreting...")
+            try:
+                self._mobile_text_handler(payload, mode)
+            except Exception:
+                self._publish_phone_text_response(
+                    "Text-Bot indisponível. Tenta novamente.",
+                    "Text-Bot unavailable. Please try again.",
+                )
+            return
+
+        payload = msg.payload.decode("utf-8", errors="ignore").strip()
+        if self._is_suppressed_echo(topic, payload):
+            return
         command = command_for_topic_payload(topic_suffix, payload)
         if not command:
             return
@@ -239,6 +281,25 @@ class MQTTBridge:
         for suffix in topics:
             if suffix:
                 self.client.subscribe(self._topic(suffix), qos=1)
+        for suffix in self._PHONE_TEXT_TOPICS:
+            self.client.subscribe(self._topic(suffix), qos=0)
+
+    def set_mobile_text_handler(self, handler: Optional[Callable[[str, str], None]]):
+        self._mobile_text_handler = handler
+
+    def _publish_phone_text_response(self, pt: str, en: str):
+        self._publish("monitor/pt/phone_textbot_response", pt)
+        self._publish("monitor/en/phone_textbot_response", en)
+
+    def publish_phone_text_path(self, mode: str, fallback: bool = False):
+        if fallback:
+            pt, en = "Online indisponível; usado Offline", "Online unavailable; used Offline"
+        elif mode == "online":
+            pt, en = "Online", "Online"
+        else:
+            pt, en = "Offline", "Offline"
+        self._publish("monitor/pt/phone_textbot_path", pt)
+        self._publish("monitor/en/phone_textbot_path", en)
 
     def _extract_suffix(self, full_topic: str) -> Optional[str]:
         prefix = f"{self._topic_prefix}/"
@@ -710,17 +771,26 @@ class MQTTBridge:
 
     def _publish_monitor_event(self, event: dict):
         for lang in ("pt", "en"):
-            if not event["accepted"]:
-                message = rejection_for_event(event, lang)
-            elif event["command"] == "SYSTEM_RESET":
-                message = "Sistema reiniciado." if lang == "pt" else "System reset."
-            elif event["command"] == "SYSTEM_SHUTDOWN":
-                message = "Sistema a desligar." if lang == "pt" else "System shutting down."
-            else:
-                message = self._response_for_command(event["command"], lang)
-                if message == event["command"]:
-                    message = "Pedido executado." if lang == "pt" else "Request completed."
+            message = self._event_monitor_message(event, lang)
             self._publish(f"monitor/{lang}/last_message", message)
+            if event["source"] == "mqtt_text":
+                self._publish(f"monitor/{lang}/phone_textbot_response", message)
+
+    def _publish_phone_event(self, event: dict):
+        for lang in ("pt", "en"):
+            self._publish(f"monitor/{lang}/phone_textbot_response", self._event_monitor_message(event, lang))
+
+    def _event_monitor_message(self, event: dict, lang: str) -> str:
+        if not event["accepted"]:
+            return rejection_for_event(event, lang)
+        if event["command"] == "SYSTEM_RESET":
+            return "Sistema reiniciado." if lang == "pt" else "System reset."
+        if event["command"] == "SYSTEM_SHUTDOWN":
+            return "Sistema a desligar." if lang == "pt" else "System shutting down."
+        message = self._response_for_command(event["command"], lang)
+        if message == event["command"]:
+            return "Pedido executado." if lang == "pt" else "Request completed."
+        return message
 
     def reset_system(self, lang: str, source: str = "button") -> Tuple[bool, str]:
         with self._lock:

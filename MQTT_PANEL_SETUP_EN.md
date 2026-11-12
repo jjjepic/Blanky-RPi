@@ -125,6 +125,21 @@ For advanced diagnostics, the existing topics remain available:
 
 The `MQTT Phone` card in Blanky's interface shows activity for 30 seconds after receiving a valid message. `events/last_command` contains the latest attempt even if rejected; `events/rejected` is not a substitute for the accessible `monitor/en/last_message`.
 
+### Text-Bot on the phone
+
+IoT MQTT Panel can send complete phrases rather than only button codes. Add a **Text Input** for each mode you want to use:
+
+| Widget | Publish topic (with dashboard prefix `blanky`) | Behavior |
+| --- | --- | --- |
+| Text Input: Text-Bot Online | `textbot/online` | AI interprets natural language; if unavailable, it falls back to the Offline parser. |
+| Text Input: Text-Bot Offline | `textbot/offline` | Uses local phrase variants directly, without AI. |
+| Text Output: Response | `monitor/en/phone_textbot_response` | Shows only the latest response to a phone text request. |
+| Text Output: Route used | `monitor/en/phone_textbot_path` | Online, Offline or Online-to-Offline fallback. |
+
+In Text Input, publish **plain text**, with JSON off, `retain` **off** and QoS `0`. The topic selects the mode; interpretation uses Blanky's active UI language. Separate multiple requests with semicolons, for example `start; manual mode; turn on motor 1`. Retained input messages are never executed, even if saved by mistake. Messages are limited to 1000 characters.
+
+The phone Text-Bot follows the same safety rules, Events and TTS flow as the local Text-Bot; audio plays on the Raspberry Pi, **not on the phone speaker**. Events identify the source as `PHONE TEXT-BOT`. The phone response has its own topic so voice and button activity does not overwrite it. Protect the broker: an accepted phrase can operate real actuators.
+
 ## 5. Test the connection
 
 On the Raspberry Pi, open two terminals:
@@ -141,6 +156,7 @@ mosquitto_pub -h localhost -t blanky/mqtt_start -m 1
 
 You should see the command in Blanky Events and in `blanky/events/last_command` and `blanky/state/*` topics.
 To inspect only the new presentation topics, run `mosquitto_sub -h localhost -v -t 'blanky/monitor/#'`.
+To test phone Text-Bot without the app, run `mosquitto_pub -h localhost -t blanky/textbot/offline -m 'start'`. Check `blanky/monitor/en/phone_textbot_response` and Events.
 
 ## 6. Common issues
 
