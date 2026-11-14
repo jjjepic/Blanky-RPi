@@ -10,7 +10,7 @@ REJECTION_TEXT = {
         "manual_only": "Os componentes só se comandam no modo manual. Mude primeiro de modo.",
         "change_mode_first": 'Para trocar de modo, use primeiro "Mudar de modo".',
         "choose_new_mode": "Escolha o novo modo: rápido, ideal ou manual.",
-        "unknown": "Não percebi o pedido. Pode repetir?",
+        "unknown": "Não percebi. Podes repetir?",
         "no_audio": "Não ouvi nada. Tente outra vez.",
     },
     "en": {
@@ -19,7 +19,7 @@ REJECTION_TEXT = {
         "manual_only": "Components can only be controlled in manual mode. Change mode first.",
         "change_mode_first": 'To switch modes, first use "Change mode".',
         "choose_new_mode": "Choose the new mode: fast, ideal or manual.",
-        "unknown": "I did not understand the request. Could you repeat it?",
+        "unknown": "I didn't understand. Can you repeat?",
         "no_audio": "I did not hear anything. Please try again.",
     },
 }
@@ -100,7 +100,8 @@ def command_label(command: str, lang: str) -> str:
         "RED_OFF": "apagar a luz vermelha", "ROBOT_TO_METAL": "robô para peças metálicas",
         "ROBOT_TO_NONMETAL": "robô para peças não metálicas", "UNKNOWN": "pedido não reconhecido",
         "NO_AUDIO": "pedido sem áudio", "SYSTEM_RESET": "reiniciar o sistema",
-        "SYSTEM_SHUTDOWN": "desligar o Blanky",
+        "SYSTEM_SHUTDOWN": "desligar o Blanky", "SET_SETTING": "alterar uma definição",
+        "QUERY_SETTING": "consultar uma definição", "QUERY_CLARIFY": "esclarecer uma definição",
     }
     en = {
         "START": "start the system", "STOP": "stop the system",
@@ -110,7 +111,8 @@ def command_label(command: str, lang: str) -> str:
         "RED_OFF": "turn off the red light", "ROBOT_TO_METAL": "robot to metal pieces",
         "ROBOT_TO_NONMETAL": "robot to non-metal pieces", "UNKNOWN": "unrecognized request",
         "NO_AUDIO": "request without audio", "SYSTEM_RESET": "reset the system",
-        "SYSTEM_SHUTDOWN": "shut down Blanky",
+        "SYSTEM_SHUTDOWN": "shut down Blanky", "SET_SETTING": "change a setting",
+        "QUERY_SETTING": "ask about a setting", "QUERY_CLARIFY": "clarify a setting",
     }
     fixed = pt if lang == "pt" else en
     if command in fixed:

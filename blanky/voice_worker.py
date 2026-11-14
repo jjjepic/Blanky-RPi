@@ -17,6 +17,8 @@ class VoiceWorker(QThread):
     commandRecognized = Signal(str)
     diagnostic = Signal(object)
     spoken = Signal(str)
+    detailReady = Signal(str)
+    preferenceRequested = Signal(object)
     done = Signal()
 
     def __init__(self, lang: str, tts_speed: float = 1.0, parent=None):
@@ -47,6 +49,7 @@ class VoiceWorker(QThread):
         accepted: bool,
         started_at: float,
         transcribe_duration: float,
+        item: dict | None = None,
     ):
         self.diagnostic.emit(
             {
@@ -57,6 +60,8 @@ class VoiceWorker(QThread):
                 "end": str(diag.get("end_reason") or "--"),
                 "command": command,
                 "text": text or ("(sem áudio detetado)" if self.lang == "pt" else "(no audio detected)"),
+                "interpretation": item or {"type": "command", "name": command},
+                "confidence": float((item or {}).get("confidence", 1.0)),
                 "result": "OK" if accepted else "REJECT",
                 "duration": time.perf_counter() - started_at,
             }
@@ -91,6 +96,7 @@ class VoiceWorker(QThread):
                 self.commandRecognized.emit(command)
                 accepted, message = mqtt_bridge.process_command(command, self.lang, source="voice")
                 response = self._response_for_result(mqtt_bridge, command, accepted, message)
+                speech = response
                 self._emit_diagnostic(
                     diag,
                     text,
@@ -113,6 +119,7 @@ class VoiceWorker(QThread):
                     self.commandRecognized.emit(command)
                     accepted, message = mqtt_bridge.process_command(command, self.lang, source="voice")
                     response = self._response_for_result(mqtt_bridge, command, accepted, message)
+                    speech = response
                     self._emit_diagnostic(
                         diag,
                         text,
@@ -123,13 +130,30 @@ class VoiceWorker(QThread):
                     )
                 else:
                     responses = []
+                    spoken_parts = []
                     for index, item in enumerate(items):
                         command = item["name"]
-                        if item["type"] == "query":
+                        if item["type"] == "setting" or command in {"QUERY_SETTING", "QUERY_CLARIFY"}:
+                            request = {"item": item, "language": self.lang, "done": threading.Event(),
+                                       "answers": None, "speed": self.tts_speed}
+                            self.preferenceRequested.emit(request)
+                            if request["done"].wait(timeout=10) and request["answers"]:
+                                response_part = request["answers"]["detail"]
+                                spoken_part = request["answers"]["speech"]
+                                self.tts_speed = float(request["speed"])
+                                accepted = command != "BLOCKED_SETTING"
+                            else:
+                                response_part = "Não percebi. Podes repetir?" if self.lang == "pt" else "I didn't understand. Can you repeat?"
+                                spoken_part = response_part
+                                accepted = False
+                            diagnostic_name = "Definição" if self.lang == "pt" else "Setting"
+                        elif item["type"] == "query":
                             accepted = True
-                            response_part = mqtt_bridge.answer_status_query(
-                                command, item.get("component", ""), self.lang, "voice"
+                            parts = mqtt_bridge.answer_status_query_parts(
+                                command, item.get("target") or item.get("component", ""),
+                                self.lang, "voice", item.get("value", "")
                             )
+                            response_part, spoken_part = parts["detail"], parts["speech"]
                             diagnostic_name = "Consulta" if self.lang == "pt" else "Query"
                         else:
                             self.commandRecognized.emit(command)
@@ -139,9 +163,11 @@ class VoiceWorker(QThread):
                             response_part = self._response_for_result(
                                 mqtt_bridge, command, accepted, mqtt_message
                             )
+                            spoken_part = response_part
                             diagnostic_name = command
                         if response_part:
                             responses.append(response_part)
+                            spoken_parts.append(spoken_part)
                         self._emit_diagnostic(
                             diag,
                             text,
@@ -149,15 +175,18 @@ class VoiceWorker(QThread):
                             accepted,
                             started_at,
                             transcribe_duration,
+                            item,
                         )
                         if index < len(items) - 1:
                             time.sleep(0.3)
                     response = " ".join(responses)
+                    speech = " ".join(spoken_parts)
             if response:
-                mqtt_bridge.remember_interaction_response(response, self.lang)
+                mqtt_bridge.remember_interaction_response(response, self.lang, speech)
                 self.status.emit("Resposta pronta." if self.lang == "pt" else "Answer ready.")
-                self.spoken.emit(response)
-                t = threading.Thread(target=self._speak_async, args=(response,), daemon=True)
+                self.spoken.emit(speech)
+                self.detailReady.emit(response)
+                t = threading.Thread(target=self._speak_async, args=(speech,), daemon=True)
                 t.start()
 
         except Exception:

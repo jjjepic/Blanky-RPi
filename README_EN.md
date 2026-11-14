@@ -47,6 +47,12 @@ Voice recognition needs OpenAI to transcribe audio. If Online interpretation fai
 
 By voice or Text-Bot, Online or Offline, you can ask about the system, mode, motors, cylinders, lights, robot, MQTT, OPC UA, OpenAI, errors, last event and available actions. Examples: `How is the system?`, `Is cylinder A extended?`, `Tell me the status of OPC UA and OpenAI`, `What can I do now?` and `Repeat`. You can mix an action and a question, for example `Turn on motor 1 and tell me if MQTT is connected`.
 
+You can also ask about groups: `Which motors are on?`, `Which cylinders are extended?`, `What is active?`. Ask `Which voice are you using?`, `What is the volume?` or `Which voices are available?` for preferences. Spoken answers are brief; the screen and Events retain the detail, including the source of component states and the limits of PLC feedback.
+
+## Change settings by voice or Text-Bot
+
+Try `Set the volume to 60`, `Increase the volume`, `Speak more slowly`, `Change the voice to Coral`, `Switch to light theme` or `Larger text`. You can also change language, color profile, audio profile, animations, display scale and Text-Bot Online/Offline mode. These preferences work even when the system is stopped, use the same limits as the interface controls, and are logged as `Setting`. They never send anything to the PLC. MQTT/OPC UA parameters and the OpenAI key can only be changed in the Settings menu.
+
 Questions work while the system is stopped, are logged as `Query`, and never send commands to the PLC. Component status is the last state accepted by Blanky; a return signal may confirm a command, **not physical position**. An OpenAI key alone does not guarantee service availability.
 
 ## Settings

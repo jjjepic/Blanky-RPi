@@ -52,6 +52,12 @@ O reconhecimento por voz precisa da OpenAI para transcrever o áudio. Se a inter
 
 Por voz ou Text-Bot, Online ou Offline, podes perguntar pelo sistema, modo, motores, cilindros, luzes, robô, MQTT, OPC UA, OpenAI, erros, último evento e ações disponíveis. Exemplos: `Como está o sistema?`, `O cilindro A está avançado?`, `Diz-me o estado do OPC UA e da OpenAI`, `O que posso fazer agora?` e `Repete`. Podes misturar uma ação e uma pergunta, por exemplo `Liga o motor 1 e diz-me se o MQTT está ligado`.
 
+Também podes consultar grupos: `Quais os motores ligados?`, `Que cilindros estão avançados?`, `O que é que está ligado?`. Para saber as preferências, pergunta `Que voz estás a usar?`, `Qual é o volume?` ou `Quais são as vozes disponíveis?`. As respostas faladas são curtas; o ecrã e os Eventos mantêm o detalhe, incluindo a origem do estado e os limites da confirmação pelo PLC.
+
+## Definições por voz ou Text-Bot
+
+Podes pedir `Põe o volume a 60`, `Aumenta o volume`, `Fala mais devagar`, `Muda a voz para a Coral`, `Muda para o tema claro` ou `Letra maior`. Também podes alterar idioma, perfil cromático, perfil de áudio, animações, escala do ecrã e modo Online/Offline do Text-Bot. Estas definições funcionam mesmo com o sistema parado, usam os mesmos limites dos controlos da interface e ficam registadas como `Definição`. Não enviam nada ao PLC. Parâmetros MQTT/OPC UA e a chave OpenAI só podem ser alterados no menu de definições.
+
 As consultas funcionam com o sistema parado, são registadas como `Consulta` e não enviam comandos ao PLC. O estado dos componentes é o último aceite pelo Blanky; um sinal de retorno pode confirmar o comando, **não a posição física**. A disponibilidade da OpenAI não é garantida só por existir uma chave configurada.
 
 ## Definições

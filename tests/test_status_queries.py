@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from blanky.command_parser import interpret_online_items, parse_command, parse_offline_items, validate_items
 from blanky.mqtt_service import MQTTBridge
+from blanky.intent_diagnostics import interpretation_snapshot
 
 
 class QueryParserTests(unittest.TestCase):
@@ -72,6 +73,72 @@ class QueryParserTests(unittest.TestCase):
         ])
         self.assertEqual([item["name"] for item in items], ["START", "QUERY_COMPONENT"])
 
+    def test_group_preference_and_typo_phrases(self):
+        examples = {
+            "quais os motores ligados": ("QUERY_COMPONENT_GROUP", "motors", "on"),
+            "ha motores ativos?": ("QUERY_COMPONENT_GROUP", "motors", "on"),
+            "como estão os motores?": ("QUERY_COMPONENT_GROUP", "motors", ""),
+            "que cilindros estao avancados": ("QUERY_COMPONENT_GROUP", "cylinders", "extended"),
+            "o que é que está ligado": ("QUERY_ACTIVE", "", ""),
+            "que voz estás a usar": ("QUERY_SETTING", "voice", ""),
+            "qual é o volume": ("QUERY_SETTING", "volume", ""),
+            "fala mais devagar": ("SET_SETTING", "speech_speed", "slow"),
+            "aumenta o volume": ("SET_SETTING", "volume", "increase"),
+            "põe o volume a 60": ("SET_SETTING", "volume", "60"),
+            "muda a voz para a coral": ("SET_SETTING", "voice", "coral"),
+            "muda para o tema claro": ("SET_SETTING", "appearance", "light"),
+            "muda para alto contraste": ("SET_SETTING", "appearance", "high_contrast"),
+            "tema monocromático": ("SET_SETTING", "appearance", "monochrome"),
+            "letra maior": ("SET_SETTING", "text_scale", "increase"),
+            "bolume": ("QUERY_CLARIFY", "volume", ""),
+            "cilindro bê está avançado?": ("QUERY_COMPONENT", "cyl_b", ""),
+        }
+        for phrase, expected in examples.items():
+            with self.subTest(phrase=phrase):
+                item = parse_offline_items(phrase, "pt")[0]
+                self.assertEqual((item["name"], item.get("target", ""), item.get("value", "")), expected)
+        mixed = parse_offline_items("liga o motor 2 e diz-me que motores estão ligados", "pt")
+        self.assertEqual([item["name"] for item in mixed], ["MOTOR_2_ON", "QUERY_COMPONENT_GROUP"])
+        self.assertEqual(parse_offline_items("muda a chave OpenAI", "pt")[0]["name"], "BLOCKED_SETTING")
+        last = interpretation_snapshot()[-1]
+        self.assertEqual(last["text"], "muda a chave OpenAI")
+        self.assertEqual(last["items"][0]["confidence"], 1.0)
+
+    def test_english_group_and_preference_phrases(self):
+        examples = {
+            "which motors are on": "QUERY_COMPONENT_GROUP",
+            "which cylinders are extended": "QUERY_COMPONENT_GROUP",
+            "what is on": "QUERY_ACTIVE",
+            "which voice are you using": "QUERY_SETTING",
+            "what is the volume": "QUERY_SETTING",
+            "speak more slowly": "SET_SETTING",
+            "increase the volume": "SET_SETTING",
+            "set the volume to 60": "SET_SETTING",
+            "change the voice to coral": "SET_SETTING",
+            "switch to light theme": "SET_SETTING",
+            "larger text": "SET_SETTING",
+        }
+        for phrase, name in examples.items():
+            with self.subTest(phrase=phrase):
+                self.assertEqual(parse_offline_items(phrase, "en")[0]["name"], name)
+
+    def test_online_uses_strict_schema_and_rejects_low_confidence(self):
+        content = '{"items":[{"type":"query","name":"QUERY_COMPONENT_GROUP","target":"motors","value":"on","confidence":0.9}]}'
+        captured = {}
+        fake_response = types.SimpleNamespace(choices=[types.SimpleNamespace(message=types.SimpleNamespace(content=content))])
+        def create(**kwargs):
+            captured.update(kwargs)
+            return fake_response
+        fake_client = types.SimpleNamespace(chat=types.SimpleNamespace(completions=types.SimpleNamespace(create=create)))
+        with patch.dict(sys.modules, {"openai": types.SimpleNamespace(OpenAI=lambda: fake_client)}):
+            items = interpret_online_items("quais os motores ligados", "pt")
+        self.assertEqual(items[0]["target"], "motors")
+        schema = captured["response_format"]
+        self.assertEqual(schema["type"], "json_schema")
+        self.assertTrue(schema["json_schema"]["strict"])
+        self.assertEqual(validate_items([{"type": "setting", "name": "SET_SETTING", "target": "volume",
+                                          "value": "80", "confidence": 0.2}]), [])
+
     def test_online_interpreter_keeps_mixed_order(self):
         content = ('{"items":[{"type":"command","name":"MOTOR_1_ON"},'
                    '{"type":"query","name":"QUERY_MQTT"},'
@@ -92,6 +159,18 @@ class QueryParserTests(unittest.TestCase):
             items = interpret_online_items("o motor 1 está ligado?", "pt")
         self.assertEqual(items[0]["type"], "query")
         self.assertEqual(items[0]["name"], "QUERY_COMPONENT")
+
+    def test_online_cannot_turn_blocked_setting_into_mode_command(self):
+        fake_client = types.SimpleNamespace(chat=types.SimpleNamespace(completions=types.SimpleNamespace(
+            create=lambda **kwargs: self.fail("Blocked setting should not reach the model"))))
+        with patch.dict(sys.modules, {"openai": types.SimpleNamespace(OpenAI=lambda: fake_client)}):
+            items = interpret_online_items("muda a chave OpenAI", "pt")
+        self.assertEqual(items[0]["name"], "BLOCKED_SETTING")
+        self.assertEqual(parse_command("muda a chave OpenAI", "pt")[0], "UNKNOWN")
+
+    def test_transcribed_cylinder_letter_is_safe_for_commands(self):
+        self.assertEqual(parse_command("avança o cilindro bê", "pt")[0], "CYL_B_EXTEND")
+        self.assertEqual(parse_command("avança o cilindro sem letra", "pt")[0], "UNKNOWN")
 
 
 class QueryBridgeTests(unittest.TestCase):
@@ -131,6 +210,25 @@ class QueryBridgeTests(unittest.TestCase):
         self.assertTrue(all(event["accepted"] for event in self.bridge._events))
         self.assertTrue(all(not re.search(r"[A-Z]{2,}_[A-Z_]+", answer) for answer in answers))
         self.assertEqual(self.bridge.state["start"], 0)
+
+    def test_group_query_has_short_speech_and_detailed_provenance(self):
+        self.bridge.state["motor_2"] = 1
+        parts = self.bridge.answer_status_query_parts("QUERY_COMPONENT_GROUP", "motors", "pt", "voice", "on")
+        self.assertEqual(parts["speech"], "Só o motor 2 está ligado.")
+        self.assertIn("Estado interno", parts["detail"])
+        self.assertLessEqual(len(parts["speech"].split()), 12)
+        self.assertEqual(self.writes, [])
+        self.assertEqual(self.bridge._events[-1]["kind"], "query")
+        self.assertEqual(self.bridge._events[-1]["source"], "voice")
+        unfiltered = self.bridge.answer_status_query_parts("QUERY_COMPONENT_GROUP", "motors", "pt", "text")
+        self.assertIn("motor 1 desligado", unfiltered["speech"].lower())
+        self.assertIn("motor 2 ligado", unfiltered["speech"].lower())
+        self.assertIn("motor 3 desligado", unfiltered["speech"].lower())
+        self.assertLessEqual(len(unfiltered["speech"].split()), 12)
+        self.bridge.state["cyl_a"] = 1
+        active = self.bridge.answer_status_query_parts("QUERY_ACTIVE", "", "pt", "text")
+        self.assertIn("cilindro A", active["speech"])
+        self.assertLessEqual(len(active["speech"].split()), 12)
 
     def test_component_answer_does_not_claim_physical_position(self):
         self.bridge.state["cyl_c"] = 1

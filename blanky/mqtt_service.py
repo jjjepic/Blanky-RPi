@@ -25,9 +25,9 @@ from blanky.mqtt_topics import (
 from blanky.opcua_service import get_opcua_bridge
 from blanky.command_messages import no_change_message, rejection_for_event, rejection_message
 from blanky.mqtt_monitor import health_monitor_updates, state_monitor_updates
-from blanky.command_parser import VALID_COMMANDS, VALID_COMPONENTS, VALID_QUERIES
+from blanky.command_parser import VALID_COMMANDS, VALID_COMPONENTS, VALID_GROUPS, VALID_QUERIES
 from blanky.openai_activity import activity_snapshot
-from blanky.status_queries import answer_query
+from blanky.status_queries import answer_query_parts
 
 
 class MQTTBridge:
@@ -791,7 +791,7 @@ class MQTTBridge:
             self._publish(f"monitor/{lang}/phone_textbot_response", self._event_monitor_message(event, lang))
 
     def _event_monitor_message(self, event: dict, lang: str) -> str:
-        if event.get("kind") == "query":
+        if event.get("kind") in {"query", "setting"}:
             return str(event.get(f"detail_{lang}") or event.get("detail") or "")
         if not event["accepted"]:
             return rejection_for_event(event, lang)
@@ -808,14 +808,26 @@ class MQTTBridge:
         with self._lock:
             return self._event_monitor_message(self._events[-1], lang) if self._events else ""
 
-    def remember_interaction_response(self, response: str, lang: str):
+    def remember_interaction_response(self, response: str, lang: str, speech: str = ""):
         if response:
             with self._lock:
                 self._last_interaction_response[lang] = response
+                if speech:
+                    if not hasattr(self, "_last_speech_response"):
+                        self._last_speech_response = {"pt": "", "en": ""}
+                    self._last_speech_response[lang] = speech
 
-    def answer_status_query(self, name: str, component: str, lang: str, source: str) -> str:
-        if name not in VALID_QUERIES or (name == "QUERY_COMPONENT" and component not in VALID_COMPONENTS):
-            return rejection_message("unknown", lang)
+    def answer_status_query(self, name: str, component: str, lang: str, source: str, value: str = "") -> str:
+        return self.answer_status_query_parts(name, component, lang, source, value)["detail"]
+
+    def answer_status_query_parts(self, name: str, component: str, lang: str, source: str,
+                                  value: str = "") -> dict[str, str]:
+        if (name not in VALID_QUERIES or
+                (name == "QUERY_COMPONENT" and component not in VALID_COMPONENTS) or
+                (name == "QUERY_COMPONENT_GROUP" and component not in VALID_GROUPS) or
+                name == "QUERY_SETTING"):
+            message = rejection_message("unknown", lang)
+            return {"speech": message, "detail": message}
         health = self.health()
         try:
             from blanky.speech_service import is_openai_configured
@@ -834,19 +846,44 @@ class MQTTBridge:
             allowed = {command for command in VALID_COMMANDS if self._workflow_rejection_reason(command) is None}
             previous = dict(self._last_interaction_response)
             answers = {
-                language: answer_query(name, component, language, state, health, events, allowed, previous[language])
+                language: answer_query_parts(name, component, value, language, state, health, events, allowed,
+                                             previous[language])
                 for language in ("pt", "en")
             }
+            if name == "REPEAT":
+                previous_speech = getattr(self, "_last_speech_response", {})
+                for language in ("pt", "en"):
+                    if previous_speech.get(language):
+                        answers[language]["speech"] = previous_speech[language]
             event = {
                 "id": self._next_event_id, "time": datetime.now().strftime("%H:%M:%S"),
                 "source": source, "command": name, "kind": "query", "accepted": True,
-                "detail": answers[lang], "detail_pt": answers["pt"], "detail_en": answers["en"],
+                "detail": answers[lang]["detail"], "detail_pt": answers["pt"]["detail"],
+                "detail_en": answers["en"]["detail"],
+                "speech_pt": answers["pt"]["speech"], "speech_en": answers["en"]["speech"],
                 "reason": "", "generation": self._event_generation,
             }
             self._next_event_id += 1
             self._events.append(event)
             self._publish_monitor_event(event)
         return answers[lang]
+
+    def record_preference_event(self, source: str, answers: dict[str, dict[str, str]],
+                                accepted: bool = True, kind: str = "setting"):
+        """Log a UI preference without entering the command/OPC UA path."""
+        with self._lock:
+            event = {
+                "id": self._next_event_id, "time": datetime.now().strftime("%H:%M:%S"),
+                "source": source, "command": "SET_SETTING" if kind == "setting" else "QUERY_SETTING",
+                "kind": kind,
+                "accepted": accepted, "detail": answers["pt"]["detail"],
+                "detail_pt": answers["pt"]["detail"], "detail_en": answers["en"]["detail"],
+                "speech_pt": answers["pt"]["speech"], "speech_en": answers["en"]["speech"],
+                "reason": "", "generation": self._event_generation,
+            }
+            self._next_event_id += 1
+            self._events.append(event)
+            self._publish_monitor_event(event)
 
     def reset_system(self, lang: str, source: str = "button") -> Tuple[bool, str]:
         with self._lock:
