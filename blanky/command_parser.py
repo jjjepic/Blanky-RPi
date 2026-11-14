@@ -5,7 +5,6 @@ import unicodedata
 from difflib import SequenceMatcher
 from typing import Tuple
 
-from openai import OpenAI
 from blanky.openai_activity import measure_request
 from blanky.command_messages import rejection_message
 
@@ -21,6 +20,16 @@ VALID_COMMANDS = frozenset({
     "CYL_A_EXTEND", "CYL_A_RETRACT", "CYL_B_EXTEND", "CYL_B_RETRACT",
     "CYL_C_EXTEND", "CYL_C_RETRACT", "CYL_D_EXTEND", "CYL_D_RETRACT",
     "GREEN_ON", "GREEN_OFF", "RED_ON", "RED_OFF", "ROBOT_TO_METAL", "ROBOT_TO_NONMETAL",
+})
+
+VALID_QUERIES = frozenset({
+    "QUERY_SYSTEM", "QUERY_MODE", "QUERY_COMPONENT", "QUERY_MQTT", "QUERY_OPCUA",
+    "QUERY_OPENAI", "QUERY_CONNECTIONS", "QUERY_ERRORS", "QUERY_LAST_EVENT",
+    "QUERY_OPTIONS", "REPEAT",
+})
+VALID_COMPONENTS = frozenset({
+    "motor_1", "motor_2", "motor_3", "cyl_a", "cyl_b", "cyl_c", "cyl_d",
+    "light_green", "light_red", "lights", "robot",
 })
 
 
@@ -54,7 +63,7 @@ Pedidos de grupo claros devem ser expandidos para os comandos individuais, pela 
 - Pedidos de subconjuntos como "motor 1 e 3" ou "cilindro B e D" devolvem uma ação por cada
   componente mencionado. Nunca incluas o robô num pedido de "tudo" sem destino explícito.
 
-Preserva a ordem de várias ações. Não devolvas nada para pedidos ambíguos, conversa, perguntas,
+Preserva a ordem de várias ações. Não devolvas nada para pedidos ambíguos, conversa,
 ou quando faltar o componente, destino ou direção necessários para uma ação segura.
 """,
     "en": """
@@ -86,21 +95,56 @@ Clear group requests must expand into individual commands in the stated order:
   component. Never include the robot in an "everything" request without an explicit destination.
 
 Preserve the order of multiple actions. Return nothing for ambiguous requests, conversation,
-questions, or when a safe action is missing its required component, destination or direction.
+or when a safe action is missing its required component, destination or direction.
 """,
 }
 
 
-def interpret_online_commands(raw_text: str, lang: str) -> list[str]:
-    """Use the AI only to map natural text to a validated canonical command list."""
+def validate_items(items) -> list[dict[str, str]]:
+    """Reject model output outside the fixed command/query vocabulary."""
+    if not isinstance(items, list):
+        return []
+    validated = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        kind = item.get("type")
+        name = str(item.get("name") or "").upper()
+        if kind == "command" and name in VALID_COMMANDS:
+            validated.append({"type": "command", "name": name})
+        elif kind == "query" and name in VALID_QUERIES:
+            component = str(item.get("component") or "").lower()
+            if name == "QUERY_COMPONENT" and component not in VALID_COMPONENTS:
+                continue
+            validated.append({"type": "query", "name": name, "component": component if name == "QUERY_COMPONENT" else ""})
+    return validated
+
+
+def interpret_online_items(raw_text: str, lang: str) -> list[dict[str, str]]:
+    """Map natural text to an ordered, validated list without executing it."""
+    from openai import OpenAI
+
     language = "Portuguese" if lang == "pt" else "English"
     allowed = ", ".join(sorted(VALID_COMMANDS))
+    queries = ", ".join(sorted(VALID_QUERIES))
+    components = ", ".join(sorted(VALID_COMPONENTS))
     guide = _ONLINE_INTENT_GUIDES.get(lang, _ONLINE_INTENT_GUIDES["en"])
     instructions = (
-        "You are a strict industrial command interpreter. Return JSON only, in the form "
-        "{\"commands\": [\"COMMAND\"]}. Extract one or more explicit, safe actions from the user's text "
-        "and preserve their order. Never invent commands, explanations or extra fields. "
-        f"The user language is {language}. Allowed commands are: {allowed}.\n\n"
+        "You are a strict industrial intent interpreter. Return JSON only: "
+        '{"items":[{"type":"command","name":"START"},{"type":"query","name":"QUERY_MODE"}]}. '
+        "Extract commands and read-only questions in the user's order. A query must never be a command. "
+        "For component queries include a component field. Multiple questions produce multiple query items. "
+        "Do not execute anything or invent names. "
+        f"The user language is {language}. Commands: {allowed}. Queries: {queries}. "
+        f"Components: {components}. Examples: 'o motor 1 está ligado?' -> QUERY_COMPONENT motor_1; "
+        "'liga o motor 1 e diz-me se o MQTT está ligado' -> MOTOR_1_ON then QUERY_MQTT; "
+        "'diz-me o estado do OPC UA e da OpenAI' -> QUERY_OPCUA then QUERY_OPENAI. "
+        "QUERY_SYSTEM covers start/stop/error and active mode; QUERY_MODE asks the active mode; "
+        "QUERY_COMPONENT asks for a named motor, cylinder, light or robot; QUERY_MQTT, QUERY_OPCUA "
+        "and QUERY_OPENAI ask each service; QUERY_CONNECTIONS summarizes all services; "
+        "QUERY_ERRORS asks for an active error; QUERY_LAST_EVENT asks for the latest event; "
+        "QUERY_OPTIONS asks what is currently allowed; REPEAT asks to repeat the previous answer. "
+        "Queries work even when the system is stopped.\n\n"
         f"{guide}"
     )
     client = OpenAI()
@@ -116,10 +160,16 @@ def interpret_online_commands(raw_text: str, lang: str) -> list[str]:
         )
     content = response.choices[0].message.content or "{}"
     payload = json.loads(content)
-    commands = payload.get("commands", [])
-    if not isinstance(commands, list):
-        return []
-    return [str(command).upper() for command in commands if str(command).upper() in VALID_COMMANDS]
+    items = validate_items(payload.get("items"))
+    local = parse_offline_items(raw_text, lang)
+    if local and all(item["type"] == "query" for item in local) and any(item["type"] == "command" for item in items):
+        return local
+    return items
+
+
+def interpret_online_commands(raw_text: str, lang: str) -> list[str]:
+    """Compatibility wrapper for callers that only need action commands."""
+    return [item["name"] for item in interpret_online_items(raw_text, lang) if item["type"] == "command"]
 
 
 def normalize(text: str) -> str:
@@ -220,10 +270,91 @@ def resolve_change_mode_request(text: str, data: dict) -> bool:
     return False
 
 
+def _offline_query_items(raw_text: str, lang: str) -> list[dict[str, str]]:
+    text = normalize(raw_text)
+    d = DATA.get(lang, DATA["pt"])
+    q = d["queries"]
+
+    def query(name: str, component: str = "") -> dict[str, str]:
+        return {"type": "query", "name": name, "component": component}
+
+    for key, name in (("repeat", "REPEAT"), ("options", "QUERY_OPTIONS"),
+                      ("last_event", "QUERY_LAST_EVENT"), ("errors", "QUERY_ERRORS")):
+        if contains_any_substring(text, q[key]):
+            return [query(name)]
+
+    question_words = contains_any_substring(text, q["question"])
+    action_words = (d["start"] + d["stop"] + d["activate"] + d["deactivate"]
+                    + d.get("activate_ph", []) + d.get("deactivate_ph", []))
+    question = question_words or ("?" in raw_text and not contains_any_substring(text, action_words))
+    if not question:
+        return []
+
+    components = []
+    for number, words in ((1, "um|one"), (2, "dois|two"), (3, "tres|three")):
+        match = re.search(rf"\bmotor(?:es|s)?\s+(?:{number}|{words})\b", text)
+        if match:
+            components.append((match.start(), f"motor_{number}"))
+    for letter in "abcd":
+        match = re.search(rf"\b(?:cilindro|cilindros|cylinder|cylinders|valvula|valve)\s+{letter}\b", text)
+        if match:
+            components.append((match.start(), f"cyl_{letter}"))
+    if contains_any_substring(text, d["light_green"]):
+        components.append((text.find("verde" if lang == "pt" else "green"), "light_green"))
+    if contains_any_substring(text, d["light_red"]):
+        components.append((text.find("vermelha" if lang == "pt" else "red"), "light_red"))
+    if not any(component.startswith("light_") for _, component in components) and contains_any_substring(text, ["luzes", "lights"]):
+        components.append((text.find("luzes" if lang == "pt" else "lights"), "lights"))
+    if contains_any_substring(text, d["robot_word"]):
+        components.append((text.find("robo" if lang == "pt" else "robot"), "robot"))
+    if components:
+        return [query("QUERY_COMPONENT", component) for _, component in sorted(components)]
+
+    service_items = []
+    for term, name in (("mqtt", "QUERY_MQTT"), ("opc ua", "QUERY_OPCUA"),
+                       ("opcua", "QUERY_OPCUA"), ("openai", "QUERY_OPENAI")):
+        if contains_any_substring(text, [term]) and name not in [item["name"] for _, item in service_items]:
+            service_items.append((text.index(term), query(name)))
+    if service_items:
+        return [item for _, item in sorted(service_items, key=lambda pair: pair[0])]
+    if contains_any_substring(text, q["connections"]):
+        return [query("QUERY_CONNECTIONS")]
+    if contains_any_substring(text, q["mode"]):
+        return [query("QUERY_MODE")]
+    if contains_any_substring(text, ["modo", "mode"]):
+        return [query("QUERY_MODE")]
+    if contains_any_substring(text, q["system"]) or contains_any_substring(text, ["sistema", "system"]):
+        return [query("QUERY_SYSTEM")]
+    return []
+
+
+def parse_offline_items(raw_text: str, lang: str) -> list[dict[str, str]]:
+    """Parse ordered local clauses, giving explicit questions priority over actions."""
+    clauses = re.split(
+        r"[\n;]+|\s+(?:e\s+(?=(?:diz[ -]?me|liga|desliga|acende|apaga|avanca|recua|inicia|para|como|qual)\b)"
+        r"|and\s+(?=(?:tell\s+me|turn|switch|start|stop|how|what|which)\b))",
+        raw_text or "", flags=re.IGNORECASE,
+    )
+    items = []
+    for clause in clauses:
+        if not clause.strip():
+            continue
+        questions = _offline_query_items(clause, lang)
+        if questions:
+            items.extend(questions)
+        else:
+            command, _ = parse_command(clause, lang)
+            items.append({"type": "command", "name": command})
+    return items
+
+
 def parse_command(raw_text: str, lang: str) -> Tuple[str, str]:
     text = normalize(raw_text)
     if not text:
         return "NO_AUDIO", rejection_message("no_audio", lang)
+
+    if _offline_query_items(raw_text, lang):
+        return "UNKNOWN", rejection_message("unknown", lang)
 
     d = DATA.get(lang, DATA["pt"])
     # ============ START/STOP ============

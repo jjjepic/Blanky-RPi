@@ -40,13 +40,19 @@ O campo da interface é mascarado e a chave introduzida aí fica apenas na sess�
 
 ## Interação por texto e voz
 
-O Text-Bot inicia em modo `Online`. Neste modo, a IA interpreta frases naturais e só devolve comandos permitidos. Se o serviço Online não estiver disponível, o Blanky muda automaticamente para `Offline`, usa o reconhecimento local e informa esse fallback na área Resposta.
+O Text-Bot inicia em modo `Online`. Neste modo, a IA interpreta frases naturais e só devolve comandos permitidos ou consultas de estado validadas. Se o serviço Online não estiver disponível, o Blanky muda automaticamente para `Offline`, usa o reconhecimento local e informa esse fallback na área Resposta.
 
 O modo `Offline` também pode ser escolhido manualmente. Aceita as variantes previstas na lista local e continua a aplicar as mesmas regras de segurança.
 
 No reconhecimento Offline, "avança o cilindro A" seleciona o cilindro, não o arranque do sistema; "para" só significa parar quando surge sozinho ou no início da frase. As recusas e pedidos sem alteração usam frases naturais em PT/EN, iguais na Resposta, nos Eventos e na resposta falada, sem identificadores internos no texto da mensagem. Para escolher outro modo, usa o botão `Mudar de modo`.
 
-O reconhecimento por voz utiliza o fluxo Online para interpretar frases naturais. Sem acesso ao serviço de IA, a voz não executa comandos; os controlos diretos, MQTT e Text-Bot Offline continuam disponíveis.
+O reconhecimento por voz precisa da OpenAI para transcrever o áudio. Se a interpretação Online falhar depois da transcrição, tenta o interpretador Offline. Sem acesso ao serviço de IA para transcrição, a voz não executa pedidos; os controlos diretos, MQTT e Text-Bot Offline continuam disponíveis.
+
+## Consultas de estado
+
+Por voz ou Text-Bot, Online ou Offline, podes perguntar pelo sistema, modo, motores, cilindros, luzes, robô, MQTT, OPC UA, OpenAI, erros, último evento e ações disponíveis. Exemplos: `Como está o sistema?`, `O cilindro A está avançado?`, `Diz-me o estado do OPC UA e da OpenAI`, `O que posso fazer agora?` e `Repete`. Podes misturar uma ação e uma pergunta, por exemplo `Liga o motor 1 e diz-me se o MQTT está ligado`.
+
+As consultas funcionam com o sistema parado, são registadas como `Consulta` e não enviam comandos ao PLC. O estado dos componentes é o último aceite pelo Blanky; um sinal de retorno pode confirmar o comando, **não a posição física**. A disponibilidade da OpenAI não é garantida só por existir uma chave configurada.
 
 ## Definições
 

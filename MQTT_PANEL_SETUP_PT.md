@@ -141,7 +141,7 @@ O IoT MQTT Panel pode enviar frases completas, e não apenas os códigos dos bot
 
 Nos Text Input, envie a frase como **texto simples**, sem JSON, `retain` **desativado** e QoS `0`. O modo é escolhido pelo tópico; o idioma de interpretação acompanha o idioma ativo no Blanky. Pode enviar vários pedidos separados por ponto e vírgula, por exemplo `iniciar; modo manual; ligar motor 1`. Uma mensagem retida nunca é executada, mesmo que tenha sido guardada por engano. O limite é de 1000 caracteres por mensagem.
 
-O Text-Bot do telemóvel usa as mesmas regras de segurança, Eventos e TTS do Text-Bot local; a fala sai no Raspberry Pi, **não no altifalante do telemóvel**. Os Eventos identificam a origem como `TELEMOVEL`, tal como os botões da app. A resposta do telemóvel tem um tópico próprio para não ser substituída por ações de voz ou dos botões. Mantenha o broker protegido: uma frase aceite pode comandar atuadores reais.
+O Text-Bot do telemóvel usa as mesmas regras de segurança, Eventos e TTS do Text-Bot local; a fala sai no Raspberry Pi, **não no altifalante do telemóvel**. Também aceita consultas de estado, por exemplo `como está o sistema?` ou `o MQTT está ligado?`, sem enviar comandos ao PLC. Os Eventos identificam a origem como `TELEMOVEL`, tal como os botões da app. A resposta agregada do telemóvel tem um tópico próprio para não ser substituída por ações de voz ou dos botões. Mantenha o broker protegido: uma frase de ação aceite pode comandar atuadores reais.
 
 ## 5. Testar a ligação
 

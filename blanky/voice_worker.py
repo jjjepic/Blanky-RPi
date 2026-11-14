@@ -7,7 +7,7 @@ from PySide6.QtCore import QThread, Signal
 from blanky.config import INPUT_WAV, TTS_WAV
 from blanky.audio_service import audio_info, record_wav, play_wav
 from blanky.speech_service import is_openai_configured, stt_transcribe, tts_speak_to_wav
-from blanky.command_parser import interpret_online_commands
+from blanky.command_parser import interpret_online_items, parse_offline_items
 from blanky.mqtt_service import get_mqtt_bridge
 
 
@@ -102,11 +102,13 @@ class VoiceWorker(QThread):
             else:
                 self.status.emit("A interpretar..." if self.lang == "pt" else "Interpreting...")
                 try:
-                    commands = interpret_online_commands(text, self.lang)
+                    items = interpret_online_items(text, self.lang)
                 except Exception:
-                    commands = []
+                    items = []
+                if not items:
+                    items = parse_offline_items(text, self.lang)
 
-                if not commands:
+                if not items:
                     command = "UNKNOWN"
                     self.commandRecognized.emit(command)
                     accepted, message = mqtt_bridge.process_command(command, self.lang, source="voice")
@@ -120,31 +122,40 @@ class VoiceWorker(QThread):
                         transcribe_duration,
                     )
                 else:
-                    response = ""
-                    for index, command in enumerate(commands):
-                        self.commandRecognized.emit(command)
-                        accepted, mqtt_message = mqtt_bridge.process_command(
-                            command,
-                            self.lang,
-                            source="voice",
-                        )
-                        response = self._response_for_result(
-                            mqtt_bridge,
-                            command,
-                            accepted,
-                            mqtt_message,
-                        )
+                    responses = []
+                    for index, item in enumerate(items):
+                        command = item["name"]
+                        if item["type"] == "query":
+                            accepted = True
+                            response_part = mqtt_bridge.answer_status_query(
+                                command, item.get("component", ""), self.lang, "voice"
+                            )
+                            diagnostic_name = "Consulta" if self.lang == "pt" else "Query"
+                        else:
+                            self.commandRecognized.emit(command)
+                            accepted, mqtt_message = mqtt_bridge.process_command(
+                                command, self.lang, source="voice"
+                            )
+                            response_part = self._response_for_result(
+                                mqtt_bridge, command, accepted, mqtt_message
+                            )
+                            diagnostic_name = command
+                        if response_part:
+                            responses.append(response_part)
                         self._emit_diagnostic(
                             diag,
                             text,
-                            command,
+                            diagnostic_name,
                             accepted,
                             started_at,
                             transcribe_duration,
                         )
-                        if index < len(commands) - 1:
+                        if index < len(items) - 1:
                             time.sleep(0.3)
+                    response = " ".join(responses)
             if response:
+                mqtt_bridge.remember_interaction_response(response, self.lang)
+                self.status.emit("Resposta pronta." if self.lang == "pt" else "Answer ready.")
                 self.spoken.emit(response)
                 t = threading.Thread(target=self._speak_async, args=(response,), daemon=True)
                 t.start()

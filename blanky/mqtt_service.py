@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import threading
 import time
@@ -24,6 +25,9 @@ from blanky.mqtt_topics import (
 from blanky.opcua_service import get_opcua_bridge
 from blanky.command_messages import no_change_message, rejection_for_event, rejection_message
 from blanky.mqtt_monitor import health_monitor_updates, state_monitor_updates
+from blanky.command_parser import VALID_COMMANDS, VALID_COMPONENTS, VALID_QUERIES
+from blanky.openai_activity import activity_snapshot
+from blanky.status_queries import answer_query
 
 
 class MQTTBridge:
@@ -43,6 +47,7 @@ class MQTTBridge:
         self._pulse_seconds = float(MQTT_PULSE_SECONDS)
         self._echo_suppression: dict[tuple[str, str], float] = {}
         self._events: list[dict[str, Any]] = []
+        self._last_interaction_response = {"pt": "", "en": ""}
         self._next_event_id = 1
         # Each reset starts a new visual event session without discarding history.
         self._event_generation = 0
@@ -291,6 +296,9 @@ class MQTTBridge:
     def _publish_phone_text_response(self, pt: str, en: str):
         self._publish("monitor/pt/phone_textbot_response", pt)
         self._publish("monitor/en/phone_textbot_response", en)
+
+    def publish_phone_interaction_response(self, pt: str, en: str):
+        self._publish_phone_text_response(pt, en)
 
     def publish_phone_text_path(self, mode: str, fallback: bool = False):
         if fallback:
@@ -783,6 +791,8 @@ class MQTTBridge:
             self._publish(f"monitor/{lang}/phone_textbot_response", self._event_monitor_message(event, lang))
 
     def _event_monitor_message(self, event: dict, lang: str) -> str:
+        if event.get("kind") == "query":
+            return str(event.get(f"detail_{lang}") or event.get("detail") or "")
         if not event["accepted"]:
             return rejection_for_event(event, lang)
         if event["command"] == "SYSTEM_RESET":
@@ -793,6 +803,50 @@ class MQTTBridge:
         if message == event["command"]:
             return "Pedido executado." if lang == "pt" else "Request completed."
         return message
+
+    def last_event_message(self, lang: str) -> str:
+        with self._lock:
+            return self._event_monitor_message(self._events[-1], lang) if self._events else ""
+
+    def remember_interaction_response(self, response: str, lang: str):
+        if response:
+            with self._lock:
+                self._last_interaction_response[lang] = response
+
+    def answer_status_query(self, name: str, component: str, lang: str, source: str) -> str:
+        if name not in VALID_QUERIES or (name == "QUERY_COMPONENT" and component not in VALID_COMPONENTS):
+            return rejection_message("unknown", lang)
+        health = self.health()
+        try:
+            from blanky.speech_service import is_openai_configured
+            health["openai_configured"] = is_openai_configured()
+        except ImportError:
+            health["openai_configured"] = bool(os.environ.get("OPENAI_API_KEY"))
+        health["openai_activity"] = activity_snapshot()
+        with self._lock:
+            state = dict(self.state)
+            events = list(self._events)
+            if events:
+                events[-1] = {**events[-1], **{
+                    f"detail_{language}": self._event_monitor_message(events[-1], language)
+                    for language in ("pt", "en")
+                }}
+            allowed = {command for command in VALID_COMMANDS if self._workflow_rejection_reason(command) is None}
+            previous = dict(self._last_interaction_response)
+            answers = {
+                language: answer_query(name, component, language, state, health, events, allowed, previous[language])
+                for language in ("pt", "en")
+            }
+            event = {
+                "id": self._next_event_id, "time": datetime.now().strftime("%H:%M:%S"),
+                "source": source, "command": name, "kind": "query", "accepted": True,
+                "detail": answers[lang], "detail_pt": answers["pt"], "detail_en": answers["en"],
+                "reason": "", "generation": self._event_generation,
+            }
+            self._next_event_id += 1
+            self._events.append(event)
+            self._publish_monitor_event(event)
+        return answers[lang]
 
     def reset_system(self, lang: str, source: str = "button") -> Tuple[bool, str]:
         with self._lock:

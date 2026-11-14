@@ -88,3 +88,41 @@ def rejection_message(reason: str, lang: str, command: str = "") -> str:
 
 def rejection_for_event(event: dict, lang: str) -> str:
     return rejection_message(str(event.get("reason") or "unknown"), lang, str(event.get("command") or ""))
+
+
+def command_label(command: str, lang: str) -> str:
+    """A short spoken name for an event, never its internal identifier."""
+    pt = {
+        "START": "iniciar o sistema", "STOP": "parar o sistema",
+        "MODE_FAST": "modo rápido", "MODE_IDEAL": "modo ideal", "MODE_MANUAL": "modo manual",
+        "MODE_UNSPEC": "mudar de modo", "GREEN_ON": "acender a luz verde",
+        "GREEN_OFF": "apagar a luz verde", "RED_ON": "acender a luz vermelha",
+        "RED_OFF": "apagar a luz vermelha", "ROBOT_TO_METAL": "robô para peças metálicas",
+        "ROBOT_TO_NONMETAL": "robô para peças não metálicas", "UNKNOWN": "pedido não reconhecido",
+        "NO_AUDIO": "pedido sem áudio", "SYSTEM_RESET": "reiniciar o sistema",
+        "SYSTEM_SHUTDOWN": "desligar o Blanky",
+    }
+    en = {
+        "START": "start the system", "STOP": "stop the system",
+        "MODE_FAST": "fast mode", "MODE_IDEAL": "ideal mode", "MODE_MANUAL": "manual mode",
+        "MODE_UNSPEC": "change mode", "GREEN_ON": "turn on the green light",
+        "GREEN_OFF": "turn off the green light", "RED_ON": "turn on the red light",
+        "RED_OFF": "turn off the red light", "ROBOT_TO_METAL": "robot to metal pieces",
+        "ROBOT_TO_NONMETAL": "robot to non-metal pieces", "UNKNOWN": "unrecognized request",
+        "NO_AUDIO": "request without audio", "SYSTEM_RESET": "reset the system",
+        "SYSTEM_SHUTDOWN": "shut down Blanky",
+    }
+    fixed = pt if lang == "pt" else en
+    if command in fixed:
+        return fixed[command]
+    motor = re.fullmatch(r"MOTOR_([123])_(ON|OFF)", command)
+    if motor:
+        number, action = motor.groups()
+        return (f"{'ligar' if action == 'ON' else 'desligar'} o motor {number}" if lang == "pt"
+                else f"turn {'on' if action == 'ON' else 'off'} motor {number}")
+    cylinder = re.fullmatch(r"CYL_([ABCD])_(EXTEND|RETRACT)", command)
+    if cylinder:
+        letter, action = cylinder.groups()
+        return (f"{'avançar' if action == 'EXTEND' else 'recuar'} o cilindro {letter}" if lang == "pt"
+                else f"{'extend' if action == 'EXTEND' else 'retract'} cylinder {letter}")
+    return "consulta" if lang == "pt" else "query"

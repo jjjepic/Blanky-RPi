@@ -40,7 +40,7 @@ from blanky.speech_service import (
 )
 from blanky.voice_worker import VoiceWorker
 from blanky.wakeword_service import get_wakeword_service
-from blanky.command_parser import interpret_online_commands, parse_command
+from blanky.command_parser import interpret_online_items, parse_offline_items
 from blanky.openai_activity import activity_snapshot
 from blanky.color_vision_profiles import get_profile_tokens
 from blanky.command_messages import rejection_for_event, rejection_message
@@ -286,7 +286,9 @@ class BlankyController(QObject):
         self._last_event_id_seen = 0
 
         self._tts_queue: queue.Queue[object] = queue.Queue()
-        self._text_command_queue: list[tuple[str, str, str]] = []
+        self._text_command_queue: list[tuple[dict, str, str, int, bool]] = []
+        self._text_request_id = 0
+        self._text_response_parts: dict[int, dict[str, list[str]]] = {}
         self._text_command_timer = QTimer(self)
         self._text_command_timer.setSingleShot(True)
         self._text_command_timer.timeout.connect(self._execute_next_text_command)
@@ -930,31 +932,32 @@ class BlankyController(QObject):
             threading.Thread(target=self._resolve_online_text, args=(raw, language, source), daemon=True).start()
             return
 
-        commands = []
+        items = []
         for phrase in re.split(r"[\n;]+", raw):
             phrase = phrase.strip()
             if phrase:
-                command, _ = parse_command(phrase, language)
-                commands.append(command)
-        self._queue_text_commands(commands, raw, source, language)
+                items.extend(parse_offline_items(phrase, language))
+        self._queue_text_commands(items, raw, source, language)
 
     def _resolve_online_text(self, raw: str, language: str, source: str):
         try:
-            commands = interpret_online_commands(raw, language)
+            items = interpret_online_items(raw, language)
         except Exception:
             self.textCommandsFailed.emit(raw, source, language)
             return
-        self.textCommandsResolved.emit(commands, raw, source, language)
+        if not items:
+            self.textCommandsFailed.emit(raw, source, language)
+            return
+        self.textCommandsResolved.emit(items, raw, source, language)
 
     @Slot(str, str, str)
     def _handle_text_online_error(self, raw: str, source: str, language: str):
-        commands = []
+        items = []
         for phrase in re.split(r"[\n;]+", raw or ""):
             phrase = phrase.strip()
             if phrase:
-                command, _ = parse_command(phrase, language)
-                commands.append(command)
-        self._queue_text_commands(commands, raw, source, language)
+                items.extend(parse_offline_items(phrase, language))
+        self._queue_text_commands(items, raw, source, language)
         # Keep the fallback notice without replacing a command rejection.
         self._set_status(self._tr("text_online_fallback"))
         if source == "mqtt_text":
@@ -962,9 +965,8 @@ class BlankyController(QObject):
         self.textOnlineFallbackRequested.emit()
 
     @Slot(object, str, str, str)
-    def _queue_text_commands(self, commands, raw: str, source: str, language: str):
-        valid_commands = [str(command).upper() for command in commands if str(command).strip()]
-        if not valid_commands:
+    def _queue_text_commands(self, items, raw: str, source: str, language: str):
+        if not items:
             _, response = self._bridge.process_command("UNKNOWN", language, source=source)
             self._set_status(self._tr("text_no_commands"))
             self._set_recognized(response)
@@ -973,7 +975,13 @@ class BlankyController(QObject):
 
         self._stop_and_flush_audio()
         self._set_recognized(self._tr("text_received_response"))
-        self._text_command_queue.extend((command, source, language) for command in valid_commands)
+        self._text_request_id += 1
+        request_id = self._text_request_id
+        self._text_response_parts[request_id] = {"pt": [], "en": []}
+        self._text_command_queue.extend(
+            (item, source, language, request_id, index == len(items) - 1)
+            for index, item in enumerate(items)
+        )
         if not self._text_command_timer.isActive():
             self._execute_next_text_command()
 
@@ -981,22 +989,34 @@ class BlankyController(QObject):
         if not self._text_command_queue:
             return
 
-        command, source, language = self._text_command_queue.pop(0)
-        if command in {"UNKNOWN", "NO_AUDIO"}:
-            _, response = self._bridge.process_command(command, language, source=source)
-            self._set_status(self._tr("text_no_commands"))
-            self._set_recognized(response)
-            if response:
-                self._enqueue_tts(response)
-            if self._text_command_queue:
-                self._text_command_timer.start(300)
-            return
-        accepted, response = self._bridge.process_command(command, language, source=source)
-        self._set_command_interaction("text_status", command)
-        if not accepted and response:
-            self._set_recognized(response)
+        item, source, language, request_id, is_last = self._text_command_queue.pop(0)
+        if item["type"] == "query":
+            response = self._bridge.answer_status_query(item["name"], item.get("component", ""), language, source)
+            self._set_status("Consulta respondida." if language == "pt" else "Question answered.")
+        else:
+            command = item["name"]
+            accepted, response = self._bridge.process_command(command, language, source=source)
+            if accepted and not response:
+                response = self._bridge.last_event_message(language)
+            if command in {"UNKNOWN", "NO_AUDIO"}:
+                self._set_status(self._tr("text_no_commands"))
+            else:
+                self._set_command_interaction("text_status", command)
         if response:
-            self._enqueue_tts(response)
+            self._text_response_parts[request_id][language].append(response)
+            other_language = "en" if language == "pt" else "pt"
+            self._text_response_parts[request_id][other_language].append(self._bridge.last_event_message(other_language))
+        if is_last:
+            responses = self._text_response_parts.pop(request_id)
+            combined = " ".join(responses[language])
+            if combined:
+                self._set_recognized(combined)
+                self._bridge.remember_interaction_response(combined, language)
+                self._enqueue_tts(combined)
+                if source == "mqtt_text":
+                    self._bridge.publish_phone_interaction_response(
+                        " ".join(responses["pt"]), " ".join(responses["en"])
+                    )
         if self._text_command_queue:
             self._text_command_timer.start(300)
 
@@ -1257,6 +1277,7 @@ class BlankyController(QObject):
         if not text:
             return
         self._last_tts_text = str(text)
+        self._bridge.remember_interaction_response(self._last_tts_text, self._language)
         self.canRepeatTtsChanged.emit()
 
     def _enqueue_tts(self, text: str):
@@ -1435,7 +1456,7 @@ class BlankyController(QObject):
             event_time = str(ev.get("time") or "")
             source = self._source_label(str(ev.get("source") or ""))
             status = "✓ OK" if ev.get("accepted") else "✕ REJECT"
-            command = str(ev.get("command") or "")
+            command = ("CONSULTA" if self._language == "pt" else "QUERY") if ev.get("kind") == "query" else str(ev.get("command") or "")
             is_previous_session = int(ev.get("generation", 0) or 0) < current_generation
             color = "#6d8290" if is_previous_session else self._event_visual_color(command, bool(ev.get("accepted")))
             detail_lines = textwrap.wrap(
@@ -1459,6 +1480,8 @@ class BlankyController(QObject):
         return f"<pre style='font-family:Consolas; font-size:{event_font_size}px;'>" + "\n".join(rich_rows) + "</pre>"
 
     def _localized_event_detail(self, event: dict) -> str:
+        if event.get("kind") == "query":
+            return str(event.get(f"detail_{self._language}") or event.get("detail") or "")
         command = str(event.get("command") or "")
         original = self._repair_display_text(str(event.get("detail") or ""))
         if event.get("accepted"):
@@ -1497,7 +1520,7 @@ class BlankyController(QObject):
                 "ID": f"{int(ev.get('id', 0) or 0):03d}",
                 "Hora" if self._language == "pt" else "Time": str(ev.get("time") or ""),
                 "Origem" if self._language == "pt" else "Source": self._source_label(str(ev.get("source") or "")),
-                "Comando" if self._language == "pt" else "Command": str(ev.get("command") or ""),
+                "Comando" if self._language == "pt" else "Command": ("CONSULTA" if self._language == "pt" else "QUERY") if ev.get("kind") == "query" else str(ev.get("command") or ""),
                 "Estado" if self._language == "pt" else "State": "OK" if ev.get("accepted") else "REJECT",
                 "Descri\u00e7\u00e3o" if self._language == "pt" else "Description": self._localized_event_detail(ev),
             })
