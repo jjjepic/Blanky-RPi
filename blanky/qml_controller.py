@@ -1,7 +1,7 @@
 import os
 import csv
-import queue
 import threading
+import logging
 import html
 import textwrap
 import re
@@ -17,14 +17,15 @@ from blanky.audio_service import (
     get_audio_output_volume,
     is_audio_output_enabled,
     play_beep,
-    play_wav,
+    play_wav_interruptible,
     set_audio_output_enabled,
     set_audio_output_volume,
-    stop_playback,
     update_audio_input_settings,
 )
 from blanky.config import (
-    AUDIO_DIR,
+    AUDIO_GROUP_WINDOW_SECONDS,
+    AUDIO_GROUP_MAX_WAIT_SECONDS,
+    AUDIO_TTS_CACHE_ENTRIES,
     MQTT_BROKER_HOST,
     MQTT_BROKER_PORT,
     MQTT_TOPIC_PREFIX,
@@ -44,7 +45,12 @@ from blanky.command_parser import interpret_online_items, parse_offline_items
 from blanky.openai_activity import activity_snapshot
 from blanky.color_vision_profiles import get_profile_tokens
 from blanky.command_messages import rejection_for_event, rejection_message
+from blanky.audio_coordinator import AudioCoordinator
+from blanky.audio_messages import command_group_key, operational_speech
 from blanky.preference_intents import handle_preference
+
+
+_LOG = logging.getLogger(__name__)
 
 
 class BlankyController(QObject):
@@ -89,6 +95,9 @@ class BlankyController(QObject):
     mobileTextReceived = Signal(str, str)
     textOnlineFallbackRequested = Signal()
     textBotModeChanged = Signal()
+    audioStateReported = Signal(str, str)
+    audioDelivered = Signal(object)
+    audioPlaybackStateChanged = Signal()
 
     _SENSITIVITY_FACTOR_MIN = 1.20
     _SENSITIVITY_FACTOR_MAX = 2.60
@@ -256,6 +265,9 @@ class BlankyController(QObject):
         self._tts_speed = 1.0
         self._textbot_mode = "online"
         self._last_tts_text = ""
+        self._last_tts_localized: dict[str, str] = {}
+        self._audio_playback_state = "idle"
+        self._interaction_generation = 0
         self._sound_enabled = is_audio_output_enabled()
         self._sound_volume = get_audio_output_volume()
         self._audio_input_preset = ""
@@ -288,7 +300,15 @@ class BlankyController(QObject):
         self._worker = None
         self._last_event_id_seen = 0
 
-        self._tts_queue: queue.Queue[object] = queue.Queue()
+        self.audioStateReported.connect(self._on_audio_state)
+        self.audioDelivered.connect(self._remember_tts_text)
+        self._audio = AudioCoordinator(
+            self._synthesize_audio, play_wav_interruptible,
+            self.audioStateReported.emit, self.audioDelivered.emit,
+            group_window=AUDIO_GROUP_WINDOW_SECONDS,
+            max_group_wait=AUDIO_GROUP_MAX_WAIT_SECONDS,
+            cache_entries=AUDIO_TTS_CACHE_ENTRIES,
+        )
         self._text_command_queue: list[tuple[dict, str, str, int, bool]] = []
         self._text_request_id = 0
         self._text_response_parts: dict[int, dict[str, list[str]]] = {}
@@ -297,9 +317,6 @@ class BlankyController(QObject):
         self._text_command_timer.timeout.connect(self._execute_next_text_command)
         self.textCommandsResolved.connect(self._queue_text_commands)
         self.textCommandsFailed.connect(self._handle_text_online_error)
-        self._panel_tts_path = os.path.join(AUDIO_DIR, "tts_panel.wav")
-        self._tts_thread = threading.Thread(target=self._panel_tts_loop, daemon=True)
-        self._tts_thread.start()
 
         self._timer = QTimer(self)
         self._timer.setInterval(500)
@@ -421,6 +438,10 @@ class BlankyController(QObject):
     @Property(bool, notify=canRepeatTtsChanged)
     def canRepeatTts(self):
         return bool(self._last_tts_text)
+
+    @Property(str, notify=audioPlaybackStateChanged)
+    def audioPlaybackState(self):
+        return self._audio_playback_state
 
     @Property(QUrl, constant=True)
     def defaultExportFolder(self):
@@ -751,7 +772,9 @@ class BlankyController(QObject):
         if voice not in get_tts_voice_options(self._language):
             return
         preview = self._tr("voice_preview", voice=voice.capitalize())
-        self._tts_queue.put((preview, voice, self._tts_speed))
+        self._stop_and_flush_audio()
+        self._audio.submit(preview, voice=voice, speed=self._tts_speed,
+                           language=self._language, priority="requested", remember=False)
 
     @Slot(float)
     def setTtsSpeed(self, speed: float):
@@ -770,7 +793,10 @@ class BlankyController(QObject):
     @Slot()
     def repeatLastTts(self):
         if self._last_tts_text:
-            self._tts_queue.put((self._last_tts_text, self._tts_voice, self._tts_speed))
+            text = self._last_tts_localized.get(self._language, self._last_tts_text)
+            self._audio.submit(text, voice=self._tts_voice, speed=self._tts_speed,
+                               language=self._language, priority="requested",
+                               localized=self._last_tts_localized)
 
     @Slot()
     def clearInteraction(self):
@@ -794,7 +820,8 @@ class BlankyController(QObject):
 
     @Slot()
     def testBeep(self):
-        play_beep()
+        self._stop_and_flush_audio()
+        threading.Thread(target=play_beep, name="blanky-test-beep", daemon=True).start()
 
     @Slot(str)
     def setAudioInputPreset(self, preset: str):
@@ -865,12 +892,8 @@ class BlankyController(QObject):
         self._sync_audio_input_state()
 
     def _stop_and_flush_audio(self):
-        stop_playback()
-        while True:
-            try:
-                self._tts_queue.get_nowait()
-            except Exception:
-                break
+        self._interaction_generation += 1
+        self._audio.cancel_pending()
 
     def _trigger_factor_to_sensitivity(self, factor: float) -> float:
         clamped = max(self._SENSITIVITY_FACTOR_MIN, min(self._SENSITIVITY_FACTOR_MAX, float(factor)))
@@ -986,18 +1009,21 @@ class BlankyController(QObject):
 
     @Slot(object, str, str, str)
     def _queue_text_commands(self, items, raw: str, source: str, language: str):
+        self._stop_and_flush_audio()
         if not items:
             _, response = self._bridge.process_command("UNKNOWN", language, source=source)
             self._set_status(self._tr("text_no_commands"))
             self._set_recognized(response)
-            self._enqueue_tts(response)
+            other = "en" if language == "pt" else "pt"
+            self._enqueue_tts(response, localized={language: response,
+                                                   other: self._bridge.last_event_message(other)})
             return
 
-        self._stop_and_flush_audio()
         self._set_recognized(self._tr("text_received_response"))
         self._text_request_id += 1
         request_id = self._text_request_id
-        self._text_response_parts[request_id] = {"pt": [], "en": [], "speech": []}
+        self._text_response_parts[request_id] = {"pt": [], "en": [],
+                                                 "spoken_pt": [], "spoken_en": []}
         self._text_command_queue.extend(
             (item, source, language, request_id, index == len(items) - 1)
             for index, item in enumerate(items)
@@ -1010,6 +1036,7 @@ class BlankyController(QObject):
             return
 
         item, source, language, request_id, is_last = self._text_command_queue.pop(0)
+        other_language = "en" if language == "pt" else "pt"
         if item["type"] == "setting" or item["name"] in {"QUERY_SETTING", "QUERY_CLARIFY"}:
             try:
                 answers = handle_preference(self, item, language)
@@ -1019,39 +1046,45 @@ class BlankyController(QObject):
                 )
                 response = answers[language]["detail"]
                 speech = answers[language]["speech"]
+                other_speech = answers[other_language]["speech"]
             except (ValueError, TypeError):
                 response = "Não percebi. Podes repetir?" if language == "pt" else "I didn't understand. Can you repeat?"
                 speech = response
+                other_speech = "I didn't understand. Can you repeat?" if language == "pt" else "Não percebi. Podes repetir?"
             self._set_status("Definição atualizada." if language == "pt" else "Preference updated.")
         elif item["type"] == "query":
             parts = self._bridge.answer_status_query_parts(
                 item["name"], item.get("target") or item.get("component", ""), language,
                 source, item.get("value", ""))
             response, speech = parts["detail"], parts["speech"]
+            other_speech = parts["localized_speech"][other_language]
             self._set_status("Consulta respondida." if language == "pt" else "Question answered.")
         else:
             command = item["name"]
             accepted, response = self._bridge.process_command(command, language, source=source)
             if accepted and not response:
                 response = self._bridge.last_event_message(language)
-            speech = response
+            speech = operational_speech(command, accepted, response, language)
+            other_detail = self._bridge.last_event_message(other_language)
+            other_speech = operational_speech(command, accepted, other_detail, other_language)
             if command in {"UNKNOWN", "NO_AUDIO"}:
                 self._set_status(self._tr("text_no_commands"))
             else:
                 self._set_command_interaction("text_status", command)
         if response:
             self._text_response_parts[request_id][language].append(response)
-            self._text_response_parts[request_id]["speech"].append(speech)
-            other_language = "en" if language == "pt" else "pt"
+            self._text_response_parts[request_id][f"spoken_{language}"].append(speech)
+            self._text_response_parts[request_id][f"spoken_{other_language}"].append(other_speech)
             self._text_response_parts[request_id][other_language].append(self._bridge.last_event_message(other_language))
         if is_last:
             responses = self._text_response_parts.pop(request_id)
-            combined = " ".join(responses[language])
-            spoken = " ".join(responses["speech"])
+            effective_language = self._language
+            combined = " ".join(responses[effective_language])
+            localized = {lang: " ".join(responses[f"spoken_{lang}"]) for lang in ("pt", "en")}
+            spoken = localized[effective_language]
             if combined:
                 self._set_recognized(combined)
-                self._bridge.remember_interaction_response(combined, language, spoken)
-                self._enqueue_tts(spoken)
+                self._enqueue_tts(spoken, localized=localized)
                 if source == "mqtt_text":
                     self._bridge.publish_phone_interaction_response(
                         " ".join(responses["pt"]), " ".join(responses["en"])
@@ -1074,7 +1107,13 @@ class BlankyController(QObject):
         if not accepted and response:
             self._set_recognized(response)
         if response:
-            self._enqueue_tts(response)
+            spoken = operational_speech(command, accepted, response, self._language)
+            other = "en" if self._language == "pt" else "pt"
+            other_detail = self._bridge.last_event_message(other)
+            localized = {self._language: spoken,
+                         other: operational_speech(command, accepted, other_detail, other)}
+            self._enqueue_tts(spoken, priority="operational" if accepted else "critical",
+                              group=accepted, group_key=command_group_key(command), localized=localized)
 
     @Slot()
     def resetSystem(self):
@@ -1082,7 +1121,8 @@ class BlankyController(QObject):
         _, response = self._bridge.reset_system(self._language, source="button")
         self._set_recognized(self._tr("system_reset"))
         self._set_status(self._tr("system_reset_status"))
-        self._enqueue_tts(response)
+        self._enqueue_tts(response, localized={lang: self._tr("system_reset", lang=lang)
+                                               for lang in ("pt", "en")})
 
     @Slot()
     def shutdownApplication(self):
@@ -1108,7 +1148,9 @@ class BlankyController(QObject):
             return
 
         self._set_status(self._tr("exported", path=path))
-        self._enqueue_tts(self._tr("exported_tts"))
+        self._enqueue_tts(self._tr("exported_tts"), localized={
+            lang: self._tr("exported_tts", lang=lang) for lang in ("pt", "en")
+        })
 
     @Slot(str, str)
     def exportAudioDiagnosticsTo(self, fmt: str, folder: str):
@@ -1120,7 +1162,9 @@ class BlankyController(QObject):
             return
 
         self._set_status(self._tr("audio_exported", path=path))
-        self._enqueue_tts(self._tr("audio_exported_tts"))
+        self._enqueue_tts(self._tr("audio_exported_tts"), localized={
+            lang: self._tr("audio_exported_tts", lang=lang) for lang in ("pt", "en")
+        })
 
     @Slot()
     def startVoice(self):
@@ -1128,24 +1172,26 @@ class BlankyController(QObject):
             return
 
         try:
-            self._stop_and_flush_audio()
+            self._interaction_generation += 1
+            self._audio.begin_capture()
             self._wakeword.set_paused(True)
             self._set_listening(True)
             self._set_recognized(self._tr("voice_prompt"))
             self._set_status(self._tr("starting_status"))
-            play_beep()
-
-            self._worker = VoiceWorker(lang=self._language, tts_speed=self._tts_speed)
-            self._worker.status.connect(self._set_status)
-            self._worker.recognized.connect(self._on_recognized)
-            self._worker.commandRecognized.connect(self._on_voice_command)
+            self._worker = VoiceWorker(lang=self._language, tts_speed=self._tts_speed,
+                                       audio_coordinator=self._audio,
+                                       session_id=self._interaction_generation)
+            self._worker.status.connect(self._on_voice_status)
+            self._worker.recognized.connect(self._on_voice_recognized)
+            self._worker.commandRecognized.connect(self._on_voice_command_payload)
             self._worker.diagnostic.connect(self._append_audio_diagnostic)
-            self._worker.spoken.connect(self._remember_tts_text)
-            self._worker.detailReady.connect(self._set_recognized)
+            self._worker.spoken.connect(self._on_voice_speech)
+            self._worker.detailReady.connect(self._on_voice_detail)
             self._worker.preferenceRequested.connect(self._handle_voice_preference)
-            self._worker.done.connect(self._on_done)
+            self._worker.finished.connect(self._on_done)
             self._worker.start()
         except Exception as exc:
+            self._audio.end_capture()
             self._worker = None
             self._set_listening(False)
             self._wakeword.set_paused(False)
@@ -1161,12 +1207,41 @@ class BlankyController(QObject):
                 kind="setting" if item["type"] == "setting" else "query"
             )
             request["answers"] = answers[request["language"]]
+            request["all_answers"] = answers
             request["speed"] = self._tts_speed
         except (ValueError, TypeError):
             message = "Não percebi. Podes repetir?" if request["language"] == "pt" else "I didn't understand. Can you repeat?"
             request["answers"] = {"speech": message, "detail": message}
         finally:
             request["done"].set()
+
+    @Slot(object)
+    def _on_voice_status(self, payload: dict):
+        if payload.get("session") == self._interaction_generation:
+            self._set_status(payload.get("text", ""))
+
+    @Slot(object)
+    def _on_voice_recognized(self, payload: dict):
+        if payload.get("session") == self._interaction_generation:
+            self._on_recognized(payload.get("text", ""))
+
+    @Slot(object)
+    def _on_voice_command_payload(self, payload: dict):
+        if payload.get("session") == self._interaction_generation:
+            self._on_voice_command(payload.get("command", ""))
+
+    @Slot(object)
+    def _on_voice_speech(self, payload: dict):
+        if payload.get("session") != self._interaction_generation:
+            return
+        localized = payload.get("localized") or {}
+        text = localized.get(self._language, "")
+        self._enqueue_tts(text, localized=localized)
+
+    @Slot(object)
+    def _on_voice_detail(self, payload: dict):
+        if payload.get("session") == self._interaction_generation:
+            self._set_recognized(payload.get("detail", ""))
 
     # ---------- Internal ----------
     def _set_status(self, text: str):
@@ -1303,45 +1378,48 @@ class BlankyController(QObject):
         self._set_listening(False)
         self._wakeword.set_paused(False)
 
-    def _panel_tts_loop(self):
-        while True:
-            job = self._tts_queue.get()
-            voice = None
-            speed = self._tts_speed
-            if isinstance(job, tuple):
-                text = job[0]
-                if len(job) > 1:
-                    voice = job[1]
-                if len(job) > 2:
-                    speed = job[2]
-            else:
-                text = job
-            if not text:
-                continue
-            try:
-                tts_speak_to_wav(
-                    text,
-                    self._panel_tts_path,
-                    voice=voice,
-                    speed=speed,
-                    lang=self._language,
-                )
-                play_wav(self._panel_tts_path)
-            except Exception:
-                pass
+    @staticmethod
+    def _synthesize_audio(text: str, path: str, voice: str, speed: float, language: str):
+        tts_speak_to_wav(text, path, voice=voice, speed=speed, lang=language)
 
-    def _remember_tts_text(self, text: str):
+    @Slot(str, str)
+    def _on_audio_state(self, state: str, message: str):
+        if state != self._audio_playback_state:
+            self._audio_playback_state = state
+            self.audioPlaybackStateChanged.emit()
+        if state in {"error", "stale"}:
+            if state == "error":
+                _LOG.error("Audio unavailable: %s", message)
+                self._set_status("Áudio indisponível. Podes tentar novamente." if self._language == "pt"
+                                 else "Audio unavailable. You can try again.")
+            else:
+                _LOG.warning("Stale speech discarded: %s", message)
+            self._append_audio_diagnostic({
+                "time": datetime.now().strftime("%H:%M:%S"), "language": self._language,
+                "capture": 0.0, "stt": 0.0, "end": "audio_error" if state == "error" else "stale",
+                "command": "AUDIO", "text": message,
+                "result": "ERROR" if state == "error" else "STALE", "duration": 0.0,
+            })
+
+    @Slot(object)
+    def _remember_tts_text(self, delivered: dict):
+        text = delivered.get("text", "")
+        language = delivered.get("language", self._language)
         if not text:
             return
         self._last_tts_text = str(text)
-        self._bridge.remember_interaction_response(self._last_tts_text, self._language)
+        self._last_tts_localized = dict(delivered.get("localized") or {language: text})
+        for locale, spoken in self._last_tts_localized.items():
+            self._bridge.remember_interaction_response(spoken, locale, spoken)
         self.canRepeatTtsChanged.emit()
 
-    def _enqueue_tts(self, text: str):
+    def _enqueue_tts(self, text: str, *, priority: str = "requested", group: bool = False,
+                     group_key: str = "", localized: dict[str, str] | None = None):
         if not text:
             return
-        self._remember_tts_text(text)
-        self._tts_queue.put((str(text), self._tts_voice, self._tts_speed))
+        self._audio.submit(str(text), voice=self._tts_voice, speed=self._tts_speed,
+                           language=self._language, priority=priority, group=group,
+                           group_key=group_key, localized=localized)
 
     def _comm_badge(self, label: str, state: str) -> str:
         palette = {
@@ -1853,16 +1931,25 @@ class BlankyController(QObject):
             self._last_event_id_seen = event_id
 
             if ev.get("source") == "mqtt_panel":
-                self._stop_and_flush_audio()
                 self._set_command_interaction("mqtt_status", str(ev.get("command") or ""))
                 detail = self._localized_event_detail(ev)
                 if not ev.get("accepted"):
                     self._set_recognized(detail)
                 if detail:
-                    self._enqueue_tts(detail)
+                    command = str(ev.get("command") or "")
+                    spoken = operational_speech(command, bool(ev.get("accepted")), detail, self._language)
+                    other = "en" if self._language == "pt" else "pt"
+                    other_detail = (self._bridge.response_for_command(command, other) if ev.get("accepted")
+                                    else rejection_for_event(ev, other))
+                    localized = {self._language: spoken,
+                                 other: operational_speech(command, bool(ev.get("accepted")), other_detail, other)}
+                    self._enqueue_tts(spoken, priority="operational" if ev.get("accepted") else "critical",
+                                      group=bool(ev.get("accepted")), group_key=command_group_key(command),
+                                      localized=localized)
 
     @Slot()
     def shutdown(self):
+        self._audio.close()
         try:
             self._wakeword.stop()
         except Exception:

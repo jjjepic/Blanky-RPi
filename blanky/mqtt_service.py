@@ -827,7 +827,9 @@ class MQTTBridge:
                 (name == "QUERY_COMPONENT_GROUP" and component not in VALID_GROUPS) or
                 name == "QUERY_SETTING"):
             message = rejection_message("unknown", lang)
-            return {"speech": message, "detail": message}
+            return {"speech": message, "detail": message, "localized_speech": {
+                language: rejection_message("unknown", language) for language in ("pt", "en")
+            }}
         health = self.health()
         try:
             from blanky.speech_service import is_openai_configured
@@ -866,7 +868,9 @@ class MQTTBridge:
             self._next_event_id += 1
             self._events.append(event)
             self._publish_monitor_event(event)
-        return answers[lang]
+        return {**answers[lang], "localized_speech": {
+            language: answers[language]["speech"] for language in ("pt", "en")
+        }}
 
     def record_preference_event(self, source: str, answers: dict[str, dict[str, str]],
                                 accepted: bool = True, kind: str = "setting"):

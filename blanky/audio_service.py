@@ -2,6 +2,8 @@ import os
 import subprocess
 import tempfile
 import threading
+import time
+import logging
 from collections import deque
 from typing import Optional
 
@@ -39,6 +41,10 @@ _LAST_RECORD_DIAG: dict = {}
 _AUDIO_OUTPUT_ENABLED = True
 _AUDIO_OUTPUT_VOLUME = 1.0
 _PLAYBACK_LOCK = threading.Lock()
+_PLAYBACK_SERIAL_LOCK = threading.Lock()
+_ACTIVE_PLAY_CANCEL: Optional[threading.Event] = None
+_ACTIVE_APLAY: Optional[subprocess.Popen] = None
+_LOG = logging.getLogger(__name__)
 
 _SETTINGS_LIMITS = {
     "calibration_seconds": (0.08, 1.20),
@@ -360,6 +366,19 @@ def init_audio():
 
 
 def record_wav(path: str, seconds: int = SECONDS, fs: Optional[int] = None):
+    """Retry once after a device disappears or its input stream fails."""
+    global _ACTIVE_INPUT_DEVICE, _ACTIVE_FS
+    try:
+        return _record_wav_once(path, seconds, fs)
+    except Exception as exc:
+        _LOG.warning("Audio capture failed; re-detecting the input device: %s", exc)
+        _ACTIVE_INPUT_DEVICE = None
+        _ACTIVE_FS = None
+        init_audio()
+        return _record_wav_once(path, seconds, fs)
+
+
+def _record_wav_once(path: str, seconds: int = SECONDS, fs: Optional[int] = None):
     global _LAST_RECORD_DIAG
     if _ACTIVE_FS is None:
         init_audio()
@@ -557,50 +576,137 @@ def _normalize_audio_for_playback(data) -> tuple[np.ndarray, int]:
     return audio, int(sr)
 
 
-def _play_with_system_fallback(audio: np.ndarray, sr: int):
-    if audio.size == 0:
-        return
-    tmp_path = os.path.join(tempfile.gettempdir(), "blanky_playback.wav")
+def _play_with_system_fallback(audio: np.ndarray, sr: int, cancel: threading.Event,
+                               on_started=None) -> bool:
+    global _ACTIVE_APLAY
+    fd, tmp_path = tempfile.mkstemp(prefix="blanky_playback_", suffix=".wav")
+    os.close(fd)
+    process = None
     audio_i16 = (np.clip(audio, -1.0, 1.0) * 32767.0).astype(np.int16)
-    wav.write(tmp_path, int(sr), audio_i16)
     try:
-        subprocess.run(
-            ["aplay", tmp_path],
-            check=False,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-    except Exception:
-        pass
+        wav.write(tmp_path, int(sr), audio_i16)
+        if cancel.is_set():
+            return False
+        process = subprocess.Popen(["aplay", tmp_path], stdout=subprocess.DEVNULL,
+                                   stderr=subprocess.PIPE)
+        with _PLAYBACK_LOCK:
+            _ACTIVE_APLAY = process
+        if cancel.wait(0.03):
+            process.terminate()
+            return False
+        if process.poll() is not None:
+            error = (process.stderr.read(300) or b"").decode("utf-8", errors="replace")
+            raise RuntimeError(f"aplay exited with {process.returncode}: {error}")
+        if on_started:
+            on_started()
+        deadline = time.monotonic() + max(2.0, len(audio) / float(sr) + 2.0)
+        while process.poll() is None:
+            if cancel.wait(0.03):
+                process.terminate()
+                return False
+            if time.monotonic() >= deadline:
+                process.terminate()
+                raise TimeoutError("aplay playback timed out")
+        if process.returncode != 0:
+            error = (process.stderr.read(300) or b"").decode("utf-8", errors="replace")
+            raise RuntimeError(f"aplay exited with {process.returncode}: {error}")
+        return True
+    finally:
+        if process is not None:
+            try:
+                process.wait(timeout=0.2)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=0.2)
+            if process.stderr:
+                process.stderr.close()
+        with _PLAYBACK_LOCK:
+            _ACTIVE_APLAY = None
+        try:
+            os.unlink(tmp_path)
+        except FileNotFoundError:
+            pass
 
 
-def play_wav(path: str):
+def play_wav_interruptible(path: str, cancel: Optional[threading.Event] = None,
+                           on_started=None) -> bool:
+    """Play off the UI thread; cancellation never waits for the whole WAV."""
+    global _ACTIVE_PLAY_CANCEL
     if not _AUDIO_OUTPUT_ENABLED or float(_AUDIO_OUTPUT_VOLUME) <= 0.0:
-        return
+        return False
     if not os.path.exists(path):
-        return
-    with _PLAYBACK_LOCK:
-        audio = np.zeros((0,), dtype=np.float32)
-        sr = int(_ACTIVE_FS or FS)
+        raise FileNotFoundError(path)
+    cancel = cancel or threading.Event()
+    with _PLAYBACK_SERIAL_LOCK:
+        announced = False
+
+        def announce():
+            nonlocal announced
+            if not announced:
+                announced = True
+                if on_started:
+                    on_started()
+
+        with _PLAYBACK_LOCK:
+            _ACTIVE_PLAY_CANCEL = cancel
         try:
             audio, sr = _normalize_audio_for_playback(wav.read(path))
             if audio.size == 0:
-                return
-            sd.stop()
-            sd.play(audio, samplerate=sr, blocking=True)
-        except Exception:
+                return False
+            if cancel.is_set():
+                return False
             try:
-                _play_with_system_fallback(audio, sr)
-            except Exception:
-                pass
+                with _PLAYBACK_LOCK:
+                    if cancel.is_set():
+                        return False
+                    sd.stop()
+                    sd.play(audio, samplerate=sr, blocking=False)
+                    stream = sd.get_stream()
+                    if not stream.active:
+                        raise RuntimeError("audio stream did not start")
+                announce()
+                while stream.active and not cancel.wait(0.03):
+                    pass
+                if cancel.is_set():
+                    with _PLAYBACK_LOCK:
+                        sd.stop()
+                    return False
+                return True
+            except Exception as exc:
+                if announced:
+                    raise
+                _LOG.warning("Primary audio output failed; trying aplay: %s", exc)
+                if cancel.is_set():
+                    return False
+                with _PLAYBACK_LOCK:
+                    try:
+                        sd.stop()
+                    except Exception as stop_exc:
+                        _LOG.warning("Could not reset primary audio output: %s", stop_exc)
+                return _play_with_system_fallback(audio, sr, cancel, announce)
+        finally:
+            with _PLAYBACK_LOCK:
+                if _ACTIVE_PLAY_CANCEL is cancel:
+                    _ACTIVE_PLAY_CANCEL = None
+
+
+def play_wav(path: str):
+    return play_wav_interruptible(path)
 
 
 def stop_playback():
     with _PLAYBACK_LOCK:
+        if _ACTIVE_PLAY_CANCEL is not None:
+            _ACTIVE_PLAY_CANCEL.set()
+        if _ACTIVE_APLAY is not None and _ACTIVE_APLAY.poll() is None:
+            try:
+                _ACTIVE_APLAY.terminate()
+            except ProcessLookupError:
+                pass
         try:
             sd.stop()
-        except Exception:
-            pass
+        except Exception as exc:
+            _LOG.warning("Failed to stop audio output: %s", exc)
 
 
 def set_audio_output_enabled(enabled: bool):
@@ -648,8 +754,8 @@ def play_beep():
             return
         _ensure_beep(BEEP_WAV)
         play_wav(BEEP_WAV)
-    except Exception:
-        pass
+    except Exception as exc:
+        _LOG.warning("Audio cue unavailable: %s", exc)
 
 
 def is_audio_ready() -> bool:

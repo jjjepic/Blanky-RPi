@@ -48,6 +48,8 @@ No reconhecimento Offline, "avança o cilindro A" seleciona o cilindro, não o a
 
 O reconhecimento por voz precisa da OpenAI para transcrever o áudio. Se a interpretação Online falhar depois da transcrição, tenta o interpretador Offline. Sem acesso ao serviço de IA para transcrição, a voz não executa pedidos; os controlos diretos, MQTT e Text-Bot Offline continuam disponíveis.
 
+A fala passa por um coordenador único: a síntese não bloqueia a interface, uma nova gravação interrompe respostas antigas antes de captar áudio e confirmações de botões/telemóvel próximas podem ser agrupadas. A fala de um comando aceite confirma apenas o **pedido aceite**, nunca uma posição física. Respostas solicitadas, avisos críticos e confirmações têm prioridades distintas. **Repetir resposta** usa a última fala iniciada, com a voz, velocidade e idioma atuais. Falhas de TTS/reprodução ficam no Diagnóstico de áudio. Consulta [AUDIO_VALIDATION_PT.md](AUDIO_VALIDATION_PT.md) para validar no Raspberry Pi.
+
 ## Consultas de estado
 
 Por voz ou Text-Bot, Online ou Offline, podes perguntar pelo sistema, modo, motores, cilindros, luzes, robô, MQTT, OPC UA, OpenAI, erros, último evento e ações disponíveis. Exemplos: `Como está o sistema?`, `O cilindro A está avançado?`, `Diz-me o estado do OPC UA e da OpenAI`, `O que posso fazer agora?` e `Repete`. Podes misturar uma ação e uma pergunta, por exemplo `Liga o motor 1 e diz-me se o MQTT está ligado`.

@@ -1,4 +1,5 @@
 import os
+import threading
 
 from openai import OpenAI
 from blanky.openai_activity import measure_request
@@ -15,13 +16,15 @@ from blanky.config import (
 client = None
 _client_api_key = ""
 _ACTIVE_VOICE = TTS_VOICE_DEFAULT_PT
+_CLIENT_LOCK = threading.Lock()
 
 
 def set_openai_api_key(api_key: str):
     """Refresh the session client after the user changes the API key in settings."""
     global client, _client_api_key
-    _client_api_key = (api_key or "").strip()
-    client = OpenAI(api_key=_client_api_key) if _client_api_key else None
+    with _CLIENT_LOCK:
+        _client_api_key = (api_key or "").strip()
+        client = OpenAI(api_key=_client_api_key) if _client_api_key else None
 
 
 def is_openai_configured() -> bool:
@@ -34,10 +37,11 @@ def _get_client():
     api_key = os.environ.get("OPENAI_API_KEY", "").strip()
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY is not configured")
-    if client is None or api_key != _client_api_key:
-        client = OpenAI(api_key=api_key)
-        _client_api_key = api_key
-    return client
+    with _CLIENT_LOCK:
+        if client is None or api_key != _client_api_key:
+            client = OpenAI(api_key=api_key)
+            _client_api_key = api_key
+        return client
 
 
 def _looks_like_prompt_echo(text: str) -> bool:
