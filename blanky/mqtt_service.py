@@ -3,7 +3,7 @@ import re
 import threading
 import time
 from datetime import datetime
-from typing import Any, Optional, Tuple
+from typing import Any, Callable, Optional, Tuple
 
 from blanky.config import (
     MQTT_BROKER_HOST,
@@ -22,9 +22,14 @@ from blanky.mqtt_topics import (
     should_use_pulse,
 )
 from blanky.opcua_service import get_opcua_bridge
+from blanky.command_messages import no_change_message, rejection_for_event, rejection_message
+from blanky.mqtt_monitor import health_monitor_updates, state_monitor_updates
 
 
 class MQTTBridge:
+    _PHONE_TEXT_TOPICS = {"textbot/online": "online", "textbot/offline": "offline"}
+    _MAX_PHONE_TEXT_LENGTH = 1000
+
     def __init__(self):
         self.enabled = bool(MQTT_ENABLED)
         self._lock = threading.Lock()
@@ -45,6 +50,8 @@ class MQTTBridge:
         self._ui_lang = "pt"
         self._opcua = get_opcua_bridge()
         self._last_mqtt_panel_rx = 0.0
+        self._monitor_health_cache: dict[str, str] = {}
+        self._mobile_text_handler: Optional[Callable[[str, str], None]] = None
 
         self.state = {
             "start": 0,
@@ -80,6 +87,7 @@ class MQTTBridge:
 
     def _create_client(self):
         client = self._mqtt.Client(client_id=self._client_id, clean_session=True)
+        client.will_set(self._topic("monitor/availability"), payload="offline", qos=1, retain=True)
         if self._username:
             client.username_pw_set(self._username, self._password)
         client.on_connect = self._on_connect
@@ -112,8 +120,9 @@ class MQTTBridge:
             return
 
         previous_client = self.client
-        self._connected = False
         if previous_client is not None:
+            self._publish_offline(previous_client)
+            self._connected = False
             try:
                 previous_client.disconnect()
             except Exception:
@@ -137,22 +146,69 @@ class MQTTBridge:
     def _on_connect(self, client, userdata, flags, rc):
         self._connected = (rc == 0)
         if self._connected:
+            self._monitor_health_cache = {}
             self._subscribe_command_topics()
             self.publish_all_state()
+            self._publish("monitor/availability", "online")
+            if self._events:
+                self._publish_monitor_event(self._events[-1])
+            else:
+                self._publish("monitor/pt/last_message", "Sem atividade.")
+                self._publish("monitor/en/last_message", "No activity yet.")
+                self._publish("monitor/last_event_status", "none")
+            phone_events = (event for event in reversed(self._events) if event["source"] == "mqtt_text")
+            last_phone_event = next(phone_events, None)
+            if last_phone_event is None:
+                self._publish_phone_text_response("Sem pedidos.", "No requests yet.")
+                self._publish("monitor/pt/phone_textbot_path", "Sem pedidos")
+                self._publish("monitor/en/phone_textbot_path", "No requests yet")
+            else:
+                self._publish_phone_event(last_phone_event)
+            self.publish_monitor_health(self.health())
 
     def _on_disconnect(self, client, userdata, rc):
         self._connected = False
 
     def _on_message(self, client, userdata, msg):
         topic = str(msg.topic or "")
-        payload = msg.payload.decode("utf-8", errors="ignore").strip()
-        if self._is_suppressed_echo(topic, payload):
-            return
-
         topic_suffix = self._extract_suffix(topic)
         if not topic_suffix:
             return
 
+        mode = self._PHONE_TEXT_TOPICS.get(topic_suffix)
+        if mode:
+            if getattr(msg, "retain", False):
+                return
+            self._last_mqtt_panel_rx = time.monotonic()
+            try:
+                payload = msg.payload.decode("utf-8").strip() if len(msg.payload) <= 4000 else ""
+            except UnicodeDecodeError:
+                payload = ""
+            if not payload or len(payload) > self._MAX_PHONE_TEXT_LENGTH:
+                self._publish_phone_text_response(
+                    "Escreve um pedido até 1000 caracteres.",
+                    "Enter a request of up to 1000 characters.",
+                )
+                return
+            if self._mobile_text_handler is None:
+                self._publish_phone_text_response(
+                    "Text-Bot indisponível. Tenta novamente.",
+                    "Text-Bot unavailable. Please try again.",
+                )
+                return
+            self._publish_phone_text_response("A interpretar...", "Interpreting...")
+            try:
+                self._mobile_text_handler(payload, mode)
+            except Exception:
+                self._publish_phone_text_response(
+                    "Text-Bot indisponível. Tenta novamente.",
+                    "Text-Bot unavailable. Please try again.",
+                )
+            return
+
+        payload = msg.payload.decode("utf-8", errors="ignore").strip()
+        if self._is_suppressed_echo(topic, payload):
+            return
         command = command_for_topic_payload(topic_suffix, payload)
         if not command:
             return
@@ -162,10 +218,10 @@ class MQTTBridge:
         self.process_command(command=command, lang=self._ui_lang, source="mqtt_panel", emit_pulse=False)
 
     def _connect(self):
+        self._connected = False
         try:
             self.client.connect(self._broker_host, self._broker_port, 30)
             self.client.loop_start()
-            self._connected = False
         except Exception:
             self.enabled = False
             self._connected = False
@@ -181,6 +237,43 @@ class MQTTBridge:
         if suppress_echo:
             self._echo_suppression[(topic, payload_str)] = time.monotonic() + 2.0
         self.client.publish(topic, payload_str, qos=1, retain=retain)
+        if topic_suffix.startswith("state/"):
+            key = topic_suffix.removeprefix("state/")
+            for monitor_suffix, monitor_payload in state_monitor_updates(self.state, key).items():
+                self._publish(monitor_suffix, monitor_payload)
+
+    def _publish_offline(self, client):
+        if not self._connected:
+            return
+        try:
+            info = client.publish(self._topic("monitor/availability"), "offline", qos=1, retain=True)
+            info.wait_for_publish(timeout=1.0)
+        except Exception:
+            pass
+
+    def close(self):
+        """Mark a clean exit offline; the broker's Will covers unexpected exits."""
+        client = self.client
+        if client is None:
+            return
+        self._publish_offline(client)
+        self._connected = False
+        try:
+            client.disconnect()
+        except Exception:
+            pass
+        try:
+            client.loop_stop()
+        except Exception:
+            pass
+
+    def publish_monitor_health(self, health: dict):
+        if not self.enabled or not self._connected:
+            return
+        for suffix, payload in health_monitor_updates(health).items():
+            if self._monitor_health_cache.get(suffix) != payload:
+                self._publish(suffix, payload)
+                self._monitor_health_cache[suffix] = payload
 
     def _subscribe_command_topics(self):
         if not self.enabled or self.client is None:
@@ -189,6 +282,25 @@ class MQTTBridge:
         for suffix in topics:
             if suffix:
                 self.client.subscribe(self._topic(suffix), qos=1)
+        for suffix in self._PHONE_TEXT_TOPICS:
+            self.client.subscribe(self._topic(suffix), qos=0)
+
+    def set_mobile_text_handler(self, handler: Optional[Callable[[str, str], None]]):
+        self._mobile_text_handler = handler
+
+    def _publish_phone_text_response(self, pt: str, en: str):
+        self._publish("monitor/pt/phone_textbot_response", pt)
+        self._publish("monitor/en/phone_textbot_response", en)
+
+    def publish_phone_text_path(self, mode: str, fallback: bool = False):
+        if fallback:
+            pt, en = "Online indisponível; usado Offline", "Online unavailable; used Offline"
+        elif mode == "online":
+            pt, en = "Online", "Online"
+        else:
+            pt, en = "Offline", "Offline"
+        self._publish("monitor/pt/phone_textbot_path", pt)
+        self._publish("monitor/en/phone_textbot_path", en)
 
     def _extract_suffix(self, full_topic: str) -> Optional[str]:
         prefix = f"{self._topic_prefix}/"
@@ -227,21 +339,24 @@ class MQTTBridge:
             )
 
             if command in {"UNKNOWN", "NO_AUDIO"}:
-                self._add_event(command=command, source=source, accepted=False, detail=self._workflow_message_invalid(command, lang))
-                return False, None
+                reason = "no_audio" if command == "NO_AUDIO" else "unknown"
+                msg = rejection_message(reason, lang)
+                self._add_event(command=command, source=source, accepted=False, detail=msg, reason=reason)
+                return False, msg
 
             if not bypass_workflow:
-                invalid_msg = self._workflow_message_invalid(command, lang)
-                if invalid_msg:
+                invalid_reason = self._workflow_rejection_reason(command)
+                if invalid_reason:
+                    invalid_msg = rejection_message(invalid_reason, lang)
                     self._publish_rejected(command, "workflow_blocked")
-                    self._add_event(command=command, source=source, accepted=False, detail=invalid_msg)
+                    self._add_event(command=command, source=source, accepted=False, detail=invalid_msg, reason=invalid_reason)
                     return False, invalid_msg
 
             if command == "START":
                 if self.state["start"] == 1:
                     msg = self._no_change_message(command, lang)
                     self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg)
+                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
                     return False, msg
                 self._emit_for_command(command, emit_pulse)
                 self.state["start"] = 1
@@ -253,7 +368,7 @@ class MQTTBridge:
                 if self._is_everything_reset():
                     msg = self._no_change_message(command, lang)
                     self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg)
+                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
                     return False, msg
                 self._emit_for_command(command, emit_pulse)
                 self._reset_all_state()
@@ -265,7 +380,7 @@ class MQTTBridge:
                 if self.state["mode_fast"] == 1:
                     msg = self._no_change_message(command, lang)
                     self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg)
+                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
                     return False, msg
                 self._emit_for_command(command, emit_pulse)
                 self._set_modes(fast=1, ideal=0, manual=0, change=0)
@@ -275,7 +390,7 @@ class MQTTBridge:
                 if self.state["mode_ideal"] == 1:
                     msg = self._no_change_message(command, lang)
                     self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg)
+                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
                     return False, msg
                 self._emit_for_command(command, emit_pulse)
                 self._set_modes(fast=0, ideal=1, manual=0, change=0)
@@ -285,7 +400,7 @@ class MQTTBridge:
                 if self.state["mode_manual"] == 1:
                     msg = self._no_change_message(command, lang)
                     self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg)
+                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
                     return False, msg
                 self._emit_for_command(command, emit_pulse)
                 self._set_modes(fast=0, ideal=0, manual=1, change=0)
@@ -295,7 +410,7 @@ class MQTTBridge:
                 if self.state["mode_change"] == 1:
                     msg = self._no_change_message(command, lang)
                     self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg)
+                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
                     return False, msg
                 if self.state["mode_manual"] == 1:
                     self._deactivate_manual_components(lang)
@@ -312,7 +427,7 @@ class MQTTBridge:
                 if self.state[key] == value:
                     msg = self._no_change_message(command, lang)
                     self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg)
+                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
                     return False, msg
                 self._emit_for_command(command, emit_pulse)
                 self.state[key] = value
@@ -328,7 +443,7 @@ class MQTTBridge:
                 if self.state[key] == value:
                     msg = self._no_change_message(command, lang)
                     self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg)
+                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
                     return False, msg
                 self._emit_for_command(command, emit_pulse)
                 self.state[key] = value
@@ -340,7 +455,7 @@ class MQTTBridge:
                 if self.state["light_green"] == 1:
                     msg = self._no_change_message(command, lang)
                     self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg)
+                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
                     return False, msg
                 self._emit_for_command(command, emit_pulse)
                 self.state["light_green"] = 1
@@ -351,7 +466,7 @@ class MQTTBridge:
                 if self.state["light_green"] == 0:
                     msg = self._no_change_message(command, lang)
                     self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg)
+                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
                     return False, msg
                 self._emit_for_command(command, emit_pulse)
                 self.state["light_green"] = 0
@@ -363,7 +478,7 @@ class MQTTBridge:
                 if self.state["light_red"] == 1:
                     msg = self._no_change_message(command, lang)
                     self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg)
+                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
                     return False, msg
                 self._emit_for_command(command, emit_pulse)
                 self.state["light_red"] = 1
@@ -373,7 +488,7 @@ class MQTTBridge:
             if command == "RED_OFF":
                 if self.state["light_red"] == 0:
                     msg = self._no_change_message(command, lang)
-                    self._add_event(command=command, source=source, accepted=False, detail=msg)
+                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
                     return False, msg
                 self._emit_for_command(command, emit_pulse)
                 self.state["light_red"] = 0
@@ -384,7 +499,7 @@ class MQTTBridge:
             if command == "ROBOT_TO_METAL":
                 if self.state["robot_metal"] == 1 and self.state["robot_nonmetal"] == 0:
                     msg = self._no_change_message(command, lang)
-                    self._add_event(command=command, source=source, accepted=False, detail=msg)
+                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
                     return False, msg
                 self._emit_for_command(command, emit_pulse)
                 self.state["robot_metal"] = 1
@@ -398,7 +513,7 @@ class MQTTBridge:
             if command == "ROBOT_TO_NONMETAL":
                 if self.state["robot_metal"] == 0 and self.state["robot_nonmetal"] == 1:
                     msg = self._no_change_message(command, lang)
-                    self._add_event(command=command, source=source, accepted=False, detail=msg)
+                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
                     return False, msg
                 self._emit_for_command(command, emit_pulse)
                 self.state["robot_metal"] = 0
@@ -539,16 +654,12 @@ class MQTTBridge:
             or command in {"GREEN_ON", "GREEN_OFF", "RED_ON", "RED_OFF", "ROBOT_TO_METAL", "ROBOT_TO_NONMETAL"}
         )
 
-    def _workflow_message_invalid(self, command: str, lang: str) -> Optional[str]:
+    def _workflow_rejection_reason(self, command: str) -> Optional[str]:
         if command in {"UNKNOWN", "NO_AUDIO"}:
             return None
 
         if self.state["start"] == 0 and command not in {"START", "STOP"}:
-            return (
-                "Nao pode executar esse comando agora. Primeiro diga START."
-                if lang == "pt"
-                else "You cannot run that command now. Please set START first."
-            )
+            return "before_start"
 
         if command in {"START", "STOP"}:
             return None
@@ -558,20 +669,12 @@ class MQTTBridge:
         if mode == "none":
             if command in {"MODE_FAST", "MODE_IDEAL", "MODE_MANUAL"}:
                 return None
-            return (
-                "Nao pode ainda. Depois de START deve escolher um modo: rapido, ideal ou manual. Pode tambem dizer STOP."
-                if lang == "pt"
-                else "Not allowed yet. After START, choose a mode: fast, ideal or manual. You can also say STOP."
-            )
+            return "choose_mode"
 
         if mode == "change":
             if command in {"MODE_FAST", "MODE_IDEAL", "MODE_MANUAL"}:
                 return None
-            return (
-                "Modo de troca ativo. Escolha agora: rapido, ideal ou manual. Ou STOP."
-                if lang == "pt"
-                else "Mode change is active. Choose now: fast, ideal or manual. Or STOP."
-            )
+            return "choose_new_mode"
 
         if mode in {"fast", "ideal"}:
             if command == "MODE_UNSPEC":
@@ -579,46 +682,26 @@ class MQTTBridge:
             if command in {"MODE_FAST", "MODE_IDEAL", "MODE_MANUAL"}:
                 if (mode == "fast" and command == "MODE_FAST") or (mode == "ideal" and command == "MODE_IDEAL"):
                     return None
-                return (
-                    "Nao pode mudar diretamente de modo. Use MODE_CHANGE e depois escolha o novo modo, ou diga STOP."
-                    if lang == "pt"
-                    else "Direct mode switch is not allowed. Use MODE_CHANGE and then select the new mode, or say STOP."
-                )
+                return "change_mode_first"
             if self._is_component_command(command):
-                return (
-                    "Neste modo nao pode comandar componentes. Use MODE_CHANGE ou STOP."
-                    if lang == "pt"
-                    else "In this mode you cannot control components. Use MODE_CHANGE or STOP."
-                )
+                return "manual_only"
             return None
 
         if mode == "manual":
             if command == "MODE_UNSPEC":
                 return None
             if command in {"MODE_FAST", "MODE_IDEAL"}:
-                return (
-                    "No modo manual nao pode escolher rapido/ideal diretamente. Use MODE_CHANGE primeiro."
-                    if lang == "pt"
-                    else "In manual mode you cannot switch directly to fast/ideal. Use MODE_CHANGE first."
-                )
+                return "change_mode_first"
             return None
 
         return None
 
+    def _workflow_message_invalid(self, command: str, lang: str) -> Optional[str]:
+        reason = self._workflow_rejection_reason(command)
+        return rejection_message(reason, lang) if reason else None
+
     def _no_change_message(self, command: str, lang: str) -> str:
-        if command == "STOP":
-            return "Sem alteracao: sistema ja estava parado." if lang == "pt" else "No change: system was already stopped."
-        if command.endswith("_OFF") or command.endswith("_RETRACT"):
-            return (
-                f"Sem alteracao: {command} ja estava desativado."
-                if lang == "pt"
-                else f"No change: {command} was already inactive."
-            )
-        return (
-            f"Sem alteracao: {command} ja estava ativo."
-            if lang == "pt"
-            else f"No change: {command} was already active."
-        )
+        return no_change_message(command, lang)
 
     def _response_for_command(self, command: str, lang: str) -> str:
         pt = {
@@ -669,7 +752,7 @@ class MQTTBridge:
         mapping = pt if lang == "pt" else en
         return mapping.get(command, command)
 
-    def _add_event(self, command: str, source: str, accepted: bool, detail: Optional[str]):
+    def _add_event(self, command: str, source: str, accepted: bool, detail: Optional[str], reason: str = ""):
         event = {
             "id": self._next_event_id,
             "time": datetime.now().strftime("%H:%M:%S"),
@@ -677,13 +760,39 @@ class MQTTBridge:
             "command": command,
             "accepted": accepted,
             "detail": detail or "",
+            "reason": reason,
             "generation": self._event_generation,
         }
         self._next_event_id += 1
         self._events.append(event)
+        self._publish_monitor_event(event)
 
         if accepted:
-            self._opcua.enqueue_command(command)
+            self._opcua.enqueue_command(command, source=source)
+
+    def _publish_monitor_event(self, event: dict):
+        for lang in ("pt", "en"):
+            message = self._event_monitor_message(event, lang)
+            self._publish(f"monitor/{lang}/last_message", message)
+            if event["source"] == "mqtt_text":
+                self._publish(f"monitor/{lang}/phone_textbot_response", message)
+        self._publish("monitor/last_event_status", "ok" if event["accepted"] else "rejected")
+
+    def _publish_phone_event(self, event: dict):
+        for lang in ("pt", "en"):
+            self._publish(f"monitor/{lang}/phone_textbot_response", self._event_monitor_message(event, lang))
+
+    def _event_monitor_message(self, event: dict, lang: str) -> str:
+        if not event["accepted"]:
+            return rejection_for_event(event, lang)
+        if event["command"] == "SYSTEM_RESET":
+            return "Sistema reiniciado." if lang == "pt" else "System reset."
+        if event["command"] == "SYSTEM_SHUTDOWN":
+            return "Sistema a desligar." if lang == "pt" else "System shutting down."
+        message = self._response_for_command(event["command"], lang)
+        if message == event["command"]:
+            return "Pedido executado." if lang == "pt" else "Request completed."
+        return message
 
     def reset_system(self, lang: str, source: str = "button") -> Tuple[bool, str]:
         with self._lock:
@@ -732,12 +841,21 @@ class MQTTBridge:
             "opcua_connected": bool(opcua_health.get("connected")),
             "opcua_last_error": str(opcua_health.get("last_error") or ""),
             "opcua_last_write": str(opcua_health.get("last_write") or ""),
+            "opcua_feedback_active": bool(opcua_health.get("feedback_active")),
+            "opcua_feedback_error": str(opcua_health.get("feedback_error") or ""),
+            "opcua_last_feedback": str(opcua_health.get("last_feedback") or ""),
+            "opcua_last_write_ms": opcua_health.get("last_write_ms"),
+            "opcua_last_ack_ms": opcua_health.get("last_ack_ms"),
+            "opcua_received": opcua_health.get("received", {}),
             "opcua_url": str(opcua_health.get("url") or ""),
             "mqtt_host": self._broker_host,
             "mqtt_port": self._broker_port,
             "mqtt_topic_prefix": self._topic_prefix,
             "mqtt_client_id": self._client_id,
         }
+
+    def opcua_timing_records(self) -> list[dict]:
+        return self._opcua.timing_records()
 
     def set_ui_lang(self, lang: str):
         with self._lock:

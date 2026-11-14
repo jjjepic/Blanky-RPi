@@ -57,6 +57,8 @@ Rectangle {
     function stateText(state) {
         if (state === "connected")
             return t("connected")
+        if (state === "completed")
+            return t("lastRequestOk")
         if (state === "communicating")
             return t("communicating")
         if (state === "standby")
@@ -71,7 +73,7 @@ Rectangle {
     }
 
     function stateColor(state) {
-        if (state === "connected")
+        if (state === "connected" || state === "completed")
             return panel.successColor
         if (state === "communicating")
             return panel.accentColor
@@ -87,7 +89,7 @@ Rectangle {
     function stateSurfaceColor(state) {
         if (panel.colorIndependent)
             return panel.panelAltColor
-        if (state === "connected")
+        if (state === "connected" || state === "completed")
             return panel.successSurface
         if (state === "communicating")
             return panel.infoSurface
@@ -99,7 +101,7 @@ Rectangle {
     }
 
     function stateGlyph(state) {
-        if (state === "connected")
+        if (state === "connected" || state === "completed")
             return "✓"
         if (state === "communicating")
             return "⇄"
@@ -165,14 +167,14 @@ Rectangle {
             Repeater {
                 model: [
                     { key: "microphone", icon: "🎙", label: panel.t("microphone") },
-                    { key: "mqtt_base", icon: "📡", label: panel.t("mqttBase") },
+                    { key: "openai", icon: "✦", label: panel.t("openai") },
                     { key: "mqtt_phone", icon: "📱", label: panel.t("mqttPhone") },
                     { key: "opcua", icon: "🔗", label: panel.t("opcua") }
                 ]
 
                 Rectangle {
                     readonly property string communicationStatus: panel.stateFor(modelData.key)
-                    Layout.column: (modelData.key === "mqtt_base" || modelData.key === "mqtt_phone") ? 1 : 0
+                    Layout.column: (modelData.key === "openai" || modelData.key === "mqtt_phone") ? 1 : 0
                     Layout.row: (modelData.key === "mqtt_phone" || modelData.key === "opcua") ? 1 : 0
                     Layout.fillWidth: true
                     Layout.fillHeight: true

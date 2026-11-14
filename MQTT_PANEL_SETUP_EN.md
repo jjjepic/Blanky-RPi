@@ -90,14 +90,58 @@ blanky/state/robot_metal
 blanky/state/robot_nonmetal
 ```
 
-Also add text widgets for:
+These legacy topics remain available for existing switches and indicators. For a **read-only** dashboard, Blanky now also publishes `blanky/monitor/*`. Never configure a monitoring widget to publish to `monitor/*` or to send commands through `mqtt_*`.
+
+### Recommended IoT MQTT Panel layout
+
+Set the dashboard prefix to `blanky` and enter only the suffix below in Topic, for example `state/start`. Alternatively, enter `blanky/state/start` and check **Disable dashboard prefix topic**. Do not combine a dashboard prefix with a full topic path, which could subscribe to `blanky/blanky/state/start`.
+
+| Group | Widget | Topic (with dashboard prefix `blanky`) | Setup |
+| --- | --- | --- | --- |
+| Availability | Multi-State Indicator | `monitor/availability` | `online` = Blanky available; `offline` = Blanky unavailable. Subscribe-only widget, without a sync request. |
+| System | LED Indicator | `state/start` | Payload on `1`, off `0`; fixed panel name `System`. The LED does not change its name dynamically. |
+| System | Text Output | `monitor/en/system` | Displays `Started` or `Stopped`; place next to the LED. |
+| Current mode | Multi-State Indicator | `monitor/mode` | `stopped` = Stopped; `choose_mode` = Choose mode; `fast` = Fast; `ideal` = Ideal; `manual` = Manual; `changing` = Choose new mode. |
+| Current mode | Text Output (alternative) | `monitor/en/mode` | Readable text if Multi-State cannot show labels. |
+| Motors | LED Indicator + Text Output | `state/motor_1` + `monitor/en/motor_1` (also `_2`, `_3`) | `0` = Off; `1` = On. |
+| Cylinders | LED Indicator + Text Output | `state/cyl_a` + `monitor/en/cyl_a` (also `_b`, `_c`, `_d`) | `0` = Retract requested; `1` = Extend requested. Not a measured position. |
+| Lights | LED Indicator + Text Output | `state/light_green` + `monitor/en/light_green` (also `light_red`) | `0` = Off; `1` = On. |
+| Robot | Text Output | `monitor/en/robot` | No active target, Target: metal pieces or Target: non-metal pieces. The selection is temporary. |
+| Communications | Multi-State Indicator | `monitor/opcua` | `connected` / `disconnected`: OPC UA connection, not actuator confirmation. |
+| Communications | Text Output | `monitor/en/opcua_feedback` | `Active` or `Unavailable`: OPC UA feedback reception. |
+| OPC UA timings | Text Output | `monitor/en/opcua_write_time`, `monitor/en/opcua_ack_time` | Latest write and PLC signal acknowledgement in ms; unavailable values use text. These are not MQTT timings. |
+| Latest event: description | Text Output | `monitor/en/last_message` | Description of the latest Event, whether from voice, button, Text-Bot or phone. Not a full event history. |
+| Latest event: status | Multi-State Indicator | `monitor/last_event_status` | `none` = No events; `ok` = Accepted (OK); `rejected` = Rejected (REJECT). This does not confirm PLC actuation. |
+
+Portuguese equivalents are available under `monitor/pt/...`. All `monitor/*` topics are retained once first published. Use text, symbols and position in addition to color; do not rely only on red/green for critical states. **Do not use Node Status** with `monitor/availability`: the app version that requires a `Payload sync request` publishes a request, but Blanky does not implement that request/response protocol. Never publish to this topic, as doing so may overwrite its retained value. A subscribe-only Multi-State Indicator shows **Blanky's presence on the broker**, not that the system has started or that the PLC is connected. A clean exit publishes `offline`, and the Last Will publishes it after an unexpected disconnect; the broker may take some time to detect a lost connection. Disregard retained state values while availability is `offline`.
+
+`state/*` and `monitor/*` represent Blanky's internal state. The OPC UA connection and feedback indicate communication; they **do not individually confirm the physical position of each actuator**. PLC sensor/receive data is not yet published as per-component physical state over MQTT.
+
+`monitor/last_event_status` is language-independent and accompanies `monitor/en/last_message`. Configure both widgets as subscribe-only; do not publish to these topics.
+
+For advanced diagnostics, the existing topics remain available:
 
 | Topic | Content |
 | --- | --- |
 | `blanky/events/last_command` | Latest command and origin, as JSON |
 | `blanky/events/rejected` | Rejected command and reason, as JSON |
 
-The `MQTT Phone` card in Blanky's interface shows activity for 30 seconds after receiving a valid message.
+The `MQTT Phone` card in Blanky's interface shows activity for 30 seconds after receiving a valid message. `events/last_command` contains the latest attempt even if rejected; `events/rejected` is not a substitute for the accessible `monitor/en/last_message`.
+
+### Text-Bot on the phone
+
+IoT MQTT Panel can send complete phrases rather than only button codes. Add a **Text Input** for each mode you want to use:
+
+| Widget | Publish topic (with dashboard prefix `blanky`) | Behavior |
+| --- | --- | --- |
+| Text Input: Text-Bot Online | `textbot/online` | AI interprets natural language; if unavailable, it falls back to the Offline parser. |
+| Text Input: Text-Bot Offline | `textbot/offline` | Uses local phrase variants directly, without AI. |
+| Text Output: Response | `monitor/en/phone_textbot_response` | Shows only the latest response to a phone text request. |
+| Text Output: Route used | `monitor/en/phone_textbot_path` | Online, Offline or Online-to-Offline fallback. |
+
+In Text Input, publish **plain text**, with JSON off, `retain` **off** and QoS `0`. The topic selects the mode; interpretation uses Blanky's active UI language. Separate multiple requests with semicolons, for example `start; manual mode; turn on motor 1`. Retained input messages are never executed, even if saved by mistake. Messages are limited to 1000 characters.
+
+The phone Text-Bot follows the same safety rules, Events and TTS flow as the local Text-Bot; audio plays on the Raspberry Pi, **not on the phone speaker**. Events identify the source as `PHONE`, just like the app buttons. The phone response has its own topic so voice and button activity does not overwrite it. Protect the broker: an accepted phrase can operate real actuators.
 
 ## 5. Test the connection
 
@@ -114,6 +158,8 @@ mosquitto_pub -h localhost -t blanky/mqtt_start -m 1
 ```
 
 You should see the command in Blanky Events and in `blanky/events/last_command` and `blanky/state/*` topics.
+To inspect only the new presentation topics, run `mosquitto_sub -h localhost -v -t 'blanky/monitor/#'`.
+To test phone Text-Bot without operating the machine, run `mosquitto_pub -h localhost -t blanky/textbot/offline -m 'hello'`. An unrecognized-request response should appear in `blanky/monitor/en/phone_textbot_response` and Events, without sending a command to the PLC. Only then test operational commands under safe conditions.
 
 ## 6. Common issues
 

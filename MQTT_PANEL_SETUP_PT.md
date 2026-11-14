@@ -40,7 +40,7 @@ Configure cada um como botão no IoT MQTT Panel. Envie o payload `1`.
 | Modo rápido | `blanky/mqtt_mode_fast` |
 | Modo ideal | `blanky/mqtt_mode_ideal` |
 | Modo manual | `blanky/mqtt_mode_manual` |
-| Trocar modo | `blanky/mqtt_mode_change` |
+| Mudar de modo | `blanky/mqtt_mode_change` |
 | Robô para metal | `blanky/mqtt_robot_to_metal` |
 | Robô para não metal | `blanky/mqtt_robot_to_nonmetal` |
 
@@ -90,14 +90,58 @@ blanky/state/robot_metal
 blanky/state/robot_nonmetal
 ```
 
-Adicione também widgets de texto para:
+Estes tópicos legados continuam disponíveis para os interruptores e indicadores existentes. Para um painel **apenas de leitura**, o Blanky publica agora também `blanky/monitor/*`. Nunca configure um painel de monitorização para publicar em `monitor/*` ou para enviar comandos por `mqtt_*`.
+
+### Organização recomendada no IoT MQTT Panel
+
+Configure o prefixo do dashboard como `blanky` e introduza apenas o sufixo indicado abaixo no campo Topic, por exemplo `state/start`. Em alternativa, use `blanky/state/start` e marque **Disable dashboard prefix topic**. Não combine o prefixo do dashboard com o caminho completo, ou pode subscrever `blanky/blanky/state/start` por engano.
+
+| Grupo | Widget | Topic (com prefixo `blanky` no dashboard) | Configuração |
+| --- | --- | --- | --- |
+| Disponibilidade | Multi-State Indicator | `monitor/availability` | `online` = Blanky disponível; `offline` = Blanky indisponível. Widget apenas de subscrição, sem pedido de sincronização. |
+| Sistema | LED Indicator | `state/start` | Payload on `1`, off `0`; nome fixo `Sistema`. O LED não altera o nome dinamicamente. |
+| Sistema | Text Output | `monitor/pt/system` | Mostra `Iniciado` ou `Parado`; colocar ao lado do LED. |
+| Modo atual | Multi-State Indicator | `monitor/mode` | `stopped` = Parado; `choose_mode` = Escolher modo; `fast` = Rápido; `ideal` = Ideal; `manual` = Manual; `changing` = A escolher novo modo. |
+| Modo atual | Text Output (alternativa) | `monitor/pt/mode` | Mostra a frase em português, caso o Multi-State não permita rótulos legíveis. |
+| Motores | LED Indicator + Text Output | `state/motor_1` + `monitor/pt/motor_1` (também `_2`, `_3`) | `0` = Desligado; `1` = Ligado. |
+| Cilindros | LED Indicator + Text Output | `state/cyl_a` + `monitor/pt/cyl_a` (também `_b`, `_c`, `_d`) | `0` = Recuo solicitado; `1` = Avanço solicitado. Não indica posição medida. |
+| Luzes | LED Indicator + Text Output | `state/light_green` + `monitor/pt/light_green` (também `light_red`) | `0` = Apagada; `1` = Acesa. |
+| Robô | Text Output | `monitor/pt/robot` | Sem destino ativo, Destino: peças metálicas ou Destino: peças não metálicas. A seleção é temporária. |
+| Comunicações | Multi-State Indicator | `monitor/opcua` | `connected` / `disconnected`: ligação OPC UA, não confirmação de atuação. |
+| Comunicações | Text Output | `monitor/pt/opcua_feedback` | `Ativo` ou `Indisponível`: receção de feedback OPC UA. |
+| Tempos OPC UA | Text Output | `monitor/pt/opcua_write_time`, `monitor/pt/opcua_ack_time` | Última escrita e última confirmação do PLC, em ms; ausência indicada por texto. Não são tempos MQTT. |
+| Último evento: descrição | Text Output | `monitor/pt/last_message` | Descrição do Evento mais recente, venha ele de voz, botão, Text-Bot ou telemóvel. Não é um histórico completo. |
+| Último evento: estado | Multi-State Indicator | `monitor/last_event_status` | `none` = Sem eventos; `ok` = Aceite (OK); `rejected` = Recusado (REJECT). Não significa confirmação de atuação pelo PLC. |
+
+Os equivalentes em inglês estão em `monitor/en/...`. Todos os tópicos `monitor/*` são retidos, salvo se o broker ainda não tiver recebido a primeira publicação. Use texto, símbolo e posição além da cor; evite usar só vermelho/verde para estados críticos. **Não use o widget Node Status** com `monitor/availability`: a versão da app que pede `Payload sync request` publica um pedido, mas o Blanky não implementa esse protocolo de pedido/resposta. Nunca publique nesse tópico, pois pode substituir o valor retido. O Multi-State Indicator subscreve a disponibilidade do **processo Blanky no broker**, não o arranque do sistema ou a ligação ao PLC. O valor `offline` é publicado ao sair normalmente e pelo Last Will se a ligação cair inesperadamente; pode haver um pequeno atraso até o broker detetar a perda. Ignore os últimos estados retidos quando a disponibilidade estiver `offline`.
+
+Os tópicos `state/*` e `monitor/*` representam o estado interno do Blanky. A ligação OPC UA e o feedback indicam comunicação, **não confirmam individualmente a posição física de cada atuador**. Os sensores/estados recebidos do PLC ainda não são publicados em MQTT como estados físicos por componente.
+
+`monitor/last_event_status` é independente do idioma e acompanha `monitor/pt/last_message`. Configure ambos os widgets apenas para subscrição, sem publicar nesses tópicos.
+
+Para diagnóstico avançado, continuam disponíveis:
 
 | Tópico | Conteúdo |
 | --- | --- |
 | `blanky/events/last_command` | Último comando e origem, em JSON |
 | `blanky/events/rejected` | Comando rejeitado e motivo, em JSON |
 
-O cartão `MQTT Telemóvel` na interface Blanky mostra atividade durante 30 segundos depois de receber uma mensagem válida.
+O cartão `MQTT Telemóvel` na interface Blanky mostra atividade durante 30 segundos depois de receber uma mensagem válida. `events/last_command` contém a última tentativa, mesmo que seja recusada; `events/rejected` não substitui `monitor/pt/last_message` para leitura acessível.
+
+### Text-Bot no telemóvel
+
+O IoT MQTT Panel pode enviar frases completas, e não apenas os códigos dos botões. Acrescente um **Text Input** para cada modo que quiser utilizar:
+
+| Widget | Topic de publicação (com prefixo `blanky` no dashboard) | Funcionamento |
+| --- | --- | --- |
+| Text Input: Text-Bot Online | `textbot/online` | Interpreta linguagem natural pela IA; se estiver indisponível, tenta o parser Offline. |
+| Text Input: Text-Bot Offline | `textbot/offline` | Usa diretamente as variantes locais, sem IA. |
+| Text Output: Resposta | `monitor/pt/phone_textbot_response` | Mostra apenas a última resposta aos pedidos de texto do telemóvel. |
+| Text Output: Via utilizada | `monitor/pt/phone_textbot_path` | Online, Offline ou fallback Online para Offline. |
+
+Nos Text Input, envie a frase como **texto simples**, sem JSON, `retain` **desativado** e QoS `0`. O modo é escolhido pelo tópico; o idioma de interpretação acompanha o idioma ativo no Blanky. Pode enviar vários pedidos separados por ponto e vírgula, por exemplo `iniciar; modo manual; ligar motor 1`. Uma mensagem retida nunca é executada, mesmo que tenha sido guardada por engano. O limite é de 1000 caracteres por mensagem.
+
+O Text-Bot do telemóvel usa as mesmas regras de segurança, Eventos e TTS do Text-Bot local; a fala sai no Raspberry Pi, **não no altifalante do telemóvel**. Os Eventos identificam a origem como `TELEMOVEL`, tal como os botões da app. A resposta do telemóvel tem um tópico próprio para não ser substituída por ações de voz ou dos botões. Mantenha o broker protegido: uma frase aceite pode comandar atuadores reais.
 
 ## 5. Testar a ligação
 
@@ -114,6 +158,8 @@ mosquitto_pub -h localhost -t blanky/mqtt_start -m 1
 ```
 
 Deve ver o comando nos Eventos do Blanky e nos tópicos `blanky/events/last_command` e `blanky/state/*`.
+Para observar apenas os novos tópicos de apresentação, use `mosquitto_sub -h localhost -v -t 'blanky/monitor/#'`.
+Para testar o Text-Bot do telemóvel sem atuar a máquina: `mosquitto_pub -h localhost -t blanky/textbot/offline -m 'olá'`. Deve surgir uma resposta de pedido não reconhecido em `blanky/monitor/pt/phone_textbot_response` e nos Eventos, sem envio de comando ao PLC. Só depois teste comandos de operação em condições seguras.
 
 ## 6. Problemas frequentes
 

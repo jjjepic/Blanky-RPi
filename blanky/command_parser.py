@@ -6,6 +6,8 @@ from difflib import SequenceMatcher
 from typing import Tuple
 
 from openai import OpenAI
+from blanky.openai_activity import measure_request
+from blanky.command_messages import rejection_message
 
 BASE_DIR = os.path.dirname(__file__)
 JSON_PATH = os.path.join(BASE_DIR, "commands.json")
@@ -102,15 +104,16 @@ def interpret_online_commands(raw_text: str, lang: str) -> list[str]:
         f"{guide}"
     )
     client = OpenAI()
-    response = client.chat.completions.create(
-        model=os.getenv("BLANKY_TEXTBOT_MODEL", "gpt-4o-mini"),
-        messages=[
-            {"role": "system", "content": instructions},
-            {"role": "user", "content": raw_text},
-        ],
-        response_format={"type": "json_object"},
-        temperature=0,
-    )
+    with measure_request("IA"):
+        response = client.chat.completions.create(
+            model=os.getenv("BLANKY_TEXTBOT_MODEL", "gpt-4o-mini"),
+            messages=[
+                {"role": "system", "content": instructions},
+                {"role": "user", "content": raw_text},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0,
+        )
     content = response.choices[0].message.content or "{}"
     payload = json.loads(content)
     commands = payload.get("commands", [])
@@ -220,13 +223,14 @@ def resolve_change_mode_request(text: str, data: dict) -> bool:
 def parse_command(raw_text: str, lang: str) -> Tuple[str, str]:
     text = normalize(raw_text)
     if not text:
-        return "NO_AUDIO", "(sem áudio detetado)" if lang == "pt" else "(no audio detected)"
+        return "NO_AUDIO", rejection_message("no_audio", lang)
 
     d = DATA.get(lang, DATA["pt"])
     # ============ START/STOP ============
     if contains_any_substring(text, d["start"]):
         return "START", "Iniciado." if lang == "pt" else "Started."
-    if contains_any_substring(text, d["stop"]):
+    stop_words = [word for word in d["stop"] if lang != "pt" or word != "para"]
+    if (lang == "pt" and (text == "para" or text.startswith("para "))) or contains_any_substring(text, stop_words):
         return "STOP", "Parado." if lang == "pt" else "Stopped."
 
     # ============ MODOS ============
@@ -324,4 +328,4 @@ def parse_command(raw_text: str, lang: str) -> Tuple[str, str]:
                     f"Cilindro {letter} a avançar." if lang == "pt" else f"Cylinder {letter} extending."
                 )
 
-    return "UNKNOWN", "Comando não reconhecido." if lang == "pt" else "Command not recognized."
+    return "UNKNOWN", rejection_message("unknown", lang)

@@ -1,2 +1,4 @@
 # Optional development tools. They are not required to run Blanky.
 colorspacious>=1.1.2
+# Only needed to compare the previous synchronous OPC UA client with asyncua.
+opcua==0.98.13
