@@ -43,6 +43,8 @@ In Offline recognition, "advance cylinder A" selects the cylinder rather than st
 
 Voice recognition needs OpenAI to transcribe audio. If Online interpretation fails after transcription, it tries the Offline interpreter. Without the AI service for transcription, voice cannot handle requests; direct controls, MQTT and Text-Bot Offline stay available.
 
+Speech now uses one coordinator: synthesis does not block the interface, a new recording interrupts stale speech before capture, and nearby button/phone confirmations can be grouped. Spoken acceptance confirms only that a **request was accepted**, never a physical position. Requested replies, critical warnings and operational confirmations have separate priorities. **Repeat answer** uses the last speech that actually started, with the current voice, speed and language. TTS/playback failures appear in Audio Diagnostics. See the [Raspberry Pi validation checklist (Portuguese)](AUDIO_VALIDATION_PT.md).
+
 ## Status questions
 
 By voice or Text-Bot, Online or Offline, you can ask about the system, mode, motors, cylinders, lights, robot, MQTT, OPC UA, OpenAI, errors, last event and available actions. Examples: `How is the system?`, `Is cylinder A extended?`, `Tell me the status of OPC UA and OpenAI`, `What can I do now?` and `Repeat`. You can mix an action and a question, for example `Turn on motor 1 and tell me if MQTT is connected`.

@@ -1,4 +1,5 @@
 import os
+import math
 
 from blanky.opcua_nodes import PHYSICAL_SENSOR_INPUTS, RECEIVE_NAMESPACE_URI
 
@@ -91,6 +92,19 @@ TTS_VOICE_DEFAULT_PT = "nova"
 TTS_VOICE_DEFAULT_EN = "alloy"
 STT_MODEL = "gpt-transcribe"
 TTS_MODEL = "gpt-4o-mini-tts"
+
+
+def _audio_env_float(name: str, default: float, minimum: float, maximum: float) -> float:
+    try:
+        value = float(os.environ.get(name, default))
+        return max(minimum, min(maximum, value)) if math.isfinite(value) else default
+    except ValueError:
+        return default
+
+
+AUDIO_GROUP_WINDOW_SECONDS = _audio_env_float("BLANKY_AUDIO_GROUP_WINDOW_SECONDS", 0.30, 0.05, 1.0)
+AUDIO_GROUP_MAX_WAIT_SECONDS = _audio_env_float("BLANKY_AUDIO_GROUP_MAX_WAIT_SECONDS", 0.85, 0.10, 2.0)
+AUDIO_TTS_CACHE_ENTRIES = int(_audio_env_float("BLANKY_AUDIO_TTS_CACHE_ENTRIES", 8, 0, 16))
 
 AUDIO_DIR = "audio"
 INPUT_WAV = os.path.join(AUDIO_DIR, "input.wav")
