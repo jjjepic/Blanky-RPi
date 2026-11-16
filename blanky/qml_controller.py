@@ -44,6 +44,7 @@ from blanky.command_parser import interpret_online_items, parse_offline_items
 from blanky.openai_activity import activity_snapshot
 from blanky.color_vision_profiles import get_profile_tokens
 from blanky.command_messages import rejection_for_event, rejection_message
+from blanky.preference_intents import handle_preference
 
 
 class BlankyController(QObject):
@@ -87,6 +88,7 @@ class BlankyController(QObject):
     textCommandsFailed = Signal(str, str, str)
     mobileTextReceived = Signal(str, str)
     textOnlineFallbackRequested = Signal()
+    textBotModeChanged = Signal()
 
     _SENSITIVITY_FACTOR_MIN = 1.20
     _SENSITIVITY_FACTOR_MAX = 2.60
@@ -252,6 +254,7 @@ class BlankyController(QObject):
         self._language = "pt"
         self._tts_voice = set_tts_voice("", self._language)
         self._tts_speed = 1.0
+        self._textbot_mode = "online"
         self._last_tts_text = ""
         self._sound_enabled = is_audio_output_enabled()
         self._sound_volume = get_audio_output_volume()
@@ -407,6 +410,10 @@ class BlankyController(QObject):
     def ttsVoiceOptions(self):
         return "|".join(get_tts_voice_options(self._language))
 
+    @Property(str, notify=textBotModeChanged)
+    def textBotMode(self):
+        return self._textbot_mode
+
     @Property(float, notify=ttsSpeedChanged)
     def ttsSpeed(self):
         return self._tts_speed
@@ -546,6 +553,13 @@ class BlankyController(QObject):
                 + f"{float(entry.get('duration', 0.0)):.2f}s".rjust(duration_w)
             )
             lines.append((prefix, line_color))
+            interpretation = entry.get("interpretation") or {}
+            if interpretation:
+                confidence = float(entry.get("confidence", 1.0))
+                target = interpretation.get("target") or interpretation.get("component") or ""
+                value = interpretation.get("value") or ""
+                summary = f"Intenção: {interpretation.get('type', '')} {interpretation.get('name', '')} {target} {value} | confiança {confidence:.2f}"
+                lines.append((" " * 27 + summary.strip(), line_color))
 
             continuation_prefix = (
                 " ".ljust(id_w) + " | " + " ".ljust(time_w) + " | "
@@ -746,6 +760,12 @@ class BlankyController(QObject):
         if abs(selected - self._tts_speed) > 1e-6:
             self._tts_speed = selected
             self.ttsSpeedChanged.emit()
+
+    @Slot(str)
+    def setTextBotMode(self, mode: str):
+        if mode in {"online", "offline"} and mode != self._textbot_mode:
+            self._textbot_mode = mode
+            self.textBotModeChanged.emit()
 
     @Slot()
     def repeatLastTts(self):
@@ -977,7 +997,7 @@ class BlankyController(QObject):
         self._set_recognized(self._tr("text_received_response"))
         self._text_request_id += 1
         request_id = self._text_request_id
-        self._text_response_parts[request_id] = {"pt": [], "en": []}
+        self._text_response_parts[request_id] = {"pt": [], "en": [], "speech": []}
         self._text_command_queue.extend(
             (item, source, language, request_id, index == len(items) - 1)
             for index, item in enumerate(items)
@@ -990,29 +1010,48 @@ class BlankyController(QObject):
             return
 
         item, source, language, request_id, is_last = self._text_command_queue.pop(0)
-        if item["type"] == "query":
-            response = self._bridge.answer_status_query(item["name"], item.get("component", ""), language, source)
+        if item["type"] == "setting" or item["name"] in {"QUERY_SETTING", "QUERY_CLARIFY"}:
+            try:
+                answers = handle_preference(self, item, language)
+                self._bridge.record_preference_event(
+                    source, answers, accepted=item["name"] != "BLOCKED_SETTING",
+                    kind="setting" if item["type"] == "setting" else "query"
+                )
+                response = answers[language]["detail"]
+                speech = answers[language]["speech"]
+            except (ValueError, TypeError):
+                response = "Não percebi. Podes repetir?" if language == "pt" else "I didn't understand. Can you repeat?"
+                speech = response
+            self._set_status("Definição atualizada." if language == "pt" else "Preference updated.")
+        elif item["type"] == "query":
+            parts = self._bridge.answer_status_query_parts(
+                item["name"], item.get("target") or item.get("component", ""), language,
+                source, item.get("value", ""))
+            response, speech = parts["detail"], parts["speech"]
             self._set_status("Consulta respondida." if language == "pt" else "Question answered.")
         else:
             command = item["name"]
             accepted, response = self._bridge.process_command(command, language, source=source)
             if accepted and not response:
                 response = self._bridge.last_event_message(language)
+            speech = response
             if command in {"UNKNOWN", "NO_AUDIO"}:
                 self._set_status(self._tr("text_no_commands"))
             else:
                 self._set_command_interaction("text_status", command)
         if response:
             self._text_response_parts[request_id][language].append(response)
+            self._text_response_parts[request_id]["speech"].append(speech)
             other_language = "en" if language == "pt" else "pt"
             self._text_response_parts[request_id][other_language].append(self._bridge.last_event_message(other_language))
         if is_last:
             responses = self._text_response_parts.pop(request_id)
             combined = " ".join(responses[language])
+            spoken = " ".join(responses["speech"])
             if combined:
                 self._set_recognized(combined)
-                self._bridge.remember_interaction_response(combined, language)
-                self._enqueue_tts(combined)
+                self._bridge.remember_interaction_response(combined, language, spoken)
+                self._enqueue_tts(spoken)
                 if source == "mqtt_text":
                     self._bridge.publish_phone_interaction_response(
                         " ".join(responses["pt"]), " ".join(responses["en"])
@@ -1102,7 +1141,8 @@ class BlankyController(QObject):
             self._worker.commandRecognized.connect(self._on_voice_command)
             self._worker.diagnostic.connect(self._append_audio_diagnostic)
             self._worker.spoken.connect(self._remember_tts_text)
-            self._worker.spoken.connect(self._set_recognized)
+            self._worker.detailReady.connect(self._set_recognized)
+            self._worker.preferenceRequested.connect(self._handle_voice_preference)
             self._worker.done.connect(self._on_done)
             self._worker.start()
         except Exception as exc:
@@ -1110,6 +1150,23 @@ class BlankyController(QObject):
             self._set_listening(False)
             self._wakeword.set_paused(False)
             self._set_status(self._tr("error", error=exc))
+
+    @Slot(object)
+    def _handle_voice_preference(self, request: dict):
+        try:
+            item = request["item"]
+            answers = handle_preference(self, item, request["language"])
+            self._bridge.record_preference_event(
+                "voice", answers, accepted=item["name"] != "BLOCKED_SETTING",
+                kind="setting" if item["type"] == "setting" else "query"
+            )
+            request["answers"] = answers[request["language"]]
+            request["speed"] = self._tts_speed
+        except (ValueError, TypeError):
+            message = "Não percebi. Podes repetir?" if request["language"] == "pt" else "I didn't understand. Can you repeat?"
+            request["answers"] = {"speech": message, "detail": message}
+        finally:
+            request["done"].set()
 
     # ---------- Internal ----------
     def _set_status(self, text: str):
@@ -1456,7 +1513,9 @@ class BlankyController(QObject):
             event_time = str(ev.get("time") or "")
             source = self._source_label(str(ev.get("source") or ""))
             status = "✓ OK" if ev.get("accepted") else "✕ REJECT"
-            command = ("CONSULTA" if self._language == "pt" else "QUERY") if ev.get("kind") == "query" else str(ev.get("command") or "")
+            command = (("CONSULTA" if self._language == "pt" else "QUERY") if ev.get("kind") == "query"
+                       else ("DEFINIÇÃO" if self._language == "pt" else "SETTING") if ev.get("kind") == "setting"
+                       else str(ev.get("command") or ""))
             is_previous_session = int(ev.get("generation", 0) or 0) < current_generation
             color = "#6d8290" if is_previous_session else self._event_visual_color(command, bool(ev.get("accepted")))
             detail_lines = textwrap.wrap(
@@ -1480,7 +1539,7 @@ class BlankyController(QObject):
         return f"<pre style='font-family:Consolas; font-size:{event_font_size}px;'>" + "\n".join(rich_rows) + "</pre>"
 
     def _localized_event_detail(self, event: dict) -> str:
-        if event.get("kind") == "query":
+        if event.get("kind") in {"query", "setting"}:
             return str(event.get(f"detail_{self._language}") or event.get("detail") or "")
         command = str(event.get("command") or "")
         original = self._repair_display_text(str(event.get("detail") or ""))
@@ -1520,7 +1579,9 @@ class BlankyController(QObject):
                 "ID": f"{int(ev.get('id', 0) or 0):03d}",
                 "Hora" if self._language == "pt" else "Time": str(ev.get("time") or ""),
                 "Origem" if self._language == "pt" else "Source": self._source_label(str(ev.get("source") or "")),
-                "Comando" if self._language == "pt" else "Command": ("CONSULTA" if self._language == "pt" else "QUERY") if ev.get("kind") == "query" else str(ev.get("command") or ""),
+                "Comando" if self._language == "pt" else "Command": (("CONSULTA" if self._language == "pt" else "QUERY") if ev.get("kind") == "query"
+                    else ("DEFINIÇÃO" if self._language == "pt" else "SETTING") if ev.get("kind") == "setting"
+                    else str(ev.get("command") or "")),
                 "Estado" if self._language == "pt" else "State": "OK" if ev.get("accepted") else "REJECT",
                 "Descri\u00e7\u00e3o" if self._language == "pt" else "Description": self._localized_event_detail(ev),
             })
@@ -1561,9 +1622,9 @@ class BlankyController(QObject):
 
     def _audio_diagnostic_rows(self) -> list[dict[str, str]]:
         if self._language == "pt":
-            headers = ["ID", "Hora", "Captação", "Transcrição", "Comando", "Resultado", "Duração"]
+            headers = ["ID", "Hora", "Captação", "Transcrição", "Comando", "Resultado", "Duração", "Interpretação", "Confiança"]
         else:
-            headers = ["ID", "Time", "Capture", "Transcript", "Command", "Result", "Duration"]
+            headers = ["ID", "Time", "Capture", "Transcript", "Command", "Result", "Duration", "Interpretation", "Confidence"]
 
         rows = []
         for index, entry in enumerate(self._audio_diagnostic_entries, start=1):
@@ -1575,6 +1636,8 @@ class BlankyController(QObject):
                 headers[4]: str(entry.get("command") or "--"),
                 headers[5]: str(entry.get("result") or "--"),
                 headers[6]: f"{float(entry.get('duration') or 0.0):.2f} s",
+                headers[7]: str(entry.get("interpretation") or ""),
+                headers[8]: f"{float(entry.get('confidence') or 0.0):.2f}",
             })
         return rows
 

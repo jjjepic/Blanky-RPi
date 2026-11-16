@@ -76,7 +76,7 @@ ApplicationWindow {
     property string systemTransitionAction: ""
     property int systemTransitionProgress: 0
     property double systemTransitionStartedAt: 0
-    property string textBotMode: "online"
+    property string textBotMode: blanky.textBotMode
     property bool homeMenuVisible: true
     property string activeView: "general"
     property bool viewTransitionActive: false
@@ -455,7 +455,7 @@ ApplicationWindow {
             eventsAutoscrollTimer.restart()
         }
         function onTextOnlineFallbackRequested() {
-            root.textBotMode = "offline"
+            blanky.setTextBotMode("offline")
         }
     }
 
@@ -1057,14 +1057,14 @@ ApplicationWindow {
                                         Layout.preferredWidth: root.activeView === "text" ? 100 : 82; Layout.preferredHeight: Math.round((root.activeView === "text" ? 34 : 28) * root.controlScale)
                                         accentColor: root.textBotMode === "offline" ? root.successColor : root.inactiveColor
                                         textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor
-                                        onClicked: root.textBotMode = "offline"
+                                        onClicked: blanky.setTextBotMode("offline")
                                     }
                                     MenuActionButton {
                                         text: t("textBotOnline")
                                         Layout.preferredWidth: root.activeView === "text" ? 100 : 82; Layout.preferredHeight: Math.round((root.activeView === "text" ? 34 : 28) * root.controlScale)
                                         accentColor: root.textBotMode === "online" ? root.accentColor : root.inactiveColor
                                         textColor: root.textColor; mutedText: root.mutedText; borderColor: root.borderColor; panelColor: root.panelColor
-                                        onClicked: root.textBotMode = "online"
+                                        onClicked: blanky.setTextBotMode("online")
                                     }
                                 }
 

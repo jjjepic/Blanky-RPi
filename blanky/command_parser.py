@@ -7,6 +7,8 @@ from typing import Tuple
 
 from blanky.openai_activity import measure_request
 from blanky.command_messages import rejection_message
+from blanky.natural_intents import parse_group_question, parse_preference
+from blanky.intent_diagnostics import record_interpretation
 
 BASE_DIR = os.path.dirname(__file__)
 JSON_PATH = os.path.join(BASE_DIR, "commands.json")
@@ -25,12 +27,34 @@ VALID_COMMANDS = frozenset({
 VALID_QUERIES = frozenset({
     "QUERY_SYSTEM", "QUERY_MODE", "QUERY_COMPONENT", "QUERY_MQTT", "QUERY_OPCUA",
     "QUERY_OPENAI", "QUERY_CONNECTIONS", "QUERY_ERRORS", "QUERY_LAST_EVENT",
-    "QUERY_OPTIONS", "REPEAT",
+    "QUERY_OPTIONS", "QUERY_COMPONENT_GROUP", "QUERY_ACTIVE", "QUERY_SETTING", "QUERY_CLARIFY", "REPEAT",
 })
 VALID_COMPONENTS = frozenset({
     "motor_1", "motor_2", "motor_3", "cyl_a", "cyl_b", "cyl_c", "cyl_d",
     "light_green", "light_red", "lights", "robot",
 })
+VALID_GROUPS = frozenset({"motors", "cylinders", "lights", "robot", "all"})
+VALID_SETTINGS = frozenset({
+    "voice", "speech_speed", "volume", "language", "appearance", "color_profile",
+    "audio_profile", "text_scale", "animations", "display_scale", "textbot_mode", "voices",
+})
+VALID_SETTING_VALUES = frozenset({
+    "increase", "decrease", "next", "on", "off", "pt", "en", "slow", "normal", "fast",
+    "dark", "light", "high_contrast", "colorblind", "monochrome", "custom",
+    "universal", "protan", "deutan", "tritan", "simple", "balanced", "noisy",
+    "auto", "compact_1280", "hd_1366", "large_1600", "full_hd", "online", "offline",
+    "alloy", "nova", "shimmer", "sage", "coral", "fable",
+} | {str(n) for n in range(201)})
+VALID_FILTERS = frozenset({"", "on", "off", "extended", "retracted"})
+MIN_CONFIDENCE = 0.55
+
+
+def _item(kind: str, name: str, target: str = "", value: str = "", confidence: float = 1.0) -> dict:
+    item = {"type": kind, "name": name, "target": target, "value": value,
+            "confidence": confidence}
+    if kind == "query" and name == "QUERY_COMPONENT":
+        item["component"] = target
+    return item
 
 
 _ONLINE_INTENT_GUIDES = {
@@ -100,8 +124,8 @@ or when a safe action is missing its required component, destination or directio
 }
 
 
-def validate_items(items) -> list[dict[str, str]]:
-    """Reject model output outside the fixed command/query vocabulary."""
+def validate_items(items) -> list[dict]:
+    """Validate every model field before it can reach commands or settings."""
     if not isinstance(items, list):
         return []
     validated = []
@@ -110,13 +134,28 @@ def validate_items(items) -> list[dict[str, str]]:
             continue
         kind = item.get("type")
         name = str(item.get("name") or "").upper()
+        target = str(item.get("target") or item.get("component") or "").lower()
+        value = str(item.get("value") or "").lower()
+        try:
+            confidence = float(item.get("confidence", 1.0))
+        except (TypeError, ValueError):
+            continue
+        if not MIN_CONFIDENCE <= confidence <= 1.0:
+            continue
         if kind == "command" and name in VALID_COMMANDS:
-            validated.append({"type": "command", "name": name})
+            if not target and not value:
+                validated.append(_item(kind, name, confidence=confidence))
         elif kind == "query" and name in VALID_QUERIES:
-            component = str(item.get("component") or "").lower()
-            if name == "QUERY_COMPONENT" and component not in VALID_COMPONENTS:
-                continue
-            validated.append({"type": "query", "name": name, "component": component if name == "QUERY_COMPONENT" else ""})
+            if name == "QUERY_COMPONENT" and target in VALID_COMPONENTS and not value:
+                validated.append(_item(kind, name, target, confidence=confidence))
+            elif name == "QUERY_COMPONENT_GROUP" and target in VALID_GROUPS and value in VALID_FILTERS:
+                validated.append(_item(kind, name, target, value, confidence))
+            elif name in {"QUERY_SETTING", "QUERY_CLARIFY"} and target in VALID_SETTINGS and not value:
+                validated.append(_item(kind, name, target, confidence=confidence))
+            elif name not in {"QUERY_COMPONENT", "QUERY_COMPONENT_GROUP", "QUERY_SETTING", "QUERY_CLARIFY"} and not target and not value:
+                validated.append(_item(kind, name, confidence=confidence))
+        elif kind == "setting" and name == "SET_SETTING" and target in VALID_SETTINGS - {"voices"} and value in VALID_SETTING_VALUES:
+            validated.append(_item(kind, name, target, value, confidence))
     return validated
 
 
@@ -124,19 +163,37 @@ def interpret_online_items(raw_text: str, lang: str) -> list[dict[str, str]]:
     """Map natural text to an ordered, validated list without executing it."""
     from openai import OpenAI
 
+    local = parse_offline_items(raw_text, lang)
+    if any(item.get("name") == "BLOCKED_SETTING" for item in local):
+        record_interpretation(raw_text, local, "online-blocked")
+        return local
+
     language = "Portuguese" if lang == "pt" else "English"
     allowed = ", ".join(sorted(VALID_COMMANDS))
     queries = ", ".join(sorted(VALID_QUERIES))
     components = ", ".join(sorted(VALID_COMPONENTS))
+    targets = sorted(VALID_COMPONENTS | VALID_GROUPS | VALID_SETTINGS | {""})
+    names = sorted(VALID_COMMANDS | VALID_QUERIES | {"SET_SETTING"})
+    values = sorted(VALID_SETTING_VALUES | VALID_FILTERS)
     guide = _ONLINE_INTENT_GUIDES.get(lang, _ONLINE_INTENT_GUIDES["en"])
     instructions = (
-        "You are a strict industrial intent interpreter. Return JSON only: "
-        '{"items":[{"type":"command","name":"START"},{"type":"query","name":"QUERY_MODE"}]}. '
+        "You are a strict industrial intent interpreter. Return only the schema. "
         "Extract commands and read-only questions in the user's order. A query must never be a command. "
-        "For component queries include a component field. Multiple questions produce multiple query items. "
+        "Use target for a named component or setting; value for a group filter or setting value. "
+        "Use empty strings for unused target/value. Confidence is a number from 0 to 1. "
+        "Tolerate small spelling and transcription errors; choose the most likely meaning within this vocabulary. "
+        "If uncertain, return no item rather than an unsafe command. Multiple questions produce multiple query items. "
         "Do not execute anything or invent names. "
         f"The user language is {language}. Commands: {allowed}. Queries: {queries}. "
-        f"Components: {components}. Examples: 'o motor 1 está ligado?' -> QUERY_COMPONENT motor_1; "
+        f"Components: {components}. Settings: {', '.join(sorted(VALID_SETTINGS))}. "
+        "SET_SETTING changes only accessible interface/audio preferences; never communications, MQTT, OPC UA or API keys. "
+        "For speech speed use slow/normal/fast; for relative changes use increase/decrease; "
+        "for another voice use next. A numeric volume or text size uses a decimal string. "
+        "Appearance values are dark/light/high_contrast/colorblind/monochrome/custom; "
+        "color profiles are universal/protan/deutan/tritan. "
+        "QUERY_COMPONENT_GROUP targets motors/cylinders/lights/robot/all; filter on/off/extended/retracted in value. "
+        "QUERY_ACTIVE asks what components are active; QUERY_SETTING asks the current value of a setting. "
+        "Examples: 'o motor 1 está ligado?' -> QUERY_COMPONENT target motor_1; "
         "'liga o motor 1 e diz-me se o MQTT está ligado' -> MOTOR_1_ON then QUERY_MQTT; "
         "'diz-me o estado do OPC UA e da OpenAI' -> QUERY_OPCUA then QUERY_OPENAI. "
         "QUERY_SYSTEM covers start/stop/error and active mode; QUERY_MODE asks the active mode; "
@@ -144,7 +201,7 @@ def interpret_online_items(raw_text: str, lang: str) -> list[dict[str, str]]:
         "and QUERY_OPENAI ask each service; QUERY_CONNECTIONS summarizes all services; "
         "QUERY_ERRORS asks for an active error; QUERY_LAST_EVENT asks for the latest event; "
         "QUERY_OPTIONS asks what is currently allowed; REPEAT asks to repeat the previous answer. "
-        "Queries work even when the system is stopped.\n\n"
+        "Settings and queries work even when the system is stopped.\n\n"
         f"{guide}"
     )
     client = OpenAI()
@@ -155,15 +212,28 @@ def interpret_online_items(raw_text: str, lang: str) -> list[dict[str, str]]:
                 {"role": "system", "content": instructions},
                 {"role": "user", "content": raw_text},
             ],
-            response_format={"type": "json_object"},
+            response_format={"type": "json_schema", "json_schema": {
+                "name": "blanky_intents", "strict": True,
+                "schema": {"type": "object", "additionalProperties": False, "required": ["items"],
+                           "properties": {"items": {"type": "array", "items": {
+                               "type": "object", "additionalProperties": False,
+                               "required": ["type", "name", "target", "value", "confidence"],
+                               "properties": {
+                                   "type": {"type": "string", "enum": ["command", "query", "setting"]},
+                                   "name": {"type": "string", "enum": names},
+                                   "target": {"type": "string", "enum": targets},
+                                   "value": {"type": "string", "enum": values},
+                                   "confidence": {"type": "number"},
+                               }}}}}}},
             temperature=0,
         )
     content = response.choices[0].message.content or "{}"
     payload = json.loads(content)
     items = validate_items(payload.get("items"))
-    local = parse_offline_items(raw_text, lang)
     if local and all(item["type"] == "query" for item in local) and any(item["type"] == "command" for item in items):
+        record_interpretation(raw_text, local, "online-question-guard")
         return local
+    record_interpretation(raw_text, items, "online")
     return items
 
 
@@ -210,8 +280,8 @@ def motor_number(text: str):
 
 
 def cylinder_letter(text: str):
-    m = re.search(r"\b(a|b|c|d)\b", text)
-    return m.group(1).upper() if m else None
+    m = re.search(r"\b(?:cilindro|cilindros|cylinder|cylinders|valvula|valve)\s+(a|b|be|bee|c|d)\b", text)
+    return ("B" if m.group(1) in {"be", "bee"} else m.group(1).upper()) if m else None
 
 
 def resolve_mode_command(text: str, data: dict) -> str:
@@ -271,12 +341,19 @@ def resolve_change_mode_request(text: str, data: dict) -> bool:
 
 
 def _offline_query_items(raw_text: str, lang: str) -> list[dict[str, str]]:
-    text = normalize(raw_text)
+    text = normalize(re.sub(r"\b(?:b[eê]|bee)\b", "b", raw_text, flags=re.IGNORECASE))
     d = DATA.get(lang, DATA["pt"])
     q = d["queries"]
 
     def query(name: str, component: str = "") -> dict[str, str]:
-        return {"type": "query", "name": name, "component": component}
+        return _item("query", name, component)
+
+    preference = parse_preference(raw_text, lang)
+    if preference and preference["type"] == "query":
+        return [preference]
+    group = parse_group_question(raw_text, lang)
+    if group:
+        return [group]
 
     for key, name in (("repeat", "REPEAT"), ("options", "QUERY_OPTIONS"),
                       ("last_event", "QUERY_LAST_EVENT"), ("errors", "QUERY_ERRORS")):
@@ -321,6 +398,8 @@ def _offline_query_items(raw_text: str, lang: str) -> list[dict[str, str]]:
         return [query("QUERY_CONNECTIONS")]
     if contains_any_substring(text, q["mode"]):
         return [query("QUERY_MODE")]
+    if re.search(r"\b(?:o que(?: e que)?|what)\b.*\b(?:ligado|ativo|on|active)\b", text):
+        return [query("QUERY_ACTIVE")]
     if contains_any_substring(text, ["modo", "mode"]):
         return [query("QUERY_MODE")]
     if contains_any_substring(text, q["system"]) or contains_any_substring(text, ["sistema", "system"]):
@@ -339,12 +418,22 @@ def parse_offline_items(raw_text: str, lang: str) -> list[dict[str, str]]:
     for clause in clauses:
         if not clause.strip():
             continue
+        preference = parse_preference(clause, lang)
+        if preference and preference["type"] == "setting":
+            if preference["name"] == "BLOCKED_SETTING":
+                items.append(preference)
+                continue
+            validated = validate_items([preference])
+            if validated:
+                items.extend(validated)
+                continue
         questions = _offline_query_items(clause, lang)
         if questions:
             items.extend(questions)
         else:
             command, _ = parse_command(clause, lang)
-            items.append({"type": "command", "name": command})
+            items.append(_item("command", command, confidence=0.0 if command == "UNKNOWN" else 1.0))
+    record_interpretation(raw_text, items, "offline")
     return items
 
 
@@ -352,6 +441,9 @@ def parse_command(raw_text: str, lang: str) -> Tuple[str, str]:
     text = normalize(raw_text)
     if not text:
         return "NO_AUDIO", rejection_message("no_audio", lang)
+
+    if (parse_preference(raw_text, lang) or {}).get("name") == "BLOCKED_SETTING":
+        return "UNKNOWN", rejection_message("unknown", lang)
 
     if _offline_query_items(raw_text, lang):
         return "UNKNOWN", rejection_message("unknown", lang)

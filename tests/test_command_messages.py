@@ -39,7 +39,7 @@ class CommandMessageTests(unittest.TestCase):
             "manual_only": "Os componentes só se comandam no modo manual. Mude primeiro de modo.",
             "change_mode_first": 'Para trocar de modo, use primeiro "Mudar de modo".',
             "choose_new_mode": "Escolha o novo modo: rápido, ideal ou manual.",
-            "unknown": "Não percebi o pedido. Pode repetir?",
+            "unknown": "Não percebi. Podes repetir?",
             "no_audio": "Não ouvi nada. Tente outra vez.",
         })
         forbidden = re.compile(r"\b(?:START|STOP)\b|\b[A-Z]{2,}_[A-Z0-9_]+\b")
