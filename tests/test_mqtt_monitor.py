@@ -1,4 +1,5 @@
 import types
+import threading
 import unittest
 
 from blanky.mqtt_monitor import health_monitor_updates, state_monitor_updates
@@ -39,8 +40,8 @@ class MonitorPayloadTests(unittest.TestCase):
     def test_component_text_is_localized_and_separate_from_commands(self):
         state = _state(motor_1=1, cyl_c=1, light_green=1, robot_metal=1)
         expected = {
-            "motor_1": "Ligado", "cyl_c": "Avanço solicitado", "light_green": "Acesa",
-            "robot_metal": "Destino: peças metálicas",
+            "motor_1": "Ligado", "cyl_c": "Avançado", "light_green": "Acesa",
+            "robot_metal": "Pedido de recolha no Tapete 2",
         }
         for key, label in expected.items():
             with self.subTest(key=key):
@@ -50,7 +51,7 @@ class MonitorPayloadTests(unittest.TestCase):
                 self.assertTrue(all(name.startswith("monitor/") for name in updates))
                 self.assertFalse(set(updates) & set(COMMAND_TO_TOPIC.values()))
         state["robot_metal"] = 0
-        self.assertEqual(state_monitor_updates(state, "robot_metal")["monitor/pt/robot"], "Sem destino ativo")
+        self.assertEqual(state_monitor_updates(state, "robot_metal")["monitor/pt/robot"], "Sem pedido de recolha")
 
     def test_opcua_connection_and_feedback_are_not_conflated(self):
         topics = health_monitor_updates({"opcua_connected": True, "opcua_feedback_active": False})
@@ -106,11 +107,14 @@ class MonitorBridgeTests(unittest.TestCase):
         bridge._echo_suppression = {}
         bridge._mobile_text_handler = None
         bridge._events = []
+        bridge._lock = threading.Lock()
         bridge._next_event_id = 1
         bridge._event_generation = 0
         bridge._last_mqtt_panel_rx = 0.0
         bridge._opcua = types.SimpleNamespace(health=lambda: {"connected": False}, enqueue_command=lambda *a, **k: None)
         bridge.state = _state()
+        bridge.state_quality = {key: "confirmed" for key in bridge.state}
+        bridge._synchronize_plc = lambda: None
         bridge.client = FakeClient()
         return bridge
 
@@ -134,7 +138,7 @@ class MonitorBridgeTests(unittest.TestCase):
 
         bridge._add_event("START", "voice", True, "Iniciado.")
         published = {topic: value for topic, value, _ in bridge.client.messages}
-        self.assertEqual(published["blanky/monitor/pt/last_message"], "Iniciado.")
+        self.assertIn("colocado na fila", published["blanky/monitor/pt/last_message"])
         self.assertEqual(published["blanky/monitor/last_event_status"], "ok")
 
     def test_connect_publishes_presence_and_only_subscribes_commands(self):
@@ -195,7 +199,7 @@ class MonitorBridgeTests(unittest.TestCase):
         bridge.client.messages.clear()
         bridge._on_connect(bridge.client, None, None, 0)
         published = {topic: value for topic, value, _ in bridge.client.messages}
-        self.assertEqual(published["blanky/monitor/pt/last_message"], "Iniciado.")
+        self.assertIn("colocado na fila", published["blanky/monitor/pt/last_message"])
         self.assertEqual(published["blanky/monitor/last_event_status"], "ok")
         self.assertEqual(published["blanky/monitor/pt/phone_textbot_response"], "Primeiro, inicie o sistema.")
 

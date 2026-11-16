@@ -17,7 +17,6 @@ from blanky.config import (
     OPCUA_URL,
 )
 from blanky.opcua_nodes import (
-    COMMAND_LEVEL_FALLBACK,
     COMMAND_TO_NODE,
     COMMAND_TO_RECEIVE_SIGNAL,
     RECEIVE_NODE_IDENTIFIERS,
@@ -52,7 +51,7 @@ class OPCUABridge:
         self._receive_namespace_uri = str(OPCUA_RECEIVE_NAMESPACE_URI)
         self._sensor_node_ids = dict(OPCUA_SENSOR_NODE_IDS)
         self._lock = threading.Lock()
-        self._queue: queue.Queue[tuple[str, str, float, str]] = queue.Queue(maxsize=100)
+        self._queue: queue.Queue[dict] = queue.Queue(maxsize=100)
         self._stop = threading.Event()
         self._thread = None
 
@@ -62,6 +61,11 @@ class OPCUABridge:
         self._feedback_active = False
         self._feedback_mode = "unavailable"
         self._received: dict[str, bool] = {}
+        self._feedback_epoch = 0
+        self._feedback_sequence = 0
+        self._initial_complete = False
+        self._last_valid_read = ""
+        self._next_record_id = 1
         self._last_feedback = ""
         self._last_write = ""
         self._last_command = ""
@@ -75,14 +79,31 @@ class OPCUABridge:
             self._thread.start()
 
     def enqueue_command(self, command: str, source: str = "unknown"):
-        if self.enabled and (command in COMMAND_TO_NODE or command in COMMAND_LEVEL_FALLBACK):
-            with self._lock:
-                endpoint = self._url
+        if not self.enabled or command not in COMMAND_TO_NODE:
+            return False
+        with self._lock:
+            if not self._connected:
+                self._last_error = "OPC UA disconnected; command not queued"
+                return False
+            if command == "STOP":
+                self._discard_queue_locked("superseded_by_stop")
+            record = {
+                "id": self._next_record_id,
+                "time": datetime.now().isoformat(timespec="seconds"),
+                "command": command, "source": source,
+                "node": COMMAND_TO_NODE[command], "library": "asyncua",
+                "queue_ms": None, "write_ms": None, "ack_ms": None,
+                "ack_status": "queued", "queued_at": time.monotonic(),
+                "endpoint": self._url, "epoch": self._feedback_epoch,
+            }
             try:
-                self._queue.put_nowait((command, source, time.monotonic(), endpoint))
+                self._queue.put_nowait(record)
             except queue.Full:
-                with self._lock:
-                    self._last_error = f"{command}: OPC UA command queue is full"
+                self._last_error = "OPC UA command queue is full"
+                return False
+            self._next_record_id += 1
+            self._timings.append(record)
+            return record["id"]
 
     def configure_connection(self, url: str):
         url = (url or OPCUA_URL).strip()
@@ -91,7 +112,18 @@ class OPCUABridge:
                 self._url = url
                 self._received.clear()
                 self._feedback_active = False
+                self._initial_complete = False
+                self._feedback_epoch += 1
                 self._last_ack_ms = None
+                self._discard_queue_locked("endpoint_changed")
+
+    def _discard_queue_locked(self, reason: str):
+        while True:
+            try:
+                record = self._queue.get_nowait()
+            except queue.Empty:
+                return
+            record["ack_status"] = reason
 
     def close(self):
         self._stop.set()
@@ -114,6 +146,7 @@ class OPCUABridge:
                 with self._lock:
                     self._connected = True
                     self._last_error = ""
+                    self._feedback_epoch += 1
                 retry_seconds = 1.0
                 subscription, feedback_nodes = await self._start_feedback(client)
                 last_poll = time.monotonic()
@@ -126,31 +159,28 @@ class OPCUABridge:
                         break
 
                     try:
-                        command, source, queued_at, queued_endpoint = self._queue.get_nowait()
+                        record = self._queue.get_nowait()
                     except queue.Empty:
-                        command = None
-                    if command is not None:
-                        age = time.monotonic() - queued_at
-                        if age > 5.0 or queued_endpoint != url:
+                        record = None
+                    if record is not None:
+                        age = time.monotonic() - record["queued_at"]
+                        if age > 5.0 or record["endpoint"] != url or record["epoch"] != self._feedback_epoch:
                             with self._lock:
-                                self._timings.append({
-                                    "time": datetime.now().isoformat(timespec="seconds"),
-                                    "command": command, "source": source,
-                                    "node": COMMAND_TO_NODE.get(command, ""),
-                                    "library": "asyncua", "queue_ms": round(age * 1000, 2),
-                                    "write_ms": None, "ack_ms": None,
-                                    "ack_status": "stale_or_endpoint_changed",
-                                })
-                                self._last_error = f"{command}: stale command not sent"
+                                record["queue_ms"] = round(age * 1000, 2)
+                                record["ack_status"] = "stale_or_endpoint_changed"
+                                self._last_error = f"{record['command']}: stale command not sent"
                         else:
                             try:
-                                await self._send_command(client, command, source, queued_at)
+                                await self._send_command(client, record)
                             except Exception as exc:
                                 with self._lock:
-                                    self._last_error = f"{command}: {exc}"
+                                    self._last_error = f"{record['command']}: {exc}"
                                 raise
 
                     now = time.monotonic()
+                    if feedback_mode == "polling" and not feedback_nodes and now - last_poll >= 5.0:
+                        subscription, feedback_nodes = await self._start_feedback(client)
+                        last_poll = now
                     if feedback_mode == "polling" and now - last_poll >= 0.5:
                         await self._read_feedback(client, feedback_nodes)
                         last_poll = now
@@ -179,6 +209,9 @@ class OPCUABridge:
                     self._feedback_active = False
                     self._feedback_mode = "unavailable"
                     self._received.clear()
+                    self._initial_complete = False
+                    self._feedback_epoch += 1
+                    self._discard_queue_locked("disconnected")
                     for record in self._pending.values():
                         record["ack_status"] = "disconnected"
                     self._pending.clear()
@@ -204,13 +237,13 @@ class OPCUABridge:
                 with self._lock:
                     self._feedback_mode = "subscription"
                     self._feedback_error = ""
-                    self._feedback_active = True
+                    self._feedback_active = False
             except Exception:
                 await subscription.delete()
                 subscription = None
                 with self._lock:
                     self._feedback_mode = "polling"
-                    self._feedback_active = True
+                    self._feedback_active = False
             await self._read_feedback(client, nodes)
             return subscription, nodes
         except Exception as exc:
@@ -220,31 +253,40 @@ class OPCUABridge:
                 except Exception:
                     pass
             self._set_feedback_error(str(exc))
-            return None, {}
+            return None, locals().get("nodes", {})
 
     async def _read_feedback(self, client, nodes: dict):
         if not nodes:
             return
         values = await client.read_values(list(nodes.values()))
-        for name, value in zip(nodes, values):
-            self._record_feedback(name, bool(value))
         with self._lock:
+            initial = not self._initial_complete
+            for name, value in zip(nodes, values):
+                self._record_feedback_locked(name, bool(value), allow_confirmation=not initial)
+            self._initial_complete = True
             self._feedback_active = True
             self._feedback_error = ""
+            self._last_valid_read = datetime.now().isoformat(timespec="seconds")
 
     def _record_feedback(self, name: str, value: bool):
         now = time.monotonic()
         with self._lock:
-            old_value = self._received.get(name)
-            self._received[name] = value
-            if old_value == value:
-                return
-            self._last_feedback = f"{datetime.now().strftime('%H:%M:%S')} {name}={int(value)}"
-            pending = self._pending.pop(name, None) if value else None
+            self._record_feedback_locked(name, value, now=now, allow_confirmation=self._initial_complete)
+
+    def _record_feedback_locked(self, name: str, value: bool, now: float | None = None, allow_confirmation: bool = True):
+        old_value = self._received.get(name)
+        self._received[name] = value
+        self._last_valid_read = datetime.now().isoformat(timespec="seconds")
+        if old_value == value:
+            return
+        self._feedback_sequence += 1
+        self._last_feedback = f"{datetime.now().strftime('%H:%M:%S')} {name}={int(value)}"
+        if allow_confirmation and value and old_value is False:
+            pending = self._pending.pop(name, None)
             if pending is not None:
-                latency = round((now - pending["started"]) * 1000, 2)
+                latency = round(((now or time.monotonic()) - pending["started"]) * 1000, 2)
                 pending["ack_ms"] = latency
-                pending["ack_status"] = "plc_signal"
+                pending["ack_status"] = "state_observed"
                 self._last_ack_ms = latency
 
     def _set_feedback_error(self, message: str):
@@ -252,59 +294,59 @@ class OPCUABridge:
             self._feedback_error = message
             self._feedback_active = False
             self._feedback_mode = "polling"
+            self._initial_complete = False
+            self._received.clear()
+            self._feedback_epoch += 1
+            for record in self._pending.values():
+                record["ack_status"] = "feedback_lost"
+            self._pending.clear()
+            self._discard_queue_locked("feedback_lost")
 
-    async def _send_command(self, client, command: str, source: str, queued_at: float):
-        node_id = COMMAND_TO_NODE.get(command)
-        fallback = COMMAND_LEVEL_FALLBACK.get(command)
-        if node_id is None and fallback is None:
-            return
-        if fallback is not None:
-            node_id, value = fallback
-        else:
-            value = True
-
+    async def _send_command(self, client, record: dict):
+        command = record["command"]
+        node_id = record["node"]
         start = time.monotonic()
         signal = COMMAND_TO_RECEIVE_SIGNAL.get(command)
-        record = {
-            "time": datetime.now().isoformat(timespec="seconds"),
-            "command": command,
-            "source": source,
-            "node": node_id,
-            "library": "asyncua",
-            "queue_ms": round((start - queued_at) * 1000, 2),
-            "write_ms": None,
-            "ack_ms": None,
-            "ack_status": "unavailable",
-        }
         with self._lock:
+            record["queue_ms"] = round((start - record["queued_at"]) * 1000, 2)
             self._last_command = command
             self._last_ack_ms = None
-            self._timings.append(record)
-            if signal and self._feedback_active:
+            if signal and self._feedback_active and self._received.get(signal) is False:
                 old = self._pending.pop(signal, None)
                 if old is not None:
                     old["ack_status"] = "superseded"
                 record["started"] = start
                 record["ack_status"] = "pending"
                 self._pending[signal] = record
+            else:
+                record["ack_status"] = "no_fresh_transition"
 
+        attempted_true = False
         try:
-            await self._write_node_value(client, node_id, value)
+            attempted_true = True
+            await self._write_node_value(client, node_id, True)
             elapsed = round((time.monotonic() - start) * 1000, 2)
             with self._lock:
                 record["write_ms"] = elapsed
                 self._last_write_ms = elapsed
-                self._last_write = f"{datetime.now().strftime('%H:%M:%S')} {node_id}={value}"
+                self._last_write = f"{datetime.now().strftime('%H:%M:%S')} {node_id}=True"
                 self._last_error = ""
-            if fallback is None:
-                await asyncio.sleep(self._pulse_seconds)
-                await self._write_node_value(client, node_id, False)
+            await asyncio.sleep(self._pulse_seconds)
         except Exception:
             with self._lock:
                 record["ack_status"] = "write_error"
                 if signal and self._pending.get(signal) is record:
                     del self._pending[signal]
             raise
+        finally:
+            if attempted_true:
+                try:
+                    await self._write_node_value(client, node_id, False)
+                except Exception as exc:
+                    with self._lock:
+                        record["ack_status"] = "reset_error"
+                        self._last_error = f"{command}: pulse reset failed: {exc}"
+                    raise
 
     async def _write_node_value(self, client, node_id: str, value: bool):
         node = client.get_node(node_id)
@@ -328,7 +370,7 @@ class OPCUABridge:
 
     def timing_records(self) -> list[dict]:
         with self._lock:
-            return [{key: value for key, value in item.items() if key != "started"} for item in self._timings]
+            return [{key: value for key, value in item.items() if key not in {"started", "queued_at", "endpoint", "epoch"}} for item in self._timings]
 
     def health(self) -> dict:
         with self._lock:
@@ -340,6 +382,10 @@ class OPCUABridge:
                 "feedback_error": self._feedback_error,
                 "feedback_mode": self._feedback_mode,
                 "feedback_active": self._feedback_active,
+                "feedback_epoch": self._feedback_epoch,
+                "feedback_sequence": self._feedback_sequence,
+                "initial_complete": self._initial_complete,
+                "last_valid_read": self._last_valid_read,
                 "received": dict(self._received),
                 "last_feedback": self._last_feedback,
                 "last_write": self._last_write,

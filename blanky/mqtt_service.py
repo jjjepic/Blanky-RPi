@@ -23,7 +23,10 @@ from blanky.mqtt_topics import (
     should_use_pulse,
 )
 from blanky.opcua_service import get_opcua_bridge
-from blanky.command_messages import no_change_message, rejection_for_event, rejection_message
+from blanky.opcua_nodes import COMMAND_TO_NODE
+from blanky.plc_state import STATE_KEYS, command_target, project_plc_state
+from blanky.command_messages import (command_label, no_change_message, plc_change_message,
+                                      plc_observation_message, rejection_for_event, rejection_message)
 from blanky.mqtt_monitor import health_monitor_updates, state_monitor_updates
 from blanky.command_parser import VALID_COMMANDS, VALID_COMPONENTS, VALID_GROUPS, VALID_QUERIES
 from blanky.openai_activity import activity_snapshot
@@ -51,31 +54,20 @@ class MQTTBridge:
         self._next_event_id = 1
         # Each reset starts a new visual event session without discarding history.
         self._event_generation = 0
-        self._robot_release_generation = 0
         self._ui_lang = "pt"
         self._opcua = get_opcua_bridge()
         self._last_mqtt_panel_rx = 0.0
         self._monitor_health_cache: dict[str, str] = {}
         self._mobile_text_handler: Optional[Callable[[str, str], None]] = None
 
-        self.state = {
-            "start": 0,
-            "mode_fast": 0,
-            "mode_ideal": 0,
-            "mode_manual": 0,
-            "mode_change": 0,
-            "motor_1": 0,
-            "motor_2": 0,
-            "motor_3": 0,
-            "cyl_a": 0,
-            "cyl_b": 0,
-            "cyl_c": 0,
-            "cyl_d": 0,
-            "light_green": 0,
-            "light_red": 0,
-            "robot_metal": 0,
-            "robot_nonmetal": 0,
-        }
+        self.state = {key: None for key in STATE_KEYS}
+        self.state_quality = {key: "unavailable" for key in STATE_KEYS}
+        self._plc_available = False
+        self._plc_epoch = None
+        self._last_known: dict[str, int] = {}
+        self._pending_commands: dict[str, dict] = {}
+        self._plc_received: dict[str, bool] = {}
+        self._last_valid_read = ""
 
         self.client = None
         try:
@@ -161,6 +153,7 @@ class MQTTBridge:
                 self._publish("monitor/pt/last_message", "Sem atividade.")
                 self._publish("monitor/en/last_message", "No activity yet.")
                 self._publish("monitor/last_event_status", "none")
+                self._publish("monitor/last_event_stage", "none")
             phone_events = (event for event in reversed(self._events) if event["source"] == "mqtt_text")
             last_phone_event = next(phone_events, None)
             if last_phone_event is None:
@@ -175,6 +168,8 @@ class MQTTBridge:
         self._connected = False
 
     def _on_message(self, client, userdata, msg):
+        if getattr(msg, "retain", False):
+            return
         topic = str(msg.topic or "")
         topic_suffix = self._extract_suffix(topic)
         if not topic_suffix:
@@ -328,8 +323,78 @@ class MQTTBridge:
         return False
 
     def publish_all_state(self):
-        for key, value in self.state.items():
-            self._publish(f"state/{key}", value, retain=True)
+        self._synchronize_plc()
+        with self._lock:
+            for key, value in self.state.items():
+                self._publish(f"state/{key}", value if value is not None else "unknown", retain=True)
+                self._publish(f"state_quality/{key}", self.state_quality[key], retain=True)
+
+    def _synchronize_plc(self):
+        health = self._opcua.health() if hasattr(self._opcua, "health") else {}
+        records = self._opcua.timing_records() if hasattr(self._opcua, "timing_records") else []
+        available = bool(health.get("connected") and health.get("feedback_active") and health.get("initial_complete", True))
+        received = dict(health.get("received") or {})
+        state, quality = project_plc_state(received, available)
+        epoch = health.get("feedback_epoch")
+        with self._lock:
+            new_baseline = epoch != self._plc_epoch or (available and not self._plc_available)
+            self._plc_epoch = epoch
+            self._plc_available = available
+            self._plc_received = received if available else {}
+            self._last_valid_read = str(health.get("last_valid_read") or "")
+            if new_baseline or not available:
+                self._last_known = {key: value for key, value in state.items() if value is not None}
+            for key, value in state.items():
+                previous = self.state[key]
+                previous_quality = self.state_quality[key]
+                self.state[key] = value
+                self.state_quality[key] = quality[key]
+                if previous != value or previous_quality != quality[key]:
+                    self._publish(f"state/{key}", value if value is not None else "unknown", retain=True)
+                    self._publish(f"state_quality/{key}", quality[key], retain=True)
+                if available and not new_baseline and value is not None:
+                    before = self._last_known.get(key)
+                    if before is not None and before != value:
+                        self._add_event("PLC_STATE", "plc", True, plc_change_message(key, value, self._ui_lang),
+                                        detail_pt=plc_change_message(key, value, "pt"),
+                                        detail_en=plc_change_message(key, value, "en"),
+                                        plc_key=key, plc_value=value,
+                                        request_pending=key in self._pending_commands,
+                                        reason="system_error" if key == "system_error" and value else "state_change")
+                    self._last_known[key] = value
+
+            by_id = {record.get("id"): record for record in records}
+            for key, pending in list(self._pending_commands.items()):
+                record = by_id.get(pending["record_id"])
+                status = record.get("ack_status") if record else "queued"
+                if time.monotonic() - pending["created_at"] >= 6.0 and status in {"queued", "pending", "state_observed"}:
+                    status = "timeout"
+                if record and record.get("write_ms") is not None and pending["stage"] == "queued":
+                    pending["stage"] = "written"
+                    self._add_event(pending["command"], "opcua", True,
+                                    "Escrita OPC UA concluída; a aguardar o estado do PLC."
+                                    if self._ui_lang == "pt" else "OPC UA write completed; awaiting PLC state.",
+                                    reason="written", detail_pt="Escrita OPC UA concluída; a aguardar o estado do PLC.",
+                                    detail_en="OPC UA write completed; awaiting PLC state.")
+                if status == "state_observed" and state[key] == pending["target"] and quality[key] == "confirmed":
+                    self._add_event(pending["command"], "plc", True,
+                                    plc_observation_message(pending["command"], self._ui_lang),
+                                    reason="state_observed",
+                                    detail_pt=plc_observation_message(pending["command"], "pt"),
+                                    detail_en=plc_observation_message(pending["command"], "en"))
+                    del self._pending_commands[key]
+                elif status in {"timeout", "write_error", "reset_error", "disconnected", "endpoint_changed", "feedback_lost", "stale_or_endpoint_changed", "superseded", "superseded_by_stop", "no_fresh_transition"}:
+                    detail = ("Não foi possível confirmar o pedido pelo estado do PLC."
+                              if self._ui_lang == "pt" else "The request could not be confirmed by the PLC state.")
+                    self._add_event(pending["command"], "opcua", False, detail, reason=status,
+                                    detail_pt="Não foi possível confirmar o pedido pelo estado do PLC.",
+                                    detail_en="The request could not be confirmed by the PLC state.")
+                    del self._pending_commands[key]
+
+    def pending_snapshot(self) -> dict[str, dict]:
+        self._synchronize_plc()
+        with self._lock:
+            return {key: dict(value) for key, value in self._pending_commands.items()}
 
     def process_command(
         self,
@@ -339,200 +404,62 @@ class MQTTBridge:
         emit_pulse: Optional[bool] = None,
         bypass_workflow: bool = False,
     ) -> Tuple[bool, Optional[str]]:
+        self._synchronize_plc()
         with self._lock:
             self._publish(
                 "events/last_command",
                 json.dumps({"command": command, "source": source}, ensure_ascii=True),
-                retain=True
+                retain=True,
             )
-
+            reason = ""
+            target = command_target(command)
             if command in {"UNKNOWN", "NO_AUDIO"}:
                 reason = "no_audio" if command == "NO_AUDIO" else "unknown"
-                msg = rejection_message(reason, lang)
+            elif command in {"CYL_C_RETRACT", "CYL_D_RETRACT"}:
+                reason = "cylinder_retract_unavailable"
+            elif target is None or command not in COMMAND_TO_NODE:
+                reason = "unknown"
+            elif not self._plc_available and command != "STOP":
+                reason = "feedback_unavailable"
+            elif self.state.get("system_error") == 1 and command != "STOP":
+                reason = "system_error"
+            else:
+                reason = self._workflow_rejection_reason(command) or ""
+            if not reason and target is not None:
+                key, value = target
+                same_group_pending = (key in self._pending_commands
+                                      or key.startswith("mode_") and any(item.startswith("mode_") for item in self._pending_commands))
+                if command != "STOP" and (same_group_pending or command == "MODE_UNSPEC" and self._pending_commands):
+                    reason = "command_pending"
+                elif self.state.get(key) == value and not (command == "STOP" and "start" in self._pending_commands):
+                    reason = "no_change"
+            if reason:
+                msg = rejection_message(reason, lang, command)
+                self._publish_rejected(command, reason)
                 self._add_event(command=command, source=source, accepted=False, detail=msg, reason=reason)
                 return False, msg
 
-            if not bypass_workflow:
-                invalid_reason = self._workflow_rejection_reason(command)
-                if invalid_reason:
-                    invalid_msg = rejection_message(invalid_reason, lang)
-                    self._publish_rejected(command, "workflow_blocked")
-                    self._add_event(command=command, source=source, accepted=False, detail=invalid_msg, reason=invalid_reason)
-                    return False, invalid_msg
-
-            if command == "START":
-                if self.state["start"] == 1:
-                    msg = self._no_change_message(command, lang)
-                    self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
-                    return False, msg
-                self._emit_for_command(command, emit_pulse)
-                self.state["start"] = 1
-                self._publish("state/start", 1, retain=True)
-                self._add_event(command=command, source=source, accepted=True, detail=self._response_for_command(command, lang))
-                return True, None
-
-            if command == "STOP":
-                if self._is_everything_reset():
-                    msg = self._no_change_message(command, lang)
-                    self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
-                    return False, msg
-                self._emit_for_command(command, emit_pulse)
-                self._reset_all_state()
-                self.publish_all_state()
-                self._add_event(command=command, source=source, accepted=True, detail=self._response_for_command(command, lang))
-                return True, None
-
-            if command == "MODE_FAST":
-                if self.state["mode_fast"] == 1:
-                    msg = self._no_change_message(command, lang)
-                    self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
-                    return False, msg
-                self._emit_for_command(command, emit_pulse)
-                self._set_modes(fast=1, ideal=0, manual=0, change=0)
-                self._add_event(command=command, source=source, accepted=True, detail=self._response_for_command(command, lang))
-                return True, None
-            if command == "MODE_IDEAL":
-                if self.state["mode_ideal"] == 1:
-                    msg = self._no_change_message(command, lang)
-                    self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
-                    return False, msg
-                self._emit_for_command(command, emit_pulse)
-                self._set_modes(fast=0, ideal=1, manual=0, change=0)
-                self._add_event(command=command, source=source, accepted=True, detail=self._response_for_command(command, lang))
-                return True, None
-            if command == "MODE_MANUAL":
-                if self.state["mode_manual"] == 1:
-                    msg = self._no_change_message(command, lang)
-                    self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
-                    return False, msg
-                self._emit_for_command(command, emit_pulse)
-                self._set_modes(fast=0, ideal=0, manual=1, change=0)
-                self._add_event(command=command, source=source, accepted=True, detail=self._response_for_command(command, lang))
-                return True, None
-            if command == "MODE_UNSPEC":
-                if self.state["mode_change"] == 1:
-                    msg = self._no_change_message(command, lang)
-                    self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
-                    return False, msg
-                if self.state["mode_manual"] == 1:
-                    self._deactivate_manual_components(lang)
-                self._emit_for_command(command, emit_pulse)
-                self._set_modes(fast=0, ideal=0, manual=0, change=1)
-                self._add_event(command=command, source=source, accepted=True, detail=self._response_for_command(command, lang))
-                return True, None
-
-            motor_match = re.match(r"^MOTOR_([123])_(ON|OFF)$", command)
-            if motor_match:
-                idx = motor_match.group(1)
-                value = 1 if motor_match.group(2) == "ON" else 0
-                key = f"motor_{idx}"
-                if self.state[key] == value:
-                    msg = self._no_change_message(command, lang)
-                    self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
-                    return False, msg
-                self._emit_for_command(command, emit_pulse)
-                self.state[key] = value
-                self._publish(f"state/{key}", value, retain=True)
-                self._add_event(command=command, source=source, accepted=True, detail=self._response_for_command(command, lang))
-                return True, None
-
-            cyl_match = re.match(r"^CYL_([ABCD])_(EXTEND|RETRACT)$", command)
-            if cyl_match:
-                letter = cyl_match.group(1).lower()
-                value = 1 if cyl_match.group(2) == "EXTEND" else 0
-                key = f"cyl_{letter}"
-                if self.state[key] == value:
-                    msg = self._no_change_message(command, lang)
-                    self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
-                    return False, msg
-                self._emit_for_command(command, emit_pulse)
-                self.state[key] = value
-                self._publish(f"state/{key}", value, retain=True)
-                self._add_event(command=command, source=source, accepted=True, detail=self._response_for_command(command, lang))
-                return True, None
-
-            if command == "GREEN_ON":
-                if self.state["light_green"] == 1:
-                    msg = self._no_change_message(command, lang)
-                    self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
-                    return False, msg
-                self._emit_for_command(command, emit_pulse)
-                self.state["light_green"] = 1
-                self._publish("state/light_green", 1, retain=True)
-                self._add_event(command=command, source=source, accepted=True, detail=self._response_for_command(command, lang))
-                return True, None
-            if command == "GREEN_OFF":
-                if self.state["light_green"] == 0:
-                    msg = self._no_change_message(command, lang)
-                    self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
-                    return False, msg
-                self._emit_for_command(command, emit_pulse)
-                self.state["light_green"] = 0
-                self._publish("state/light_green", 0, retain=True)
-                self._add_event(command=command, source=source, accepted=True, detail=self._response_for_command(command, lang))
-                return True, None
-
-            if command == "RED_ON":
-                if self.state["light_red"] == 1:
-                    msg = self._no_change_message(command, lang)
-                    self._publish_rejected(command, "no_state_change")
-                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
-                    return False, msg
-                self._emit_for_command(command, emit_pulse)
-                self.state["light_red"] = 1
-                self._publish("state/light_red", 1, retain=True)
-                self._add_event(command=command, source=source, accepted=True, detail=self._response_for_command(command, lang))
-                return True, None
-            if command == "RED_OFF":
-                if self.state["light_red"] == 0:
-                    msg = self._no_change_message(command, lang)
-                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
-                    return False, msg
-                self._emit_for_command(command, emit_pulse)
-                self.state["light_red"] = 0
-                self._publish("state/light_red", 0, retain=True)
-                self._add_event(command=command, source=source, accepted=True, detail=self._response_for_command(command, lang))
-                return True, None
-
-            if command == "ROBOT_TO_METAL":
-                if self.state["robot_metal"] == 1 and self.state["robot_nonmetal"] == 0:
-                    msg = self._no_change_message(command, lang)
-                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
-                    return False, msg
-                self._emit_for_command(command, emit_pulse)
-                self.state["robot_metal"] = 1
-                self.state["robot_nonmetal"] = 0
-                self._publish("state/robot_metal", 1, retain=True)
-                self._publish("state/robot_nonmetal", 0, retain=True)
-                self._schedule_robot_release()
-                self._add_event(command=command, source=source, accepted=True, detail=self._response_for_command(command, lang))
-                return True, None
-
-            if command == "ROBOT_TO_NONMETAL":
-                if self.state["robot_metal"] == 0 and self.state["robot_nonmetal"] == 1:
-                    msg = self._no_change_message(command, lang)
-                    self._add_event(command=command, source=source, accepted=False, detail=msg, reason="no_change")
-                    return False, msg
-                self._emit_for_command(command, emit_pulse)
-                self.state["robot_metal"] = 0
-                self.state["robot_nonmetal"] = 1
-                self._publish("state/robot_metal", 0, retain=True)
-                self._publish("state/robot_nonmetal", 1, retain=True)
-                self._schedule_robot_release()
-                self._add_event(command=command, source=source, accepted=True, detail=self._response_for_command(command, lang))
-                return True, None
-
-            self._add_event(command=command, source=source, accepted=True, detail=self._response_for_command(command, lang))
+            record_id = self._opcua.enqueue_command(command, source=source)
+            if record_id is False:
+                reason = "opcua_unavailable"
+                msg = rejection_message(reason, lang, command)
+                self._publish_rejected(command, reason)
+                self._add_event(command=command, source=source, accepted=False, detail=msg, reason=reason)
+                return False, msg
+            key, value = target
+            if command == "STOP" and "start" in self._pending_commands:
+                self._add_event(self._pending_commands["start"]["command"], "opcua", False,
+                                "Pedido anterior substituído por paragem." if lang == "pt" else "Previous request superseded by stop.",
+                                reason="superseded_by_stop")
+            self._pending_commands[key] = {
+                "command": command, "target": value, "record_id": record_id or 0,
+                "source": source, "stage": "queued", "created_at": time.monotonic(),
+            }
+            self._emit_for_command(command, emit_pulse)
+            self._add_event(
+                command=command, source=source, accepted=True,
+                detail=self._response_for_command(command, lang), reason="queued",
+            )
             return True, None
 
     def _emit_command_pulse(self, command: str):
@@ -571,79 +498,6 @@ class MQTTBridge:
             retain=False
         )
 
-    def _set_modes(self, fast: int, ideal: int, manual: int, change: int):
-        self.state["mode_fast"] = fast
-        self.state["mode_ideal"] = ideal
-        self.state["mode_manual"] = manual
-        self.state["mode_change"] = change
-        self._publish("state/mode_fast", fast, retain=True)
-        self._publish("state/mode_ideal", ideal, retain=True)
-        self._publish("state/mode_manual", manual, retain=True)
-        self._publish("state/mode_change", change, retain=True)
-
-    def _deactivate_manual_components(self, lang: str):
-        """Safely release manual actuators before allowing another operating mode."""
-        self._cancel_robot_release()
-        self._clear_robot_state()
-        commands = (
-            ("motor_1", "MOTOR_1_OFF"),
-            ("motor_2", "MOTOR_2_OFF"),
-            ("motor_3", "MOTOR_3_OFF"),
-            ("cyl_a", "CYL_A_RETRACT"),
-            ("cyl_b", "CYL_B_RETRACT"),
-            ("cyl_c", "CYL_C_RETRACT"),
-            ("cyl_d", "CYL_D_RETRACT"),
-            ("light_green", "GREEN_OFF"),
-            ("light_red", "RED_OFF"),
-        )
-        pending = [(key, command) for key, command in commands if self.state[key] == 1]
-        for index, (key, command) in enumerate(pending):
-            self._emit_for_command(command, emit_pulse=None)
-            self.state[key] = 0
-            self._publish(f"state/{key}", 0, retain=True)
-            self._add_event(
-                command=command,
-                source="system",
-                accepted=True,
-                detail=self._response_for_command(command, lang),
-            )
-            if index < len(pending) - 1:
-                time.sleep(0.05)
-
-    def _reset_all_state(self):
-        self._cancel_robot_release()
-        for key in self.state.keys():
-            self.state[key] = 0
-
-    def _cancel_robot_release(self):
-        """Invalidate any pending visual release for a robot command."""
-        self._robot_release_generation += 1
-
-    def _clear_robot_state(self):
-        """Clear robot indicators and MQTT state without adding an Event entry."""
-        for key in ("robot_metal", "robot_nonmetal"):
-            if self.state[key] != 0:
-                self.state[key] = 0
-                self._publish(f"state/{key}", 0, retain=True)
-
-    def _schedule_robot_release(self):
-        """Keep robot selections visible briefly, then release them silently."""
-        self._cancel_robot_release()
-        generation = self._robot_release_generation
-
-        def release():
-            with self._lock:
-                if generation != self._robot_release_generation:
-                    return
-                self._clear_robot_state()
-
-        timer = threading.Timer(2.0, release)
-        timer.daemon = True
-        timer.start()
-
-    def _is_everything_reset(self) -> bool:
-        return all(value == 0 for value in self.state.values())
-
     def _current_mode(self) -> str:
         if self.state["mode_fast"] == 1:
             return "fast"
@@ -665,7 +519,13 @@ class MQTTBridge:
     def _workflow_rejection_reason(self, command: str) -> Optional[str]:
         if command in {"UNKNOWN", "NO_AUDIO"}:
             return None
+        if command == "STOP":
+            return None
 
+        if self.state["start"] is None:
+            return "feedback_unavailable"
+        if command != "STOP" and any(self.state[key] is None for key in ("mode_fast", "mode_ideal", "mode_manual", "mode_change")):
+            return "feedback_unavailable"
         if self.state["start"] == 0 and command not in {"START", "STOP"}:
             return "before_start"
 
@@ -712,55 +572,13 @@ class MQTTBridge:
         return no_change_message(command, lang)
 
     def _response_for_command(self, command: str, lang: str) -> str:
-        pt = {
-            "START": "Iniciado.",
-            "STOP": "Parado.",
-            "MODE_FAST": "Modo rapido ativado.",
-            "MODE_IDEAL": "Modo ideal ativado.",
-            "MODE_MANUAL": "Modo manual ativado.",
-            "MODE_UNSPEC": "Modo alterado.",
-            "GREEN_ON": "Luz verde acesa.",
-            "GREEN_OFF": "Luz verde apagada.",
-            "RED_ON": "Luz vermelha acesa.",
-            "RED_OFF": "Luz vermelha apagada.",
-            "ROBOT_TO_METAL": "Robo a ir para metal.",
-            "ROBOT_TO_NONMETAL": "Robo a ir para nao metal.",
-        }
-        en = {
-            "START": "Started.",
-            "STOP": "Stopped.",
-            "MODE_FAST": "Fast mode enabled.",
-            "MODE_IDEAL": "Ideal mode enabled.",
-            "MODE_MANUAL": "Manual mode enabled.",
-            "MODE_UNSPEC": "Mode changed.",
-            "GREEN_ON": "Green light on.",
-            "GREEN_OFF": "Green light off.",
-            "RED_ON": "Red light on.",
-            "RED_OFF": "Red light off.",
-            "ROBOT_TO_METAL": "Robot moving to metal.",
-            "ROBOT_TO_NONMETAL": "Robot moving to non-metal.",
-        }
+        label = command_label(command, lang)
+        return (f"Pedido para {label} colocado na fila. Aguarda confirmação do PLC."
+                if lang == "pt" else f"Request to {label} queued. Awaiting the PLC state.")
 
-        if command.startswith("MOTOR_"):
-            parts = command.split("_")
-            motor = parts[1]
-            state = parts[2]
-            if lang == "pt":
-                return f"Motor {motor} ativado." if state == "ON" else f"Motor {motor} desativado."
-            return f"Motor {motor} activated." if state == "ON" else f"Motor {motor} deactivated."
-
-        if command.startswith("CYL_"):
-            parts = command.split("_")
-            letter = parts[1]
-            state = parts[2]
-            if lang == "pt":
-                return f"Cilindro {letter} a avancar." if state == "EXTEND" else f"Cilindro {letter} a recuar."
-            return f"Cylinder {letter} extending." if state == "EXTEND" else f"Cylinder {letter} retracting."
-
-        mapping = pt if lang == "pt" else en
-        return mapping.get(command, command)
-
-    def _add_event(self, command: str, source: str, accepted: bool, detail: Optional[str], reason: str = ""):
+    def _add_event(self, command: str, source: str, accepted: bool, detail: Optional[str], reason: str = "",
+                   detail_pt: str = "", detail_en: str = "", plc_key: str = "", plc_value: int | None = None,
+                   request_pending: bool = False):
         event = {
             "id": self._next_event_id,
             "time": datetime.now().strftime("%H:%M:%S"),
@@ -768,15 +586,17 @@ class MQTTBridge:
             "command": command,
             "accepted": accepted,
             "detail": detail or "",
+            "detail_pt": detail_pt,
+            "detail_en": detail_en,
+            "plc_key": plc_key,
+            "plc_value": plc_value,
+            "request_pending": request_pending,
             "reason": reason,
             "generation": self._event_generation,
         }
         self._next_event_id += 1
         self._events.append(event)
         self._publish_monitor_event(event)
-
-        if accepted:
-            self._opcua.enqueue_command(command, source=source)
 
     def _publish_monitor_event(self, event: dict):
         for lang in ("pt", "en"):
@@ -785,6 +605,7 @@ class MQTTBridge:
             if event["source"] == "mqtt_text":
                 self._publish(f"monitor/{lang}/phone_textbot_response", message)
         self._publish("monitor/last_event_status", "ok" if event["accepted"] else "rejected")
+        self._publish("monitor/last_event_stage", event.get("reason") or ("accepted" if event["accepted"] else "rejected"))
 
     def _publish_phone_event(self, event: dict):
         for lang in ("pt", "en"):
@@ -793,10 +614,12 @@ class MQTTBridge:
     def _event_monitor_message(self, event: dict, lang: str) -> str:
         if event.get("kind") in {"query", "setting"}:
             return str(event.get(f"detail_{lang}") or event.get("detail") or "")
+        if event.get("source") in {"plc", "opcua"}:
+            return str(event.get(f"detail_{lang}") or event.get("detail") or "")
         if not event["accepted"]:
             return rejection_for_event(event, lang)
         if event["command"] == "SYSTEM_RESET":
-            return "Sistema reiniciado." if lang == "pt" else "System reset."
+            return "Sessão reiniciada; o PLC não foi alterado." if lang == "pt" else "Session restarted; PLC state unchanged."
         if event["command"] == "SYSTEM_SHUTDOWN":
             return "Sistema a desligar." if lang == "pt" else "System shutting down."
         message = self._response_for_command(event["command"], lang)
@@ -845,7 +668,9 @@ class MQTTBridge:
                     f"detail_{language}": self._event_monitor_message(events[-1], language)
                     for language in ("pt", "en")
                 }}
-            allowed = {command for command in VALID_COMMANDS if self._workflow_rejection_reason(command) is None}
+            allowed = {command for command in VALID_COMMANDS
+                       if command in COMMAND_TO_NODE and self._plc_available
+                       and self._workflow_rejection_reason(command) is None}
             previous = dict(self._last_interaction_response)
             answers = {
                 language: answer_query_parts(name, component, value, language, state, health, events, allowed,
@@ -891,22 +716,18 @@ class MQTTBridge:
 
     def reset_system(self, lang: str, source: str = "button") -> Tuple[bool, str]:
         with self._lock:
-            self._reset_all_state()
-            self.publish_all_state()
             # Preserve all existing events, but make subsequent events part of a new session.
             self._event_generation += 1
             msg = (
-                "Sistema reinicializado. Todas as variaveis foram repostas a zero."
+                "Sessão do Blanky reiniciada. O estado do PLC não foi alterado."
                 if lang == "pt"
-                else "System reset. All variables were restored to zero."
+                else "Blanky session restarted. The PLC state was not changed."
             )
             self._add_event(command="SYSTEM_RESET", source=source, accepted=True, detail=msg)
             return True, msg
 
     def shutdown_system(self, lang: str, source: str = "button") -> Tuple[bool, str]:
         with self._lock:
-            self._reset_all_state()
-            self.publish_all_state()
             msg = "Sistema a desligar." if lang == "pt" else "System shutting down."
             self._add_event(command="SYSTEM_SHUTDOWN", source=source, accepted=True, detail=msg)
             return True, msg
@@ -915,14 +736,21 @@ class MQTTBridge:
         return self._response_for_command(command, lang)
 
     def get_snapshot(self) -> dict[str, Any]:
+        self._synchronize_plc()
         with self._lock:
             return {
                 "state": dict(self.state),
+                "state_quality": dict(self.state_quality),
+                "pending": {key: dict(value) for key, value in self._pending_commands.items()},
+                "plc_received": dict(self._plc_received),
+                "plc_available": self._plc_available,
+                "last_valid_read": self._last_valid_read,
                 "events": list(self._events),
                 "event_generation": self._event_generation,
             }
 
     def health(self) -> dict[str, Any]:
+        self._synchronize_plc()
         now = time.monotonic()
         mqtt_panel_active = (now - self._last_mqtt_panel_rx) <= 30.0
         mqtt_panel_last_rx_seconds = (
@@ -937,6 +765,9 @@ class MQTTBridge:
             "opcua_last_error": str(opcua_health.get("last_error") or ""),
             "opcua_last_write": str(opcua_health.get("last_write") or ""),
             "opcua_feedback_active": bool(opcua_health.get("feedback_active")),
+            "opcua_initial_complete": bool(opcua_health.get("initial_complete")),
+            "opcua_last_valid_read": str(opcua_health.get("last_valid_read") or ""),
+            "opcua_plc_path_verified": False,
             "opcua_feedback_error": str(opcua_health.get("feedback_error") or ""),
             "opcua_last_feedback": str(opcua_health.get("last_feedback") or ""),
             "opcua_last_write_ms": opcua_health.get("last_write_ms"),

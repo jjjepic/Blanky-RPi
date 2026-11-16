@@ -28,7 +28,5 @@ def operational_speech(command: str, accepted: bool, detail: str, lang: str) -> 
     label = command_label(command, lang)
     if command in {"MODE_FAST", "MODE_IDEAL", "MODE_MANUAL"}:
         label = ("selecionar o " if lang == "pt" else "select ") + label
-    elif command in {"ROBOT_TO_METAL", "ROBOT_TO_NONMETAL"}:
-        label = ("enviar o " if lang == "pt" else "send the ") + label
     return (f"Pedido para {label} aceite." if lang == "pt" else
             f"Request to {label} accepted.")

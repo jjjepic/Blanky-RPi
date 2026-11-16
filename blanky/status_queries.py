@@ -1,6 +1,5 @@
 """Short, read-only status answers for speech and text interaction."""
 
-from blanky.opcua_nodes import COMMAND_TO_RECEIVE_SIGNAL
 from blanky.command_messages import command_label
 
 
@@ -18,210 +17,100 @@ def _mode(state: dict, lang: str) -> str:
 
 def _component(component: str, state: dict, health: dict, lang: str) -> str:
     if component == "lights":
-        green = _say(lang, "acesa" if state.get("light_green") else "apagada",
-                     "on" if state.get("light_green") else "off")
-        red = _say(lang, "acesa" if state.get("light_red") else "apagada",
-                   "on" if state.get("light_red") else "off")
-        return _say(lang, f"No Blanky, a luz verde está {green} e a vermelha está {red}. Não são estados físicos confirmados.",
-                    f"In Blanky, the green light is {green} and the red light is {red}. These are not confirmed physical states.")
+        return _group_parts("lights", "", lang, state, health)["detail"]
+    if component == "robot":
+        return _group_parts("robot", "", lang, state, health)["detail"]
+    value = state.get(component)
     if component.startswith("motor_"):
-        number = component[-1]
-        label = f"Motor {number}"
-        active = bool(state.get(component))
-        action = f"MOTOR_{number}_{'ON' if active else 'OFF'}"
-        status = _say(lang, "ligado" if active else "desligado", "on" if active else "off")
+        label = _say(lang, f"A saída lógica do motor {component[-1]}", f"The logical output for motor {component[-1]}")
+        on, off = _say(lang, "ligada", "on"), _say(lang, "desligada", "off")
     elif component.startswith("cyl_"):
         letter = component[-1].upper()
-        label = _say(lang, f"Cilindro {letter}", f"Cylinder {letter}")
-        active = bool(state.get(component))
-        action = f"CYL_{letter}_{'EXTEND' if active else 'RETRACT'}"
-        status = _say(lang, "com avanço solicitado" if active else "sem avanço solicitado",
-                      "with extend requested" if active else "without extend requested")
-    elif component.startswith("light_"):
-        color = component.removeprefix("light_")
-        label = _say(lang, "Luz verde" if color == "green" else "Luz vermelha",
-                     "Green light" if color == "green" else "Red light")
-        active = bool(state.get(component))
-        action = ("GREEN" if color == "green" else "RED") + ("_ON" if active else "_OFF")
-        status = _say(lang, "acesa" if active else "apagada", "on" if active else "off")
+        label = _say(lang, f"O cilindro {letter}", f"Cylinder {letter}")
+        on, off = _say(lang, "avançado, segundo o sensor", "extended according to its sensor"), _say(lang, "recolhido, segundo o sensor", "retracted according to its sensor")
     else:
-        metal = bool(state.get("robot_metal"))
-        nonmetal = bool(state.get("robot_nonmetal"))
-        label = _say(lang, "Robô", "Robot")
-        action = "ROBOT_TO_METAL" if metal else "ROBOT_TO_NONMETAL" if nonmetal else ""
-        status = _say(lang, "com destino peças metálicas" if metal else "com destino peças não metálicas" if nonmetal else "sem destino ativo",
-                      "targeting metal pieces" if metal else "targeting non-metal pieces" if nonmetal else "with no active target")
-
-    article = "a" if component.startswith("light_") else "o"
-    base = _say(lang, f"Segundo o Blanky, {article} {label.lower()} está {status}.",
-                f"According to Blanky, {label.lower()} is {status}.")
-    signal = COMMAND_TO_RECEIVE_SIGNAL.get(action)
-    received = health.get("opcua_received") or {}
-    if signal and health.get("opcua_feedback_active") and received.get(signal):
-        return base + _say(lang, " Sinal de comando confirmado pelo PLC; a posição física não está confirmada.",
-                           " Command signal confirmed by the PLC; physical position is not confirmed.")
-    return base + _say(lang, " É o estado interno do Blanky, não uma posição física confirmada.",
-                       " This is Blanky's internal state, not a confirmed physical position.")
+        color = component.removeprefix("light_")
+        label = _say(lang, f"A saída lógica da luz {'verde' if color == 'green' else 'vermelha'}",
+                     f"The logical output for the {'green' if color == 'green' else 'red'} light")
+        on, off = _say(lang, "ligada", "on"), _say(lang, "desligada", "off")
+    if value is None:
+        if component in {"cyl_c", "cyl_d"} and health.get("opcua_feedback_active"):
+            return _say(lang, f"{label} não tem avanço confirmado. Não consigo confirmar o recuo.",
+                        f"{label} has no confirmed extension. I cannot confirm retraction.")
+        return _say(lang, f"Não consigo confirmar o estado atual de {label.lower()}.",
+                    f"I cannot confirm the current state of {label.lower()}.")
+    return f"{label} {'encontra-se' if lang == 'pt' else 'is'} {on if value else off}."
 
 
 def _group_parts(target: str, value: str, lang: str, state: dict, health: dict | None = None) -> dict[str, str]:
     groups = {
-        "motors": [(f"motor_{n}", f"motor {n}") for n in (1, 2, 3)],
-        "cylinders": [(f"cyl_{letter.lower()}", _say(lang, f"cilindro {letter}", f"cylinder {letter}"))
-                      for letter in "ABCD"],
-        "lights": [("light_green", _say(lang, "luz verde", "green light")),
-                   ("light_red", _say(lang, "luz vermelha", "red light"))],
-        "robot": [("robot_metal", _say(lang, "robô para metal", "robot to metal")),
-                  ("robot_nonmetal", _say(lang, "robô para não metal", "robot to non-metal"))],
+        "motors": [f"motor_{n}" for n in (1, 2, 3)],
+        "cylinders": [f"cyl_{letter}" for letter in "abcd"],
+        "lights": ["light_green", "light_red"],
+        "robot": ["robot_metal", "robot_nonmetal"],
     }
-    members = [entry for group in groups.values() for entry in group] if target == "all" else groups.get(target, [])
-    if value == "" and target != "all":
-        if target == "robot":
-            speech = (_say(lang, "Robô com destino metal.", "Robot targeting metal.") if state.get("robot_metal") else
-                      _say(lang, "Robô com destino não metal.", "Robot targeting non-metal.") if state.get("robot_nonmetal") else
-                      _say(lang, "Robô sem destino ativo.", "Robot has no active destination."))
-        elif target == "cylinders":
-            active_letters = [key[-1].upper() for key, _ in members if state.get(key)]
-            inactive_letters = [key[-1].upper() for key, _ in members if not state.get(key)]
-            active_text = ", ".join(active_letters)
-            inactive_text = ", ".join(inactive_letters)
-            speech = _say(lang, f"Avanço pedido: {active_text or 'nenhum'}; sem pedido: {inactive_text or 'nenhum'}.",
-                          f"Extend requested: {active_text or 'none'}; not requested: {inactive_text or 'none'}.")
+    keys = [key for members in groups.values() for key in members] if target == "all" else groups.get(target, [])
+    if not keys:
+        message = _say(lang, "Não percebi o grupo.", "I did not understand the group.")
+        return {"speech": message, "detail": message}
+    if target == "robot":
+        if any(state.get(key) is None for key in keys):
+            message = _say(lang, "Não consigo confirmar os pedidos de recolha.", "I cannot confirm the pickup requests.")
+        elif state["robot_metal"] and state["robot_nonmetal"]:
+            message = _say(lang, "O PLC pede recolha manual nos Tapetes 2 e 3. Não há robô físico em operação.",
+                           "The PLC requests manual pickup on Conveyors 2 and 3. No physical robot is operating.")
+        elif state["robot_metal"]:
+            message = _say(lang, "O PLC pede recolha manual no Tapete 2. Não há robô físico em operação.",
+                           "The PLC requests manual pickup on Conveyor 2. No physical robot is operating.")
+        elif state["robot_nonmetal"]:
+            message = _say(lang, "O PLC pede recolha manual no Tapete 3. Não há robô físico em operação.",
+                           "The PLC requests manual pickup on Conveyor 3. No physical robot is operating.")
         else:
-            statuses = []
-            for key, label in members:
-                active_label = (_say(lang, "com avanço solicitado", "extend requested") if target == "cylinders" else
-                                _say(lang, "acesa", "on") if target == "lights" else _say(lang, "ligado", "on"))
-                inactive_label = (_say(lang, "sem avanço solicitado", "no extend requested") if target == "cylinders" else
-                                  _say(lang, "apagada", "off") if target == "lights" else _say(lang, "desligado", "off"))
-                statuses.append(f"{label} {active_label if state.get(key) else inactive_label}")
-            sentence = "; ".join(statuses)
-            speech = sentence[:1].upper() + sentence[1:] + "."
-        return {"speech": speech, "detail": speech + _say(lang,
-                " Estado interno do Blanky; a posição física não está confirmada.",
-                " Blanky's internal state; physical position is not confirmed.")}
-    active = value not in {"off", "retracted"}
-    selected = [label for key, label in members if bool(state.get(key)) == active]
-    if not selected:
-        speech = {
-            "motors": _say(lang, "Nenhum motor está ligado." if active else "Nenhum motor está desligado.",
-                           "No motor is on." if active else "No motor is off."),
-            "cylinders": _say(lang, "Nenhum cilindro tem avanço solicitado." if active else "Todos os cilindros têm avanço solicitado.",
-                              "No cylinder has extend requested." if active else "All cylinders have extend requested."),
-            "lights": _say(lang, "Nenhuma luz está acesa." if active else "Nenhuma luz está apagada.",
-                           "No light is on." if active else "No light is off."),
-            "robot": _say(lang, "O robô não tem destino ativo.", "The robot has no active destination."),
-            "all": _say(lang, "Nenhum componente está ativo.", "No component is active."),
-        }[target]
-    else:
-        names = ", ".join(selected[:-1]) + (_say(lang, " e ", " and ") if len(selected) > 1 else "") + selected[-1]
-        suffix = (_say(lang, "está", "is") if len(selected) == 1 else _say(lang, "estão", "are"))
-        state_word = (_say(lang, "com avanço solicitado", "with extend requested") if target == "cylinders" else
-                      _say(lang, "acesa", "on") if target == "lights" else _say(lang, "ligado", "on"))
-        if not active:
-            state_word = (_say(lang, "sem avanço solicitado", "without extend requested") if target == "cylinders" else
-                          _say(lang, "apagada", "off") if target == "lights" else _say(lang, "desligado", "off"))
-        if len(selected) > 1 and lang == "pt" and target == "motors":
-            state_word += "s"
-        if len(selected) > 1 and lang == "pt" and target == "lights":
-            state_word += "s"
-        if target == "all":
-            speech = _say(lang, f"Componentes ativos: {names}.", f"Active components: {names}.")
+            message = _say(lang, "Não há pedido de recolha ativo.", "There is no active pickup request.")
+        return {"speech": message, "detail": message}
+    if value:
+        expected = value not in {"off", "retracted"}
+        keys = [key for key in keys if state.get(key) is not None and bool(state[key]) == expected]
+    parts = []
+    for key in keys:
+        if key.startswith("cyl_"):
+            label = _say(lang, f"cilindro {key[-1].upper()}", f"cylinder {key[-1].upper()}")
+        elif key.startswith("light_"):
+            label = _say(lang, f"luz {'verde' if key == 'light_green' else 'vermelha'}",
+                         f"{'green' if key == 'light_green' else 'red'} light")
         else:
-            speech = f"{names[:1].upper() + names[1:]} {suffix} {state_word}."
-        if target == "all" and len(selected) > 3:
-            speech = _say(lang, f"{len(selected)} componentes estão ativos.",
-                          f"{len(selected)} components are active.")
-        if len(selected) == 1 and target == "motors" and active:
-            speech = _say(lang, f"Só o {selected[0]} está ligado.", f"Only {selected[0]} is on.")
-    detail = speech
-    if target == "all" and len(selected) > 3:
-        detail += _say(lang, f" Componentes: {', '.join(selected)}.", f" Components: {', '.join(selected)}.")
-    detail += _say(lang, " Estado interno do Blanky; não confirma a posição física dos atuadores.",
-                           " Blanky's internal state; actuator position is not physically confirmed.")
-    if health and health.get("opcua_feedback_active"):
-        received = health.get("opcua_received") or {}
-        confirmed = []
-        for key, label in members:
-            if label not in selected:
-                continue
-            if key.startswith("motor_"):
-                action = f"MOTOR_{key[-1]}_{'ON' if state.get(key) else 'OFF'}"
-            elif key.startswith("cyl_"):
-                action = f"CYL_{key[-1].upper()}_{'EXTEND' if state.get(key) else 'RETRACT'}"
+            label = key.replace("_", " ")
+        if key.startswith("cyl_") and key in {"cyl_c", "cyl_d"} and state.get(key) is None:
+            parts.append(_say(lang, f"{label}: recuo não confirmado", f"{label}: retraction unconfirmed"))
+        elif state.get(key) is None:
+            parts.append(_say(lang, f"{label}: estado não confirmado", f"{label}: state unconfirmed"))
+        else:
+            if key.startswith("cyl_"):
+                status = _say(lang, "avançado" if state[key] else "recolhido", "extended" if state[key] else "retracted")
             elif key.startswith("light_"):
-                action = ("GREEN" if key == "light_green" else "RED") + ("_ON" if state.get(key) else "_OFF")
+                status = _say(lang, "acesa" if state[key] else "apagada", "on" if state[key] else "off")
             else:
-                action = "ROBOT_TO_METAL" if key == "robot_metal" else "ROBOT_TO_NONMETAL"
-            signal = COMMAND_TO_RECEIVE_SIGNAL.get(action)
-            if signal and received.get(signal):
-                confirmed.append(label)
-        if confirmed:
-            detail += _say(lang, f" Sinal confirmado pelo PLC: {', '.join(confirmed)}.",
-                           f" PLC command signal confirmed: {', '.join(confirmed)}.")
-    return {"speech": speech, "detail": detail}
+                status = _say(lang, "saída ligada" if state[key] else "saída desligada",
+                              "output on" if state[key] else "output off")
+            parts.append(f"{label}: {status}")
+    message = "; ".join(parts) + "." if parts else _say(lang, "Nenhum estado confirmado corresponde à pergunta.",
+                                                        "No confirmed state matches the question.")
+    if target == "all" and len(parts) > 4:
+        active = sum(state.get(key) == 1 for key in keys)
+        unknown = sum(state.get(key) is None for key in keys)
+        speech = _say(lang, f"Há {active} estados ativos e {unknown} sem confirmação.",
+                      f"There are {active} active states and {unknown} unconfirmed states.")
+    else:
+        speech = message
+    return {"speech": speech, "detail": message}
 
 
 def answer_query_parts(name: str, target: str, value: str, lang: str, state: dict, health: dict,
                        events: list[dict], allowed: set[str], last_response: str) -> dict[str, str]:
-    """Keep speech concise while retaining provenance and consequences in detail."""
     if name in {"QUERY_COMPONENT_GROUP", "QUERY_ACTIVE"}:
         return _group_parts("all" if name == "QUERY_ACTIVE" else target, value, lang, state, health)
     detail = answer_query(name, target, lang, state, health, events, allowed, last_response)
-    if name == "QUERY_COMPONENT":
-        if target.startswith("motor_"):
-            n = target[-1]
-            speech = _say(lang, f"Motor {n} {'ligado' if state.get(target) else 'desligado'}.",
-                          f"Motor {n} {'on' if state.get(target) else 'off'}.")
-        elif target.startswith("cyl_"):
-            letter = target[-1].upper()
-            speech = _say(lang, f"Cilindro {letter}: {'avanço solicitado' if state.get(target) else 'sem avanço solicitado'}.",
-                          f"Cylinder {letter}: {'extend requested' if state.get(target) else 'no extend requested'}.")
-        elif target == "robot":
-            speech = _say(lang, "Robô para metal." if state.get("robot_metal") else "Robô para não metal." if state.get("robot_nonmetal") else "Robô sem destino ativo.",
-                          "Robot to metal." if state.get("robot_metal") else "Robot to non-metal." if state.get("robot_nonmetal") else "Robot has no active destination.")
-        elif target == "lights":
-            speech = _group_parts("lights", "", lang, state, health)["speech"]
-        else:
-            color = "green" if target == "light_green" else "red"
-            speech = _say(lang, f"Luz {'verde' if color == 'green' else 'vermelha'} {'acesa' if state.get(target) else 'apagada'}.",
-                          f"{'Green' if color == 'green' else 'Red'} light {'on' if state.get(target) else 'off'}.")
-    elif name == "QUERY_MQTT":
-        speech = _say(lang, "MQTT ligado." if health.get("mqtt_base_connected") else "MQTT desligado.",
-                      "MQTT connected." if health.get("mqtt_base_connected") else "MQTT disconnected.")
-    elif name == "QUERY_OPCUA":
-        speech = _say(lang, "OPC UA ligado." if health.get("opcua_connected") else "OPC UA desligado.",
-                      "OPC UA connected." if health.get("opcua_connected") else "OPC UA disconnected.")
-    elif name == "QUERY_OPENAI":
-        speech = _say(lang, "OpenAI configurada." if health.get("openai_configured") else "OpenAI indisponível.",
-                      "OpenAI configured." if health.get("openai_configured") else "OpenAI unavailable.")
-    elif name == "QUERY_CONNECTIONS":
-        speech = _say(lang,
-                      f"MQTT {'ligado' if health.get('mqtt_base_connected') else 'desligado'}; OPC UA {'ligado' if health.get('opcua_connected') else 'desligado'}; OpenAI {'configurada' if health.get('openai_configured') else 'indisponível'}.",
-                      f"MQTT {'connected' if health.get('mqtt_base_connected') else 'disconnected'}; OPC UA {'connected' if health.get('opcua_connected') else 'disconnected'}; OpenAI {'configured' if health.get('openai_configured') else 'unavailable'}.")
-    elif name == "QUERY_ERRORS":
-        error = (health.get("opcua_received") or {}).get("system_error")
-        speech = _say(lang, "O PLC comunica um erro." if error else "O PLC não comunica erros." if health.get("opcua_feedback_active") else "Não consigo confirmar erros no PLC.",
-                      "The PLC reports an error." if error else "The PLC reports no errors." if health.get("opcua_feedback_active") else "I cannot confirm PLC errors.")
-    elif name == "QUERY_SYSTEM":
-        speech = _say(lang, f"Sistema iniciado. Modo {_mode(state, lang)}." if state.get("start") else "Sistema parado.",
-                      f"System started. Mode {_mode(state, lang)}." if state.get("start") else "System stopped.")
-        if (health.get("opcua_received") or {}).get("system_error") and health.get("opcua_feedback_active"):
-            speech += _say(lang, " Erro comunicado pelo PLC.", " PLC reports an error.")
-    elif name == "QUERY_LAST_EVENT":
-        speech = detail.split(". ")[0] + "." if ". " in detail else detail
-    elif name == "QUERY_OPTIONS":
-        speech = (_say(lang, "Podes iniciar o sistema.", "You can start the system.")
-                  if not state.get("start") else
-                  _say(lang, "Escolhe um modo ou para o sistema.", "Choose a mode or stop the system.")
-                  if not any(state.get(key) for key in ("mode_fast", "mode_ideal", "mode_manual")) else
-                  _say(lang, "Podes comandar componentes, mudar de modo ou parar.",
-                       "You can control components, change mode or stop.")
-                  if "MOTOR_1_ON" in allowed else
-                  _say(lang, "Podes mudar de modo ou parar.", "You can change mode or stop."))
-    else:
-        speech = detail
-    return {"speech": speech, "detail": detail}
+    return {"speech": detail, "detail": detail}
 
 
 def answer_query(name: str, component: str, lang: str, state: dict, health: dict,
@@ -230,6 +119,9 @@ def answer_query(name: str, component: str, lang: str, state: dict, health: dict
     if name == "REPEAT":
         return last_response or _say(lang, "Ainda não tenho uma resposta para repetir.", "There is no answer to repeat yet.")
     if name == "QUERY_SYSTEM":
+        if state.get("start") is None:
+            return _say(lang, "Não consigo confirmar o estado atual do sistema.",
+                        "I cannot confirm the current system state.")
         status = (_say(lang, f"O sistema está iniciado. Modo {_mode(state, lang)}.",
                        f"The system is started. Mode: {_mode(state, lang)}.") if state.get("start")
                   else _say(lang, "O sistema está parado, sem modo ativo.", "The system is stopped, with no active mode."))
@@ -237,7 +129,10 @@ def answer_query(name: str, component: str, lang: str, state: dict, health: dict
             status += _say(lang, " O PLC comunica um erro ativo.", " The PLC reports an active error.")
         return status
     if name == "QUERY_MODE":
-        if not state.get("start"):
+        if state.get("start") is None or any(state.get(key) is None for key in ("mode_fast", "mode_ideal", "mode_manual", "mode_change")):
+            return _say(lang, "Não consigo confirmar o modo atual do PLC.",
+                        "I cannot confirm the PLC's current mode.")
+        if state.get("start") == 0:
             return _say(lang, "O sistema está parado, sem modo ativo.", "The system is stopped, with no active mode.")
         if not any(state.get(key) for key in ("mode_fast", "mode_ideal", "mode_manual", "mode_change")):
             return _say(lang, "Ainda não escolheste um modo.", "You have not chosen a mode yet.")
@@ -250,8 +145,13 @@ def answer_query(name: str, component: str, lang: str, state: dict, health: dict
         return _say(lang, "O MQTT está ligado." if health.get("mqtt_base_connected") else "O MQTT está desligado. O telemóvel não comunica com o Blanky.",
                     "MQTT is connected." if health.get("mqtt_base_connected") else "MQTT is disconnected. The phone cannot communicate with Blanky.")
     if name == "QUERY_OPCUA":
-        return _say(lang, "O OPC UA está ligado ao PLC." if health.get("opcua_connected") else "O OPC UA está desligado. Os comandos não chegam à maquete.",
-                    "OPC UA is connected to the PLC." if health.get("opcua_connected") else "OPC UA is disconnected. Commands do not reach the machine.")
+        if not health.get("opcua_connected"):
+            return _say(lang, "O OPC UA está desligado. Não consigo enviar comandos.",
+                        "OPC UA is disconnected. I cannot send commands.")
+        return _say(lang, "O servidor OPC UA está ligado e os estados são lidos. A ligação entre os PLCs não é verificável sem diagnóstico próprio."
+                    if health.get("opcua_feedback_active") else "O servidor OPC UA está ligado, mas os estados não estão disponíveis.",
+                    "The OPC UA server is connected and states are readable. The link between PLCs cannot be verified without its own diagnostics."
+                    if health.get("opcua_feedback_active") else "The OPC UA server is connected, but states are unavailable.")
     if name == "QUERY_OPENAI":
         if not health.get("openai_configured"):
             return _say(lang, "A OpenAI não está configurada. A interpretação Online não está disponível.",
@@ -296,6 +196,12 @@ def answer_query(name: str, component: str, lang: str, state: dict, health: dict
         if not events:
             return _say(lang, "Ainda não há eventos.", "There are no events yet.")
         event = events[-1]
+        if event.get("source") == "plc":
+            return _say(lang, f"Último retorno do PLC: {event.get(f'detail_{lang}') or event.get('detail') or ''}",
+                        f"Latest PLC return: {event.get(f'detail_{lang}') or event.get('detail') or ''}")
+        if event.get("source") == "opcua":
+            return _say(lang, f"Última etapa OPC UA: {event.get(f'detail_{lang}') or event.get('detail') or ''}",
+                        f"Latest OPC UA stage: {event.get(f'detail_{lang}') or event.get('detail') or ''}")
         source = {"voice": ("voz", "voice"), "text": ("Text-Bot", "Text-Bot"),
                   "mqtt_text": ("telemóvel", "phone"), "mqtt_panel": ("telemóvel", "phone"),
                   "button": ("botão", "button")}.get(event.get("source"), ("sistema", "system"))
@@ -306,6 +212,9 @@ def answer_query(name: str, component: str, lang: str, state: dict, health: dict
         return _say(lang, f"Último evento por {source[0]}: {action}, {result}. {detail}".strip(),
                     f"Last event from {source[1]}: {action}, {result}. {detail}".strip())
     if name == "QUERY_OPTIONS":
+        if state.get("start") is None:
+            return _say(lang, "Podes consultar o estado, mas aguarda pela ligação ao PLC antes de comandar.",
+                        "You can ask for status, but wait for the PLC connection before sending commands.")
         if "START" in allowed and not state.get("start"):
             return _say(lang, "Podes iniciar o sistema ou consultar o seu estado.",
                         "You can start the system or ask for its status.")
@@ -313,7 +222,7 @@ def answer_query(name: str, component: str, lang: str, state: dict, health: dict
             return _say(lang, "Podes escolher o modo rápido, ideal ou manual, ou parar o sistema.",
                         "You can choose fast, ideal or manual mode, or stop the system.")
         if "MOTOR_1_ON" in allowed:
-            return _say(lang, "Podes comandar motores, cilindros, luzes e robô, mudar de modo ou parar.",
-                        "You can control motors, cylinders, lights and the robot, change mode or stop.")
+            return _say(lang, "Podes comandar motores, cilindros A e B, pedir o avanço de C e D, controlar luzes e pedir recolha nos tapetes.",
+                        "You can control motors, cylinders A and B, request C and D extension, control lights and request conveyor pickup.")
         return _say(lang, "Podes mudar de modo ou parar o sistema.", "You can change mode or stop the system.")
     return _say(lang, "Não percebi a consulta.", "I did not understand the question.")

@@ -8,7 +8,7 @@ Blanky é uma interface assistiva para controlo de uma célula industrial simula
 
 - Controlar o sistema por voz em linguagem natural.
 - Enviar um ou mais comandos pelo Text-Bot.
-- Usar os controlos diretos para sistema, modos, motores, cilindros, luzes e robô.
+- Usar os controlos diretos para sistema, modos, motores, cilindros, luzes e pedidos de recolha.
 - Receber comandos de um telemóvel através de MQTT.
 - Encaminhar comandos validados para o PLC por OPC UA.
 - Consultar Eventos, diagnóstico de áudio e exportar dados em CSV ou PDF.
@@ -60,7 +60,7 @@ Também podes consultar grupos: `Quais os motores ligados?`, `Que cilindros est�
 
 Podes pedir `Põe o volume a 60`, `Aumenta o volume`, `Fala mais devagar`, `Muda a voz para a Coral`, `Muda para o tema claro` ou `Letra maior`. Também podes alterar idioma, perfil cromático, perfil de áudio, animações, escala do ecrã e modo Online/Offline do Text-Bot. Estas definições funcionam mesmo com o sistema parado, usam os mesmos limites dos controlos da interface e ficam registadas como `Definição`. Não enviam nada ao PLC. Parâmetros MQTT/OPC UA e a chave OpenAI só podem ser alterados no menu de definições.
 
-As consultas funcionam com o sistema parado, são registadas como `Consulta` e não enviam comandos ao PLC. O estado dos componentes é o último aceite pelo Blanky; um sinal de retorno pode confirmar o comando, **não a posição física**. A disponibilidade da OpenAI não é garantida só por existir uma chave configurada.
+As consultas funcionam com o sistema parado, são registadas como `Consulta` e não enviam comandos ao PLC. O estado apresentado provém agora do retorno comunicado pelo PLC, nunca apenas do último pedido aceite. Motores e luzes refletem saídas lógicas; A/B refletem sensores de fim de curso; C/D só confirmam avanço, não recuo. A disponibilidade da OpenAI não é garantida só por existir uma chave configurada.
 
 ## Definições
 
@@ -77,9 +77,15 @@ Nos cartões de Comunicações, `OpenAI` substitui apenas a apresentação de `M
 
 O Blanky usa `asyncua` para enviar os comandos existentes do mapa `ns=4` e observar os 25 sinais de retorno do mapa `OPC UA Receber` (atualmente `ns=5`, identificadores `i=2` a `i=26`). O índice do espaço de nomes de receção é resolvido pelo URI `http://OPC UA Receber`; pode ser alterado com `BLANKY_OPCUA_RECEIVE_NAMESPACE_URI` se o PLC usar outro URI. A ligação é mantida mesmo sem comandos, com subscrição dos sinais e leitura periódica como alternativa quando a subscrição não está disponível.
 
-Os sinais de retorno ficam separados do estado local da operação. Alguns são pulsos ou confirmações de processamento, não provas de posição física. Em particular, os nós atuais de C/D indicam o comando de avanço, não os sensores magnéticos `S_C0`/`S_C1`/`S_D0`/`S_D1` (`%I2.0` a `%I2.3`). Não se deve assumir os seus IDs OPC UA: ainda têm de ser publicados/mapeados no PLC. Quando existirem, podem ser indicados por `BLANKY_OPCUA_CYL_C_RETRACTED_NODE`, `BLANKY_OPCUA_CYL_C_ADVANCED_NODE`, `BLANKY_OPCUA_CYL_D_RETRACTED_NODE` e `BLANKY_OPCUA_CYL_D_ADVANCED_NODE` (valores no formato `ns=N;i=ID`). Sem estas variáveis, os sensores não são lidos. O temporizador de atuação de 1 segundo de C/D pertence à lógica do PLC Maquete, não ao cliente OPC UA do Blanky.
+O percurso de comando é Blanky → escrita OPC UA no PLC Send&Receive → DB100 → TSEND_C/TRCV_C → PLC Maquete. O retorno faz o percurso inverso a partir dos estados da maquete no DB4 até aos 25 nós de `OPC UA Receber`. Uma leitura inicial completa sincroniza a interface sem gerar acontecimentos falsos. A partir daí, alterações comunicadas pelo PLC atualizam a interface, mesmo quando tiveram origem na HMI ou no ciclo automático. Uma quebra OPC UA invalida os valores atuais; a religação lê de novo a base antes de anunciar transições.
 
-O cartão OPC UA mostra a última duração de escrita ou de chegada de um sinal de retorno. A escrita concluída significa resposta do servidor OPC UA; a chegada do sinal significa retorno observado no Blanky. Nenhuma das duas medidas confirma, por si só, o fim de curso físico.
+O Blanky distingue pedido aceite, enfileiramento, escrita OPC UA, estado observado e timeout/erro no histórico. O estado observado **não é um ACK individual** nem prova que aquele pedido causou a alteração. O servidor OPC UA ligado e a subscrição operacional também não provam, sem heartbeat próprio, a frescura da ligação TCP entre os dois PLCs. Sinais complementares incoerentes aparecem como não confirmados, não como `OFF` inventado. Motores e luzes representam saídas lógicas, A/B usam sensores de avanço/recuo, e C/D usam os sinais DBX2.0/DBX2.1 agora alimentados pelos sensores de avanço `S_C1`/`S_D1`. O valor `FALSE` de C/D não prova recuo. Não são inventados novos NodeIds para os sensores de recuo.
+
+Nesta versão, o Blanky só pode pedir avanço de C/D; recuo por voz, Text-Bot, botão ou MQTT é recusado e nunca escrito no PLC. `ROBOT_TO_METAL` e `ROBOT_TO_NONMETAL` mantêm os nomes técnicos por compatibilidade, mas representam pedidos de recolha manual nos Tapetes 2 e 3; não há robô físico em operação. O PLC mantém a responsabilidade pela reposição de C/D ao sair do modo manual ou entrar em STOP/erro.
+
+O cartão OPC UA mostra a última duração de escrita ou de observação de um sinal de retorno. A escrita concluída significa resposta do servidor OPC UA; o sinal é apenas um estado observado, sem atribuição causal inequívoca. O impulso de comando mantém 300 ms como ponto de partida, com tentativa de reposição a `FALSE` mesmo após falha e descarte dos pedidos antigos após reconexão. Isto não garante a entrega de todos os impulsos durante `BUSY` no TSEND_C; essa garantia exige protocolo de confirmação adicional nos PLCs. Ver [procedimento de validação da nova comunicação](PLC_VALIDATION_PT.md).
+
+Os testes sem hardware podem ser executados com `python -m unittest discover -s tests -q`. Os testes OPC UA de integração precisam de `asyncua` instalado; os testes simulados de retorno, comandos e falhas não precisam de PLC físico.
 
 ### Comparar `opcua` com `asyncua`
 

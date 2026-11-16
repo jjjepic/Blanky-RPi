@@ -29,14 +29,11 @@ COMMAND_TO_NODE = {
 }
 
 # The current PLC map has no separate retract command for C/D.
-COMMAND_LEVEL_FALLBACK = {
-    "CYL_C_RETRACT": ("ns=4;i=13", False),
-    "CYL_D_RETRACT": ("ns=4;i=14", False),
-}
+COMMAND_LEVEL_FALLBACK = {}
 
 RECEIVE_NAMESPACE_URI = "http://OPC UA Receber"
 
-# These are PLC Send&Receive signals, not necessarily physical position sensors.
+# C/D DBX2.0 and DBX2.1 now mirror the advanced-position sensors S_C1/S_D1.
 RECEIVE_NODE_IDENTIFIERS = {
     "system_on": 2,
     "system_stopped": 3,

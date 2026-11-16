@@ -8,7 +8,7 @@ Blanky is an assistive interface for controlling a simulated industrial cell. It
 
 - Natural-language voice control.
 - One or more Text-Bot commands.
-- Direct controls for the system, modes, motors, cylinders, lights and robot.
+- Direct controls for the system, modes, motors, cylinders, lights and pickup requests.
 - Mobile-phone commands through MQTT.
 - Validated commands forwarded to the PLC through OPC UA.
 - Events, audio diagnostics and CSV/PDF exports.
@@ -55,7 +55,7 @@ You can also ask about groups: `Which motors are on?`, `Which cylinders are exte
 
 Try `Set the volume to 60`, `Increase the volume`, `Speak more slowly`, `Change the voice to Coral`, `Switch to light theme` or `Larger text`. You can also change language, color profile, audio profile, animations, display scale and Text-Bot Online/Offline mode. These preferences work even when the system is stopped, use the same limits as the interface controls, and are logged as `Setting`. They never send anything to the PLC. MQTT/OPC UA parameters and the OpenAI key can only be changed in the Settings menu.
 
-Questions work while the system is stopped, are logged as `Query`, and never send commands to the PLC. Component status is the last state accepted by Blanky; a return signal may confirm a command, **not physical position**. An OpenAI key alone does not guarantee service availability.
+Questions work while the system is stopped, are logged as `Query`, and never send commands to the PLC. Displayed status now comes from PLC-reported returns, never just the last accepted request. Motors and lights reflect logical outputs; A/B use end-position sensors; C/D only confirm extension, not retraction. An OpenAI key alone does not guarantee service availability.
 
 ## Settings
 
@@ -72,9 +72,15 @@ In the Communications cards, `OpenAI` replaces only the `MQTT Base` display; the
 
 Blanky uses `asyncua` to send the existing `ns=4` commands and observe all 25 return signals in the `OPC UA Receber` map (currently `ns=5`, identifiers `i=2` through `i=26`). The receive namespace index is resolved from the URI `http://OPC UA Receber`; set `BLANKY_OPCUA_RECEIVE_NAMESPACE_URI` if the PLC uses another URI. The connection stays active without commands, using subscriptions or periodic reads if subscriptions are unavailable.
 
-Return signals are kept separate from the local operating state. Some are pulses or processing acknowledgements, not physical position feedback. In particular, the current C/D nodes indicate an advance command, not the magnetic sensors `S_C0`/`S_C1`/`S_D0`/`S_D1` (`%I2.0` through `%I2.3`). Their OPC UA node IDs must not be guessed; they still need to be exposed/mapped by the PLC. Once available, set `BLANKY_OPCUA_CYL_C_RETRACTED_NODE`, `BLANKY_OPCUA_CYL_C_ADVANCED_NODE`, `BLANKY_OPCUA_CYL_D_RETRACTED_NODE` and `BLANKY_OPCUA_CYL_D_ADVANCED_NODE` (values such as `ns=N;i=ID`). Without these variables, the sensors are not read. The C/D one-second actuation timer belongs in the PLC Maquete logic, not the Blanky OPC UA client.
+Commands travel Blanky → OPC UA write on PLC Send&Receive → DB100 → TSEND_C/TRCV_C → PLC Maquete. Returns travel back from the machine's DB4 through the 25 `OPC UA Receber` nodes. A complete initial read synchronizes the interface without fabricating events. Later PLC-reported changes update the interface even when triggered by the HMI or automatic cycle. Loss of OPC UA communication invalidates current values; reconnection establishes a fresh baseline before reporting changes.
 
-The OPC UA card displays the most recent write or PLC-return-signal duration. A completed write means the OPC UA server responded; a return signal means Blanky observed that signal. Neither proves that the actuator reached its physical endpoint.
+The event history distinguishes accepted request, queueing, OPC UA write, observed state and timeout/error. An observed state is **not an individual ACK** and cannot prove that a specific request caused the change. A connected OPC UA server and active subscription cannot, without a separate heartbeat, prove that the TCP link between PLCs is fresh. Inconsistent complementary signals are unconfirmed, not invented `OFF` values. Motors and lights are logical outputs; A/B use extend/retract sensors; C/D DBX2.0/DBX2.1 now reflect advanced-position sensors `S_C1`/`S_D1`. `FALSE` for C/D does not prove retraction. No new sensor NodeIds are assumed.
+
+Blanky can request C/D extension only in this version. Retraction through speech, Text-Bot, buttons or MQTT is rejected and never written to the PLC. Technical names `ROBOT_TO_METAL` and `ROBOT_TO_NONMETAL` remain for compatibility but mean manual pickup requests on Conveyors 2 and 3; no physical robot is operating. The PLC remains responsible for resetting C/D on leaving manual mode or entering STOP/error.
+
+The OPC UA card displays the latest write or return-signal observation time. A completed write means the OPC UA server responded; an observed signal does not establish individual command causation. The 300 ms pulse remains a starting point, with a `FALSE` reset attempted after failures and queued stale requests discarded on reconnection. This does not guarantee that every pulse crosses TSEND_C while it is busy; such a guarantee needs an additional PLC-side acknowledgement protocol. See [the laboratory validation procedure](PLC_VALIDATION_PT.md).
+
+Run hardware-free tests with `python -m unittest discover -s tests -q`. OPC UA integration tests require `asyncua`; simulated feedback, command and failure tests do not require a physical PLC.
 
 ### Comparing `opcua` and `asyncua`
 

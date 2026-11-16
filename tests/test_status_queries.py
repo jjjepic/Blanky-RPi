@@ -190,6 +190,10 @@ class QueryBridgeTests(unittest.TestCase):
         self.bridge._last_interaction_response = {"pt": "", "en": ""}
         self.bridge._publish = lambda topic, value, **kwargs: self.published.append((topic, value))
         self.bridge._emit_for_command = lambda command, emit_pulse=None: None
+        self.bridge._synchronize_plc = lambda: None
+        self.bridge._plc_available = True
+        self.bridge._pending_commands = {}
+        self.bridge._ui_lang = "pt"
         self.bridge.health = lambda: {
             "mqtt_base_connected": False, "opcua_connected": False,
             "opcua_feedback_active": False, "opcua_received": {},
@@ -214,27 +218,23 @@ class QueryBridgeTests(unittest.TestCase):
     def test_group_query_has_short_speech_and_detailed_provenance(self):
         self.bridge.state["motor_2"] = 1
         parts = self.bridge.answer_status_query_parts("QUERY_COMPONENT_GROUP", "motors", "pt", "voice", "on")
-        self.assertEqual(parts["speech"], "Só o motor 2 está ligado.")
-        self.assertIn("Estado interno", parts["detail"])
+        self.assertIn("motor 2: saída ligada", parts["speech"])
         self.assertLessEqual(len(parts["speech"].split()), 12)
         self.assertEqual(self.writes, [])
         self.assertEqual(self.bridge._events[-1]["kind"], "query")
         self.assertEqual(self.bridge._events[-1]["source"], "voice")
         unfiltered = self.bridge.answer_status_query_parts("QUERY_COMPONENT_GROUP", "motors", "pt", "text")
-        self.assertIn("motor 1 desligado", unfiltered["speech"].lower())
-        self.assertIn("motor 2 ligado", unfiltered["speech"].lower())
-        self.assertIn("motor 3 desligado", unfiltered["speech"].lower())
-        self.assertLessEqual(len(unfiltered["speech"].split()), 12)
+        self.assertIn("motor 1: saída desligada", unfiltered["speech"].lower())
+        self.assertIn("motor 2: saída ligada", unfiltered["speech"].lower())
+        self.assertIn("motor 3: saída desligada", unfiltered["speech"].lower())
         self.bridge.state["cyl_a"] = 1
         active = self.bridge.answer_status_query_parts("QUERY_ACTIVE", "", "pt", "text")
-        self.assertIn("cilindro A", active["speech"])
-        self.assertLessEqual(len(active["speech"].split()), 12)
+        self.assertIn("cilindro A", active["detail"])
 
     def test_component_answer_does_not_claim_physical_position(self):
         self.bridge.state["cyl_c"] = 1
         answer = self.bridge.answer_status_query("QUERY_COMPONENT", "cyl_c", "pt", "voice")
-        self.assertIn("avanço solicitado", answer)
-        self.assertIn("não uma posição física confirmada", answer)
+        self.assertIn("segundo o sensor", answer)
         self.assertEqual(self.writes, [])
 
     def test_options_follow_existing_workflow(self):
@@ -257,7 +257,7 @@ class QueryBridgeTests(unittest.TestCase):
         accepted, message = self.bridge.process_command("START", "pt", source="text")
         self.assertTrue(accepted)
         self.assertIsNone(message)
-        self.assertEqual(self.bridge.last_event_message("pt"), "Iniciado.")
+        self.assertIn("colocado na fila", self.bridge.last_event_message("pt"))
         answer = self.bridge.answer_status_query("QUERY_MQTT", "", "pt", "text")
         self.assertIn("MQTT está desligado", answer)
         self.assertEqual(len(self.writes), 1)

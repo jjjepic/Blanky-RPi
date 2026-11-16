@@ -73,17 +73,18 @@ Comandos e intenções:
   "trocar molde" ou "mudar móvel" quando o contexto é a troca de modo.
 - MOTOR_1_ON/OFF, MOTOR_2_ON/OFF, MOTOR_3_ON/OFF: ligar, ativar, parar ou desligar o motor
   indicado. O número do motor e a ação têm de estar claros.
-- CYL_A_EXTEND/RETRACT até CYL_D_EXTEND/RETRACT: avançar/estender ou recuar/recolher o cilindro
-  ou atuador indicado. A letra e a direção têm de estar claras.
+- CYL_A/B_EXTEND/RETRACT: avançar ou recuar A/B. CYL_C/D_EXTEND: pedir avanço de C/D.
+  Se o utilizador pedir explicitamente recuo de C/D, devolve CYL_C/D_RETRACT para que o
+  Blanky explique a indisponibilidade, nunca como ação executada.
 - GREEN_ON/OFF e RED_ON/OFF: acender/ligar ou apagar/desligar a luz verde ou vermelha.
-- ROBOT_TO_METAL e ROBOT_TO_NONMETAL: enviar, mover ou mandar o robô para metal ou não metal.
+- ROBOT_TO_METAL e ROBOT_TO_NONMETAL: pedidos de recolha manual nos Tapetes 2/3.
 
 Pedidos de grupo claros devem ser expandidos para os comandos individuais, pela ordem indicada:
 - "todos os motores" liga/desliga MOTOR_1, MOTOR_2 e MOTOR_3.
-- "todos os cilindros" avança/recolhe CYL_A, CYL_B, CYL_C e CYL_D.
+- "todos os cilindros" avança A/B/C/D; recuo em grupo aplica-se apenas a A/B.
 - "todas as luzes" liga/desliga GREEN e RED.
 - "tudo" ou "todos os componentes", exceto o robô, inclui os três motores, quatro cilindros e
-  duas luzes. Para ligar, cilindros usam EXTEND; para desligar, usam RETRACT.
+  duas luzes. Para ligar, cilindros usam EXTEND; para desligar, só A/B usam RETRACT.
 - Pedidos de subconjuntos como "motor 1 e 3" ou "cilindro B e D" devolvem uma ação por cada
   componente mencionado. Nunca incluas o robô num pedido de "tudo" sem destino explícito.
 
@@ -104,17 +105,18 @@ Commands and intents:
   which one. This includes "change mode", "switch mode" and close transcription variants.
 - MOTOR_1_ON/OFF, MOTOR_2_ON/OFF, MOTOR_3_ON/OFF: turn on, enable, stop or turn off the named
   motor. The motor number and action must be clear.
-- CYL_A_EXTEND/RETRACT through CYL_D_EXTEND/RETRACT: extend/advance or retract/pull back the
-  named cylinder or actuator. The letter and direction must be clear.
+- CYL_A/B_EXTEND/RETRACT: extend or retract A/B. CYL_C/D_EXTEND requests extension.
+  If C/D retraction is explicitly requested, return CYL_C/D_RETRACT so Blanky can explain
+  that it is unavailable, never as a completed action.
 - GREEN_ON/OFF and RED_ON/OFF: turn on or turn off the green or red light.
-- ROBOT_TO_METAL and ROBOT_TO_NONMETAL: send, move or direct the robot to metal or non-metal.
+- ROBOT_TO_METAL and ROBOT_TO_NONMETAL: manual pickup requests on Conveyors 2/3.
 
 Clear group requests must expand into individual commands in the stated order:
 - "all motors" turns MOTOR_1, MOTOR_2 and MOTOR_3 on or off.
-- "all cylinders" extends or retracts CYL_A, CYL_B, CYL_C and CYL_D.
+- "all cylinders" extends A/B/C/D; group retraction applies only to A/B.
 - "all lights" turns GREEN and RED on or off.
 - "everything" or "all components", except the robot, includes the three motors, four cylinders
-  and two lights. Turning on cylinders uses EXTEND; turning them off uses RETRACT.
+  and two lights. Turning on cylinders uses EXTEND; turning them off uses RETRACT only for A/B.
 - Subsets such as "motors 1 and 3" or "cylinders B and D" return one action for each named
   component. Never include the robot in an "everything" request without an explicit destination.
 
@@ -519,9 +521,9 @@ def parse_command(raw_text: str, lang: str) -> Tuple[str, str]:
     # ============ ROBOT ============
     if contains_any_substring(text, d["robot_word"]) and contains_any_substring(text, d["robot_go"]):
         if contains_any_substring(text, d["nonmetal"]):
-            return "ROBOT_TO_NONMETAL", "Robô a ir para não metal." if lang == "pt" else "Robot moving to non-metal."
+            return "ROBOT_TO_NONMETAL", "Pedido de recolha no Tapete 3." if lang == "pt" else "Pickup request on Conveyor 3."
         if contains_any_substring(text, d["metal"]):
-            return "ROBOT_TO_METAL", "Robô a ir para metal." if lang == "pt" else "Robot moving to metal."
+            return "ROBOT_TO_METAL", "Pedido de recolha no Tapete 2." if lang == "pt" else "Pickup request on Conveyor 2."
 
     # ============ MOTOR 1/2/3 ============
     if contains_any_substring(text, d["motor_word"]):

@@ -31,9 +31,9 @@ def _load_offline_parser():
 class CommandMessageTests(unittest.TestCase):
     def test_every_rejection_is_short_localized_and_has_no_internal_identifier(self):
         reasons = {"before_start", "choose_mode", "manual_only", "change_mode_first", "choose_new_mode", "unknown", "no_audio"}
-        self.assertEqual(set(REJECTION_TEXT["pt"]), reasons)
-        self.assertEqual(set(REJECTION_TEXT["en"]), reasons)
-        self.assertEqual(REJECTION_TEXT["pt"], {
+        self.assertTrue(reasons.issubset(REJECTION_TEXT["pt"]))
+        self.assertEqual(set(REJECTION_TEXT["pt"]), set(REJECTION_TEXT["en"]))
+        self.assertEqual({key: REJECTION_TEXT["pt"][key] for key in reasons}, {
             "before_start": "Primeiro, inicie o sistema.",
             "choose_mode": "Escolha primeiro um modo: rápido, ideal ou manual.",
             "manual_only": "Os componentes só se comandam no modo manual. Mude primeiro de modo.",
@@ -44,7 +44,7 @@ class CommandMessageTests(unittest.TestCase):
         })
         forbidden = re.compile(r"\b(?:START|STOP)\b|\b[A-Z]{2,}_[A-Z0-9_]+\b")
         for lang in ("pt", "en"):
-            for reason in reasons | {"no_change"}:
+            for reason in set(REJECTION_TEXT[lang]) | {"no_change"}:
                 for command in COMMAND_TO_TOPIC:
                     with self.subTest(lang=lang, reason=reason, command=command):
                         message = rejection_message(reason, lang, command)
@@ -96,6 +96,10 @@ class WorkflowMessageTests(unittest.TestCase):
         bridge._publish_rejected = lambda *args, **kwargs: None
         bridge._emit_for_command = lambda *args, **kwargs: None
         bridge._opcua = types.SimpleNamespace(enqueue_command=lambda *args, **kwargs: None)
+        bridge._synchronize_plc = lambda: None
+        bridge._plc_available = True
+        bridge._pending_commands = {}
+        bridge._ui_lang = "pt"
         return bridge
 
     def test_workflow_reason_and_event_match_response(self):
@@ -124,7 +128,7 @@ class WorkflowMessageTests(unittest.TestCase):
                     other_lang = "en" if lang == "pt" else "pt"
                     self.assertEqual(rejection_for_event(bridge._events[-1], other_lang), rejection_message(reason, other_lang, command))
 
-    def test_accepted_workflow_is_unchanged(self):
+    def test_accepted_requests_do_not_change_confirmed_state(self):
         bridge = self._bridge()
         for command in ("START", "MODE_MANUAL", "MOTOR_1_ON"):
             with self.subTest(command=command):
@@ -132,8 +136,14 @@ class WorkflowMessageTests(unittest.TestCase):
                 self.assertTrue(accepted)
                 self.assertIsNone(message)
                 self.assertEqual(bridge._events[-1]["command"], command)
-                self.assertEqual(bridge._events[-1]["reason"], "")
-        self.assertEqual(bridge.state["motor_1"], 1)
+                self.assertEqual(bridge._events[-1]["reason"], "queued")
+                if command == "START":
+                    self.assertEqual(bridge.state["start"], 0)
+                    bridge.state["start"] = 1  # Simulated PLC return.
+                elif command == "MODE_MANUAL":
+                    self.assertEqual(bridge.state["mode_manual"], 0)
+                    bridge.state["mode_manual"] = 1
+        self.assertEqual(bridge.state["motor_1"], 0)
 
 
 if __name__ == "__main__":

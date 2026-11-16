@@ -1,5 +1,6 @@
 import asyncio
 import socket
+import types
 import time
 import unittest
 from types import SimpleNamespace
@@ -20,6 +21,102 @@ def _free_port():
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         return sock.getsockname()[1]
+
+
+def _run_without_io(coroutine):
+    """Drive fake-only awaits without creating a Windows socket-backed loop."""
+    while True:
+        try:
+            coroutine.send(None)
+        except StopIteration as result:
+            return result.value
+
+
+class OPCUAOfflineTests(unittest.TestCase):
+    def test_stop_discards_commands_not_yet_written(self):
+        with patch.object(opcua_service, "OPCUA_ENABLED", False):
+            bridge = opcua_service.OPCUABridge()
+        bridge.enabled = bridge._connected = True
+        bridge.enqueue_command("MOTOR_1_ON", "test")
+        bridge.enqueue_command("STOP", "test")
+        self.assertEqual(bridge.timing_records()[0]["ack_status"], "superseded_by_stop")
+        self.assertEqual(bridge._queue.get_nowait()["command"], "STOP")
+
+    def test_feedback_failure_invalidates_values_and_pending_queue(self):
+        with patch.object(opcua_service, "OPCUA_ENABLED", False):
+            bridge = opcua_service.OPCUABridge()
+        bridge.enabled = bridge._connected = bridge._feedback_active = bridge._initial_complete = True
+        bridge._received["system_on"] = True
+        bridge.enqueue_command("MOTOR_1_ON", "test")
+        bridge._set_feedback_error("simulated subscription failure")
+        self.assertEqual(bridge.health()["received"], {})
+        self.assertFalse(bridge.health()["initial_complete"])
+        self.assertEqual(bridge.timing_records()[0]["ack_status"], "feedback_lost")
+        self.assertTrue(bridge._queue.empty())
+
+    def test_changing_endpoint_discards_old_queue(self):
+        with patch.object(opcua_service, "OPCUA_ENABLED", False):
+            bridge = opcua_service.OPCUABridge()
+        bridge.enabled = bridge._connected = True
+        bridge.enqueue_command("START", "test")
+        bridge.configure_connection("opc.tcp://new-server:4840")
+        self.assertTrue(bridge._queue.empty())
+        self.assertEqual(bridge.timing_records()[0]["ack_status"], "endpoint_changed")
+
+    def test_initial_read_is_complete_before_feedback_becomes_available(self):
+        with patch.object(opcua_service, "OPCUA_ENABLED", False):
+            bridge = opcua_service.OPCUABridge()
+        nodes = {name: object() for name in RECEIVE_NODE_IDENTIFIERS}
+
+        class FakeClient:
+            async def read_values(self, requested):
+                self_count = len(requested)
+                return [False] * self_count
+
+        _run_without_io(bridge._read_feedback(FakeClient(), nodes))
+        health = bridge.health()
+        self.assertTrue(health["initial_complete"])
+        self.assertTrue(health["feedback_active"])
+        self.assertEqual(len(health["received"]), 25)
+        baseline = health["feedback_sequence"]
+        bridge._record_feedback("motor_1_on", True)
+        self.assertEqual(bridge.health()["feedback_sequence"], baseline + 1)
+
+    def test_pulse_resets_after_success_and_failed_true_write(self):
+        variant = types.SimpleNamespace(Int16="i16", Int32="i32", Int64="i64", Float="f32", Double="f64", Boolean="bool")
+        fake_ua = types.SimpleNamespace(VariantType=variant, Variant=lambda value, kind: value, DataValue=lambda value: value)
+
+        class FakeNode:
+            def __init__(self, fail=False):
+                self.values = []
+                self.fail = fail
+
+            async def read_data_type_as_variant_type(self):
+                return "bool"
+
+            async def write_value(self, value):
+                self.values.append(value)
+                if self.fail and value:
+                    raise OSError("simulated write failure")
+
+        for fail in (False, True):
+            with self.subTest(fail=fail), patch.object(opcua_service, "ua", fake_ua), patch.object(opcua_service, "OPCUA_ENABLED", False):
+                bridge = opcua_service.OPCUABridge()
+                bridge.enabled = True
+                bridge._connected = True
+                bridge._pulse_seconds = 0
+                bridge.enqueue_command("MOTOR_1_ON", "test")
+                record = bridge._queue.get_nowait()
+                node = FakeNode(fail)
+                client = types.SimpleNamespace(get_node=lambda node_id: node)
+                if fail:
+                    with self.assertRaises(OSError):
+                        _run_without_io(bridge._send_command(client, record))
+                    self.assertEqual(record["ack_status"], "write_error")
+                else:
+                    _run_without_io(bridge._send_command(client, record))
+                    self.assertIsNotNone(record["write_ms"])
+                self.assertEqual(node.values, [True, False])
 
 
 @unittest.skipUnless(Server is not None, "asyncua is not installed")
@@ -75,7 +172,7 @@ class OPCUAIntegrationTests(unittest.IsolatedAsyncioTestCase):
             await self.received_nodes["system_on"].write_value(True)
             await self._wait_for(lambda: bridge.health()["last_ack_ms"] is not None)
             self.assertEqual(bridge.timing_records()[0]["source"], "test")
-            self.assertEqual(bridge.timing_records()[0]["ack_status"], "plc_signal")
+            self.assertEqual(bridge.timing_records()[0]["ack_status"], "state_observed")
         finally:
             await asyncio.to_thread(bridge.close)
 
@@ -148,7 +245,16 @@ class OPCUAIntegrationTests(unittest.IsolatedAsyncioTestCase):
             bridge = opcua_service.OPCUABridge()
         try:
             await self._wait_for(lambda: bridge.health()["connected"])
-            bridge._queue.put_nowait(("START", "test", time.monotonic() - 6, self.url))
+            with bridge._lock:
+                record = {
+                    "id": 1, "time": "", "command": "START", "source": "test",
+                    "node": COMMAND_TO_NODE["START"], "library": "asyncua", "queue_ms": None,
+                    "write_ms": None, "ack_ms": None, "ack_status": "queued",
+                    "queued_at": time.monotonic() - 6, "endpoint": self.url,
+                    "epoch": bridge._feedback_epoch,
+                }
+                bridge._timings.append(record)
+                bridge._queue.put_nowait(record)
             await self._wait_for(lambda: bool(bridge.timing_records()))
             self.assertEqual(bridge.timing_records()[0]["ack_status"], "stale_or_endpoint_changed")
             self.assertFalse(await self.server.get_node("ns=4;i=2").read_value())

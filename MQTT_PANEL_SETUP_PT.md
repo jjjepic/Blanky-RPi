@@ -41,8 +41,8 @@ Configure cada um como botão no IoT MQTT Panel. Envie o payload `1`.
 | Modo ideal | `blanky/mqtt_mode_ideal` |
 | Modo manual | `blanky/mqtt_mode_manual` |
 | Mudar de modo | `blanky/mqtt_mode_change` |
-| Robô para metal | `blanky/mqtt_robot_to_metal` |
-| Robô para não metal | `blanky/mqtt_robot_to_nonmetal` |
+| Pedir recolha no Tapete 2 | `blanky/mqtt_robot_to_metal` |
+| Pedir recolha no Tapete 3 | `blanky/mqtt_robot_to_nonmetal` |
 
 ### Interruptores de nível
 
@@ -55,12 +55,13 @@ Configure cada um como switch. O payload `1` liga/avança e `0` desliga/recua.
 | Motor 3 | `blanky/mqtt_motor_3` | Ligar | Desligar |
 | Cilindro A | `blanky/mqtt_cyl_a` | Avançar | Recuar |
 | Cilindro B | `blanky/mqtt_cyl_b` | Avançar | Recuar |
-| Cilindro C | `blanky/mqtt_cyl_c` | Avançar | Recuar |
-| Cilindro D | `blanky/mqtt_cyl_d` | Avançar | Recuar |
+| Cilindro C | `blanky/mqtt_cyl_c` | Pedir avanço | Recusado nesta versão |
+| Cilindro D | `blanky/mqtt_cyl_d` | Pedir avanço | Recusado nesta versão |
 | Luz verde | `blanky/mqtt_green` | Ligar | Desligar |
 | Luz vermelha | `blanky/mqtt_red` | Ligar | Desligar |
 
 Também são aceites `on`, `true`, `high` e `pulse` para ligar; `off`, `false` e `low` para desligar.
+Para C/D, usa um **botão de impulso** com payload `1`, não um switch: o payload `0` é recusado e não provoca recuo. Não uses mensagens MQTT retidas para comandos.
 
 ## 3. Sequência segura de utilização
 
@@ -68,7 +69,7 @@ Também são aceites `on`, `true`, `high` e `pulse` para ligar; `off`, `false` e
 2. Escolha um modo: rápido, ideal ou manual.
 3. Para componentes individuais, escolha primeiro o modo manual.
 4. Para trocar de modo, envie `mqtt_mode_change` e escolha o novo modo.
-5. Use `mqtt_stop` para parar e repor o sistema.
+5. Use `mqtt_stop` para pedir paragem; a interface só mostrará o estado parado quando o PLC o comunicar.
 
 Se um pedido não cumprir esta sequência, o Blanky publica um evento de rejeição e não envia a ação ao PLC.
 
@@ -88,9 +89,10 @@ blanky/state/light_green
 blanky/state/light_red
 blanky/state/robot_metal
 blanky/state/robot_nonmetal
+blanky/state/system_error
 ```
 
-Estes tópicos legados continuam disponíveis para os interruptores e indicadores existentes. Para um painel **apenas de leitura**, o Blanky publica agora também `blanky/monitor/*`. Nunca configure um painel de monitorização para publicar em `monitor/*` ou para enviar comandos por `mqtt_*`.
+Estes tópicos legados continuam disponíveis e refletem o estado comunicado pelo PLC, **não** o último pedido. Podem conter `unknown` quando não há confirmação. Cada um tem um tópico paralelo `blanky/state_quality/<chave>` com `confirmed`, `unavailable`, `inconsistent` ou `position_unknown`. Um LED binário deve ser acompanhado de Text Output de qualidade/estado; `unknown` não deve aparecer como `OFF`. Para um painel **apenas de leitura**, usa também `blanky/monitor/*`. Nunca publiques em `monitor/*`.
 
 ### Organização recomendada no IoT MQTT Panel
 
@@ -104,14 +106,17 @@ Configure o prefixo do dashboard como `blanky` e introduza apenas o sufixo indic
 | Modo atual | Multi-State Indicator | `monitor/mode` | `stopped` = Parado; `choose_mode` = Escolher modo; `fast` = Rápido; `ideal` = Ideal; `manual` = Manual; `changing` = A escolher novo modo. |
 | Modo atual | Text Output (alternativa) | `monitor/pt/mode` | Mostra a frase em português, caso o Multi-State não permita rótulos legíveis. |
 | Motores | LED Indicator + Text Output | `state/motor_1` + `monitor/pt/motor_1` (também `_2`, `_3`) | `0` = Desligado; `1` = Ligado. |
-| Cilindros | LED Indicator + Text Output | `state/cyl_a` + `monitor/pt/cyl_a` (também `_b`, `_c`, `_d`) | `0` = Recuo solicitado; `1` = Avanço solicitado. Não indica posição medida. |
+| Cilindros | Text Output | `monitor/pt/cyl_a` (também `_b`, `_c`, `_d`) | A/B: posição comunicada pelos sensores; C/D: só avanço confirmado ou posição não confirmada. Não configurar C/D como LED de recuo. |
 | Luzes | LED Indicator + Text Output | `state/light_green` + `monitor/pt/light_green` (também `light_red`) | `0` = Apagada; `1` = Acesa. |
-| Robô | Text Output | `monitor/pt/robot` | Sem destino ativo, Destino: peças metálicas ou Destino: peças não metálicas. A seleção é temporária. |
+| Recolha | Text Output | `monitor/pt/robot` | Pedido no Tapete 2/3; não comprova ação de robô físico. |
 | Comunicações | Multi-State Indicator | `monitor/opcua` | `connected` / `disconnected`: ligação OPC UA, não confirmação de atuação. |
 | Comunicações | Text Output | `monitor/pt/opcua_feedback` | `Ativo` ou `Indisponível`: receção de feedback OPC UA. |
-| Tempos OPC UA | Text Output | `monitor/pt/opcua_write_time`, `monitor/pt/opcua_ack_time` | Última escrita e última confirmação do PLC, em ms; ausência indicada por texto. Não são tempos MQTT. |
+| Percurso entre PLCs | Text Output | `monitor/pt/plc_path` | Indica que falta heartbeat/diagnóstico para comprovar a ligação Maquete → Send&Receive. |
+| Erro PLC | Text Output | `monitor/pt/system_error` | `Erro ativo`, `Sem erro ativo` ou `Não confirmado`. |
+| Tempos OPC UA | Text Output | `monitor/pt/opcua_write_time`, `monitor/pt/opcua_ack_time` | Última escrita e transição de sinal observada, em ms; o nome legado `ack_time` não representa ACK individual. |
 | Último evento: descrição | Text Output | `monitor/pt/last_message` | Descrição do Evento mais recente, venha ele de voz, botão, Text-Bot ou telemóvel. Não é um histórico completo. |
 | Último evento: estado | Multi-State Indicator | `monitor/last_event_status` | `none` = Sem eventos; `ok` = Aceite (OK); `rejected` = Recusado (REJECT). Não significa confirmação de atuação pelo PLC. |
+| Última etapa | Text Output | `monitor/last_event_stage` | `queued`, `written`, `state_observed`, `timeout` ou erro; distinguir pedido de retorno. |
 
 Os equivalentes em inglês estão em `monitor/en/...`. Todos os tópicos `monitor/*` são retidos, salvo se o broker ainda não tiver recebido a primeira publicação. Use texto, símbolo e posição além da cor; evite usar só vermelho/verde para estados críticos. **Não use o widget Node Status** com `monitor/availability`: a versão da app que pede `Payload sync request` publica um pedido, mas o Blanky não implementa esse protocolo de pedido/resposta. Nunca publique nesse tópico, pois pode substituir o valor retido. O Multi-State Indicator subscreve a disponibilidade do **processo Blanky no broker**, não o arranque do sistema ou a ligação ao PLC. O valor `offline` é publicado ao sair normalmente e pelo Last Will se a ligação cair inesperadamente; pode haver um pequeno atraso até o broker detetar a perda. Ignore os últimos estados retidos quando a disponibilidade estiver `offline`.
 

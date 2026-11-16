@@ -15,6 +15,8 @@ Rectangle {
     property color borderColor: "#1f6fa8"
     property color panelColor: "#091722"
     property bool active: false
+    property bool stateUnknown: false
+    property bool statePending: false
     property bool commandEnabled: true
     property bool singleLineTitle: false
     property bool centeredContent: false
@@ -22,7 +24,7 @@ Rectangle {
     readonly property int titlePixelSize: Math.round((singleLineTitle ? 11 : 12) * readabilityScale)
     readonly property int statePixelSize: Math.round(10 * readabilityScale)
     readonly property string titleText: iconText.length > 0 ? iconText + " " + label : label
-    readonly property string formattedStateText: (active ? "✓ " : "○ ") + stateText
+    readonly property string formattedStateText: (statePending ? "… " : stateUnknown ? "? " : active ? "✓ " : "○ ") + stateText
     readonly property bool hasState: stateText.length > 0
     readonly property real stateBadgeWidth: Math.ceil(stateMetrics.advanceWidth + 12 * readabilityScale)
     readonly property real requiredHorizontalWidth: titleMetrics.advanceWidth

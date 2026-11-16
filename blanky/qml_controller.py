@@ -118,6 +118,7 @@ class BlankyController(QObject):
         "light_red",
         "robot_metal",
         "robot_nonmetal",
+        "system_error",
     ]
     _TEXT = {
         "pt": {
@@ -165,7 +166,7 @@ class BlankyController(QObject):
             "events_title": "Eventos Blanky",
             "event_report_title": "Relat\u00f3rio de eventos Blanky",
             "voice_preview": "Ol\u00e1, eu sou {voice}.",
-            "system_reset": "Sistema reiniciado.",
+            "system_reset": "Sessão reiniciada; o PLC não foi alterado.",
             "system_shutdown": "A desligar.",
         },
         "en": {
@@ -213,7 +214,7 @@ class BlankyController(QObject):
             "events_title": "Blanky Events",
             "event_report_title": "Blanky event report",
             "voice_preview": "Hello, I am {voice}.",
-            "system_reset": "System reset.",
+            "system_reset": "Session restarted; PLC state unchanged.",
             "system_shutdown": "Shutting down.",
         },
     }
@@ -1303,8 +1304,8 @@ class BlankyController(QObject):
             "GREEN_OFF": ("Apagar luz verde.", "Turn off green light."),
             "RED_ON": ("Acender luz vermelha.", "Turn on red light."),
             "RED_OFF": ("Apagar luz vermelha.", "Turn off red light."),
-            "ROBOT_TO_METAL": ("Enviar robô para metal.", "Send robot to metal."),
-            "ROBOT_TO_NONMETAL": ("Enviar robô para não metal.", "Send robot to non-metal."),
+            "ROBOT_TO_METAL": ("Pedir recolha no Tapete 2.", "Request pickup on Conveyor 2."),
+            "ROBOT_TO_NONMETAL": ("Pedir recolha no Tapete 3.", "Request pickup on Conveyor 3."),
         }
         if canonical in direct:
             return direct[canonical][0 if is_pt else 1]
@@ -1499,15 +1500,15 @@ class BlankyController(QObject):
     def _opcua_card_detail(self, health: dict, is_pt: bool) -> str:
         if not health.get("opcua_connected"):
             return "Sem ligação ao PLC" if is_pt else "No PLC connection"
-        if health.get("opcua_feedback_error"):
-            return "Receção indisponível" if is_pt else "Feedback unavailable"
+        if not health.get("opcua_feedback_active"):
+            return "Servidor ligado; estados indisponíveis" if is_pt else "Server connected; states unavailable"
         ack_ms = health.get("opcua_last_ack_ms")
         if ack_ms is not None and health.get("opcua_feedback_active"):
-            return (f"Sinal PLC: {ack_ms:.0f} ms" if is_pt else f"PLC signal: {ack_ms:.0f} ms")
+            return (f"Retorno observado: {ack_ms:.0f} ms" if is_pt else f"Observed return: {ack_ms:.0f} ms")
         write_ms = health.get("opcua_last_write_ms")
         if write_ms is not None:
             return (f"Escrita OPC UA: {write_ms:.0f} ms" if is_pt else f"OPC UA write: {write_ms:.0f} ms")
-        return "Ligação ao PLC" if is_pt else "PLC connection"
+        return "Estados OPC UA disponíveis" if is_pt else "OPC UA states available"
 
     def _event_visual_color(self, command: str, accepted: bool) -> str:
         if self._appearance_mode == "high_contrast":
@@ -1590,9 +1591,10 @@ class BlankyController(QObject):
             event_label = f"[{event_id:03d}]"
             event_time = str(ev.get("time") or "")
             source = self._source_label(str(ev.get("source") or ""))
-            status = "✓ OK" if ev.get("accepted") else "✕ REJECT"
+            status = self._event_status_label(ev)
             command = (("CONSULTA" if self._language == "pt" else "QUERY") if ev.get("kind") == "query"
                        else ("DEFINIÇÃO" if self._language == "pt" else "SETTING") if ev.get("kind") == "setting"
+                       else ("RETORNO PLC" if self._language == "pt" else "PLC RETURN") if ev.get("command") == "PLC_STATE"
                        else str(ev.get("command") or ""))
             is_previous_session = int(ev.get("generation", 0) or 0) < current_generation
             color = "#6d8290" if is_previous_session else self._event_visual_color(command, bool(ev.get("accepted")))
@@ -1616,8 +1618,27 @@ class BlankyController(QObject):
         event_font_size = round(12 * self._appearance_text_scale)
         return f"<pre style='font-family:Consolas; font-size:{event_font_size}px;'>" + "\n".join(rich_rows) + "</pre>"
 
+    def _event_status_label(self, event: dict) -> str:
+        reason = event.get("reason")
+        if reason == "queued":
+            return "… FILA" if self._language == "pt" else "… QUEUED"
+        if reason == "written":
+            return "… ESCRITA" if self._language == "pt" else "… WRITTEN"
+        if reason in {"state_observed", "state_change"}:
+            return "✓ PLC"
+        if reason == "timeout":
+            return "! TIMEOUT"
+        if reason in {"write_error", "reset_error", "disconnected", "feedback_lost",
+                      "stale_or_endpoint_changed", "superseded_by_stop", "no_fresh_transition"}:
+            return "✕ FALHA" if self._language == "pt" else "✕ FAILED"
+        if reason == "system_error":
+            return "! ERRO" if self._language == "pt" else "! ERROR"
+        return "✓ OK" if event.get("accepted") else "✕ REJECT"
+
     def _localized_event_detail(self, event: dict) -> str:
         if event.get("kind") in {"query", "setting"}:
+            return str(event.get(f"detail_{self._language}") or event.get("detail") or "")
+        if event.get("source") in {"plc", "opcua"}:
             return str(event.get(f"detail_{self._language}") or event.get("detail") or "")
         command = str(event.get("command") or "")
         original = self._repair_display_text(str(event.get("detail") or ""))
@@ -1639,6 +1660,8 @@ class BlankyController(QObject):
                 "mqtt_text": "PHONE",
                 "mqtt_panel": "PHONE",
                 "button": "BUTTON",
+                "plc": "PLC",
+                "opcua": "OPC UA",
             }
         else:
             labels = {
@@ -1647,6 +1670,8 @@ class BlankyController(QObject):
                 "mqtt_text": "TELEMOVEL",
                 "mqtt_panel": "TELEMOVEL",
                 "button": "BOTAO",
+                "plc": "PLC",
+                "opcua": "OPC UA",
             }
         return labels.get(source, source.upper())
 
@@ -1659,8 +1684,9 @@ class BlankyController(QObject):
                 "Origem" if self._language == "pt" else "Source": self._source_label(str(ev.get("source") or "")),
                 "Comando" if self._language == "pt" else "Command": (("CONSULTA" if self._language == "pt" else "QUERY") if ev.get("kind") == "query"
                     else ("DEFINIÇÃO" if self._language == "pt" else "SETTING") if ev.get("kind") == "setting"
+                    else ("RETORNO PLC" if self._language == "pt" else "PLC RETURN") if ev.get("command") == "PLC_STATE"
                     else str(ev.get("command") or "")),
-                "Estado" if self._language == "pt" else "State": "OK" if ev.get("accepted") else "REJECT",
+                "Estado" if self._language == "pt" else "State": self._event_status_label(ev),
                 "Descri\u00e7\u00e3o" if self._language == "pt" else "Description": self._localized_event_detail(ev),
             })
         return rows
@@ -1896,8 +1922,10 @@ class BlankyController(QObject):
         with open(path, "wb") as f:
             f.write(document)
 
-    def _update_state_compact(self, state: dict):
-        compact = "|".join(f"{key}={int(state.get(key, 0))}" for key in self._STATE_ORDER)
+    def _update_state_compact(self, state: dict, pending: dict):
+        values = [f"{key}={-1 if state.get(key) is None else int(state[key])}" for key in self._STATE_ORDER]
+        values.extend(f"pending_{key}=1" for key in pending)
+        compact = "|".join(values)
         if compact != self._state_compact:
             self._state_compact = compact
             self.stateCompactChanged.emit()
@@ -1911,7 +1939,7 @@ class BlankyController(QObject):
         mic = audio_info()
         health["microphone_ready"] = bool(mic.get("ready"))
         health["openai_activity"] = activity_snapshot()
-        self._update_state_compact(snapshot.get("state", {}))
+        self._update_state_compact(snapshot.get("state", {}), snapshot.get("pending", {}))
 
         self._set_comm_status_compact(self._build_comm_status_compact(health))
         self._set_comm_details_compact(self._build_comm_details_compact(health))
@@ -1946,6 +1974,20 @@ class BlankyController(QObject):
                     self._enqueue_tts(spoken, priority="operational" if ev.get("accepted") else "critical",
                                       group=bool(ev.get("accepted")), group_key=command_group_key(command),
                                       localized=localized)
+            elif ev.get("source") == "plc" and ev.get("reason") in {"state_observed", "state_change", "system_error"}:
+                if ev.get("reason") == "state_change" and (ev.get("request_pending") or not (
+                    ev.get("plc_key") == "start" or
+                    ev.get("plc_key") in {"mode_fast", "mode_ideal", "mode_manual", "mode_change"}
+                    and ev.get("plc_value") == 1
+                )):
+                    continue
+                detail = self._localized_event_detail(ev)
+                self._enqueue_tts(detail, priority="critical" if ev.get("reason") == "system_error" else "operational",
+                                  group=ev.get("reason") != "system_error",
+                                  group_key=str(ev.get("plc_key") or command_group_key(str(ev.get("command") or ""))),
+                                  localized={lang: str(ev.get(f"detail_{lang}") or detail) for lang in ("pt", "en")})
+            elif ev.get("source") == "opcua" and not ev.get("accepted"):
+                self._enqueue_tts(self._localized_event_detail(ev), priority="critical")
 
     @Slot()
     def shutdown(self):
