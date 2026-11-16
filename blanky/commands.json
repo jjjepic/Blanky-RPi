@@ -31,7 +31,17 @@
     "mode_manual_words": ["manual", "manuais", "manualmente", "manuale", "operator", "hand"],
 
     "change_mode_ph": ["mudar modo", "mudar de modo", "trocar modo", "trocar de modo", "tu cara", "tu cala", "alterar modo", "alterar de modo", "muda modo", "troca modo", "altera modo", "alterna modo", "quero mudar de modo", "quero trocar de modo"],
-    "change_mode_words": ["mudar", "muda", "mude", "mudanca", "trocar", "troca", "troque", "alterar", "altera", "altere", "alternar", "alterna"]
+    "change_mode_words": ["mudar", "muda", "mude", "mudanca", "trocar", "troca", "troque", "alterar", "altera", "altere", "alternar", "alterna"],
+    "queries": {
+      "repeat": ["repete", "repetir", "diz outra vez"],
+      "options": ["o que posso fazer agora", "que posso fazer agora", "quais sao as opcoes"],
+      "last_event": ["ultimo evento", "ultima ocorrencia", "ultimo comando"],
+      "errors": ["algum erro", "ha erro", "ha algum erro", "estado dos erros"],
+      "connections": ["comunicacoes", "ligacoes", "conexoes"],
+      "system": ["como esta o sistema", "estado do sistema", "sistema esta ligado"],
+      "mode": ["em que modo", "qual o modo", "modo ativo", "modo estou"],
+      "question": ["esta", "estao", "como", "qual", "quais", "estado", "diz me", "informa me"]
+    }
   },
 
   "en": {
@@ -70,6 +80,16 @@
     "mode_manual_words": ["manual", "manually", "operator"],
 
     "change_mode_ph": ["change mode", "switch mode", "set mode", "change the mode", "switch operating mode", "change modes", "switch modes"],
-    "change_mode_words": ["change", "switch", "swap", "set"]
+    "change_mode_words": ["change", "switch", "swap", "set"],
+    "queries": {
+      "repeat": ["repeat", "say that again"],
+      "options": ["what can i do now", "what are my options"],
+      "last_event": ["last event", "latest event", "last command"],
+      "errors": ["any error", "any errors", "system error"],
+      "connections": ["connections", "communications", "connectivity"],
+      "system": ["how is the system", "system status", "is the system running"],
+      "mode": ["which mode", "what mode", "active mode"],
+      "question": ["is", "are", "how", "what", "which", "status", "tell me"]
+    }
   }
 }

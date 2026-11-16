@@ -35,13 +35,19 @@ Never store an API key in the repository, screenshots or shared documents. Confi
 
 ## Text and voice interaction
 
-Text-Bot starts in `Online` mode. AI interprets natural language and returns only permitted commands. If Online is unavailable, Blanky automatically changes to `Offline`, uses local recognition and reports this in the Response area.
+Text-Bot starts in `Online` mode. AI interprets natural language and returns only permitted commands or validated status questions. If Online is unavailable, Blanky automatically changes to `Offline`, uses local recognition and reports this in the Response area.
 
 `Offline` can also be selected manually. It accepts variants in the local command list and applies the same safety rules.
 
 In Offline recognition, "advance cylinder A" selects the cylinder rather than starting the system; the Portuguese word "para" means stop only when used alone or at the start of a phrase. Rejections and no-change requests use natural PT/EN sentences shared by the Response area, Events and spoken reply, without internal command identifiers in the message text. Use the `Change mode` button before selecting another mode.
 
-Voice recognition uses the Online flow to interpret natural phrases. Without the AI service, voice does not execute commands; direct controls, MQTT and Text-Bot Offline stay available.
+Voice recognition needs OpenAI to transcribe audio. If Online interpretation fails after transcription, it tries the Offline interpreter. Without the AI service for transcription, voice cannot handle requests; direct controls, MQTT and Text-Bot Offline stay available.
+
+## Status questions
+
+By voice or Text-Bot, Online or Offline, you can ask about the system, mode, motors, cylinders, lights, robot, MQTT, OPC UA, OpenAI, errors, last event and available actions. Examples: `How is the system?`, `Is cylinder A extended?`, `Tell me the status of OPC UA and OpenAI`, `What can I do now?` and `Repeat`. You can mix an action and a question, for example `Turn on motor 1 and tell me if MQTT is connected`.
+
+Questions work while the system is stopped, are logged as `Query`, and never send commands to the PLC. Component status is the last state accepted by Blanky; a return signal may confirm a command, **not physical position**. An OpenAI key alone does not guarantee service availability.
 
 ## Settings
 

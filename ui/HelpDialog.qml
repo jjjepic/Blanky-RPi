@@ -36,6 +36,7 @@ FloatingPanel {
             { id: "events", icon: "≡", tone: "accent", title: tr("Eventos", "Events"), summary: tr("Histórico e resultado dos pedidos.", "Request history and results.") },
             { id: "textbot", icon: "⌨", tone: "accent", title: "Text-Bot", summary: tr("Um ou vários comandos escritos.", "One or more written commands.") },
             { id: "voice", icon: monochrome ? "◉" : "🎙", tone: "success", title: tr("Comandos de voz", "Voice commands"), summary: tr("Pedidos naturais, pelas tuas palavras.", "Natural requests in your own words.") },
+            { id: "queries", icon: "?", tone: "accent", title: tr("Consultas de estado", "Status questions"), summary: tr("Pergunta pelo sistema sem mudar o seu estado.", "Ask about the system without changing it.") },
             { id: "audio", icon: monochrome ? "♪" : "🔊", tone: "warning", title: tr("Definições e áudio", "Settings and audio"), summary: tr("Som, microfone e acessibilidade.", "Sound, microphone and accessibility.") },
             { id: "alerts", icon: "!", tone: "error", title: tr("Erros e avisos", "Errors and warnings"), summary: tr("O que fazer quando algo não é aceite.", "What to do when a request is not accepted.") },
             { id: "tutorial", icon: "✓", tone: "success", title: tr("Tutorial completo", "Full tutorial"), summary: tr("Um percurso guiado pela interface.", "A guided route through the interface.") }
