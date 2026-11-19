@@ -33,6 +33,12 @@ from blanky.openai_activity import activity_snapshot
 from blanky.status_queries import answer_query_parts
 
 
+_TEST_PULSE_SECONDS = 2.0
+_TEST_PULSE_COMMANDS = frozenset({
+    "CYL_C_EXTEND", "CYL_D_EXTEND", "ROBOT_TO_METAL", "ROBOT_TO_NONMETAL",
+})
+
+
 class MQTTBridge:
     _PHONE_TEXT_TOPICS = {"textbot/online": "online", "textbot/offline": "offline"}
     _MAX_PHONE_TEXT_LENGTH = 1000
@@ -71,6 +77,7 @@ class MQTTBridge:
         self._last_valid_read = ""
         # Never persist test mode: a fresh process always trusts PLC feedback.
         self._control_mode = "plc"
+        self._test_pulses: dict[str, tuple[threading.Timer, str]] = {}
 
         self.client = None
         try:
@@ -258,6 +265,8 @@ class MQTTBridge:
 
     def close(self):
         """Mark a clean exit offline; the broker's Will covers unexpected exits."""
+        with self._lock:
+            self._cancel_test_pulses()
         client = self.client
         if client is None:
             return
@@ -450,6 +459,7 @@ class MQTTBridge:
             # Do not change semantics while a physical write may still be pending.
             if self._pending_commands:
                 return False
+            self._cancel_test_pulses()
             self._control_mode = mode
             self._plc_available = available
             self._plc_epoch = health.get("feedback_epoch")
@@ -476,8 +486,10 @@ class MQTTBridge:
     def _apply_local_command(self, command: str, key: str, value: int):
         changes = {}
         if command == "STOP":
+            self._cancel_test_pulses()
             changes = {item: 0 for item in STATE_KEYS}
         elif command in {"MODE_FAST", "MODE_IDEAL", "MODE_MANUAL", "MODE_UNSPEC"}:
+            self._cancel_test_pulses()
             changes = {item: 0 for item in ("mode_fast", "mode_ideal", "mode_manual", "mode_change")}
             changes[key] = value
             if command == "MODE_UNSPEC":
@@ -485,11 +497,42 @@ class MQTTBridge:
         else:
             changes[key] = value
             if command in {"ROBOT_TO_METAL", "ROBOT_TO_NONMETAL"}:
-                changes["robot_nonmetal" if key == "robot_metal" else "robot_metal"] = 0
+                other_key = "robot_nonmetal" if key == "robot_metal" else "robot_metal"
+                self._cancel_test_pulses({other_key})
+                changes[other_key] = 0
         for item, new_value in changes.items():
             if self.state[item] != new_value:
                 self.state[item] = new_value
                 self._publish(f"state/{item}", new_value, retain=True)
+
+    def _cancel_test_pulses(self, keys: set[str] | None = None):
+        for key in tuple(self._test_pulses):
+            if keys is not None and key not in keys:
+                continue
+            timer, topic = self._test_pulses.pop(key)
+            timer.cancel()
+            self._publish(topic, "0", retain=False, suppress_echo=True)
+
+    def _schedule_test_pulse(self, key: str, command: str):
+        outbound = command_outbound_payload(command)
+        if not outbound:
+            return
+        topic = outbound[0]
+
+        def release():
+            with self._lock:
+                if self._test_pulses.get(key, (None,))[0] is not timer:
+                    return
+                del self._test_pulses[key]
+                self._publish(topic, "0", retain=False, suppress_echo=True)
+                if self._control_mode == "test" and self.state[key] == 1:
+                    self.state[key] = 0
+                    self._publish(f"state/{key}", 0, retain=True)
+
+        timer = threading.Timer(_TEST_PULSE_SECONDS, release)
+        timer.daemon = True
+        self._test_pulses[key] = (timer, topic)
+        timer.start()
 
     def process_command(
         self,
@@ -544,7 +587,11 @@ class MQTTBridge:
             key, value = target
             if self._control_mode == "test":
                 self._apply_local_command(command, key, value)
-                self._emit_for_command(command, emit_pulse)
+                if command in _TEST_PULSE_COMMANDS:
+                    self._emit_command_level(command)
+                    self._schedule_test_pulse(key, command)
+                else:
+                    self._emit_for_command(command, emit_pulse)
                 pt = self._response_for_command(command, "pt")
                 en = self._response_for_command(command, "en")
                 if record_id is False:

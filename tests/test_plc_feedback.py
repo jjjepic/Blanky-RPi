@@ -3,6 +3,7 @@
 import threading
 import types
 import unittest
+from unittest.mock import patch
 
 from blanky.mqtt_service import MQTTBridge
 from blanky.opcua_nodes import RECEIVE_NODE_IDENTIFIERS
@@ -75,6 +76,7 @@ def make_bridge(opc):
     bridge._pending_commands = {}
     bridge._plc_available = False
     bridge._control_mode = "plc"
+    bridge._test_pulses = {}
     bridge._plc_epoch = None
     bridge._plc_received = {}
     bridge._plc_error_latched = False
@@ -317,6 +319,76 @@ class LocalTestModeTests(unittest.TestCase):
         self.opc.connected = self.opc.feedback_active = False
         self.assertEqual(self.bridge.get_snapshot()["state"]["system_error"], 1)
         self.assertFalse(self.bridge.process_command("START", "pt")[0])
+
+    def test_c_d_and_robot_test_pulses_reset_after_two_seconds(self):
+        timers = []
+
+        class FakeTimer:
+            def __init__(self, delay, callback):
+                self.delay = delay
+                self.callback = callback
+                self.cancelled = False
+                timers.append(self)
+
+            def start(self):
+                pass
+
+            def cancel(self):
+                self.cancelled = True
+
+            def fire(self):
+                if not self.cancelled:
+                    self.callback()
+
+        published = []
+        self.bridge._publish = lambda topic, value, **kwargs: published.append((topic, value))
+        self.assertTrue(self.bridge.set_control_mode("test"))
+        with patch("blanky.mqtt_service.threading.Timer", FakeTimer):
+            self.assertTrue(self.bridge.process_command("START", "pt")[0])
+            self.assertTrue(self.bridge.process_command("MODE_MANUAL", "pt")[0])
+            for command, key, topic in (
+                ("CYL_C_EXTEND", "cyl_c", "mqtt_cyl_c"),
+                ("CYL_D_EXTEND", "cyl_d", "mqtt_cyl_d"),
+                ("ROBOT_TO_METAL", "robot_metal", "mqtt_robot_to_metal"),
+            ):
+                self.assertTrue(self.bridge.process_command(command, "pt")[0])
+                timer = timers[-1]
+                self.assertEqual(timer.delay, 2.0)
+                self.assertEqual(self.bridge.state[key], 1)
+                self.assertIn((topic, "1"), published)
+                timer.fire()
+                self.assertEqual(self.bridge.state[key], 0)
+                self.assertIn((topic, "0"), published)
+            self.assertTrue(self.bridge.process_command("ROBOT_TO_NONMETAL", "pt")[0])
+            self.assertTrue(self.bridge.process_command("CYL_C_EXTEND", "pt")[0])
+            pending_timer = timers[-1]
+            self.assertTrue(self.bridge.process_command("STOP", "pt")[0])
+            self.assertTrue(pending_timer.cancelled)
+            self.assertEqual(self.bridge.state["cyl_c"], 0)
+
+    def test_switch_to_plc_cancels_local_pulse_without_stale_reset(self):
+        class FakeTimer:
+            def __init__(self, delay, callback):
+                self.callback = callback
+                self.cancelled = False
+
+            def start(self):
+                pass
+
+            def cancel(self):
+                self.cancelled = True
+
+        self.assertTrue(self.bridge.set_control_mode("test"))
+        with patch("blanky.mqtt_service.threading.Timer", FakeTimer):
+            self.assertTrue(self.bridge.process_command("START", "pt")[0])
+            self.assertTrue(self.bridge.process_command("MODE_MANUAL", "pt")[0])
+            self.assertTrue(self.bridge.process_command("CYL_D_EXTEND", "pt")[0])
+            timer = self.bridge._test_pulses["cyl_d"][0]
+            self.assertTrue(self.bridge.set_control_mode("plc"))
+            self.assertTrue(timer.cancelled)
+            self.assertIsNone(self.bridge.get_snapshot()["state"]["cyl_d"])
+            timer.callback()
+            self.assertIsNone(self.bridge.get_snapshot()["state"]["cyl_d"])
 
 
 if __name__ == "__main__":

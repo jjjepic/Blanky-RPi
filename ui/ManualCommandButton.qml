@@ -56,11 +56,16 @@ Rectangle {
     Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
 
     HoverHandler { id: hintHover }
-    ToolTip.visible: hintHover.hovered && (control.toolTip.length > 0 || control.stateUnknown)
-    ToolTip.delay: 650
-    ToolTip.text: (control.stateUnknown
-        ? (typeof blanky !== "undefined" && blanky.language === "en" ? "State not confirmed by the PLC." : "Estado não confirmado pelo PLC.")
-        : "") + (control.toolTip.length > 0 ? (control.stateUnknown ? " " : "") + control.toolTip : "")
+    BlankyToolTip {
+        parent: control
+        visible: hintHover.hovered && (control.toolTip.length > 0 || control.stateUnknown)
+        text: (control.stateUnknown
+            ? (typeof blanky !== "undefined" && blanky.language === "en" ? "State not confirmed by the PLC." : "Estado não confirmado pelo PLC.")
+            : "") + (control.toolTip.length > 0 ? (control.stateUnknown ? " " : "") + control.toolTip : "")
+        surfaceColor: control.panelColor
+        outlineColor: control.borderColor
+        foregroundColor: control.textColor
+    }
 
     TextMetrics {
         id: titleMetrics

@@ -117,6 +117,7 @@ class MonitorBridgeTests(unittest.TestCase):
         bridge._event_generation = 0
         bridge._last_mqtt_panel_rx = 0.0
         bridge._control_mode = "plc"
+        bridge._test_pulses = {}
         bridge._opcua = types.SimpleNamespace(health=lambda: {"connected": False}, enqueue_command=lambda *a, **k: None)
         bridge.state = _state()
         bridge.state_quality = {key: "confirmed" for key in bridge.state}
