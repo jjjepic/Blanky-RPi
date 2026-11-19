@@ -62,6 +62,7 @@ class OPCUABridge:
         self._feedback_mode = "unavailable"
         self._received: dict[str, bool] = {}
         self._feedback_epoch = 0
+        self._connection_epoch = 0
         self._feedback_sequence = 0
         self._initial_complete = False
         self._last_valid_read = ""
@@ -94,7 +95,7 @@ class OPCUABridge:
                 "node": COMMAND_TO_NODE[command], "library": "asyncua",
                 "queue_ms": None, "write_ms": None, "ack_ms": None,
                 "ack_status": "queued", "queued_at": time.monotonic(),
-                "endpoint": self._url, "epoch": self._feedback_epoch,
+                "endpoint": self._url, "epoch": self._connection_epoch,
             }
             try:
                 self._queue.put_nowait(record)
@@ -114,6 +115,7 @@ class OPCUABridge:
                 self._feedback_active = False
                 self._initial_complete = False
                 self._feedback_epoch += 1
+                self._connection_epoch += 1
                 self._last_ack_ms = None
                 self._discard_queue_locked("endpoint_changed")
 
@@ -147,6 +149,7 @@ class OPCUABridge:
                     self._connected = True
                     self._last_error = ""
                     self._feedback_epoch += 1
+                    self._connection_epoch += 1
                 retry_seconds = 1.0
                 subscription, feedback_nodes = await self._start_feedback(client)
                 last_poll = time.monotonic()
@@ -164,7 +167,7 @@ class OPCUABridge:
                         record = None
                     if record is not None:
                         age = time.monotonic() - record["queued_at"]
-                        if age > 5.0 or record["endpoint"] != url or record["epoch"] != self._feedback_epoch:
+                        if age > 5.0 or record["endpoint"] != url or record["epoch"] != self._connection_epoch:
                             with self._lock:
                                 record["queue_ms"] = round(age * 1000, 2)
                                 record["ack_status"] = "stale_or_endpoint_changed"
@@ -182,9 +185,12 @@ class OPCUABridge:
                         subscription, feedback_nodes = await self._start_feedback(client)
                         last_poll = now
                     if feedback_mode == "polling" and now - last_poll >= 0.5:
-                        await self._read_feedback(client, feedback_nodes)
+                        try:
+                            await self._read_feedback(client, feedback_nodes)
+                            last_keepalive = now
+                        except Exception as exc:
+                            self._set_feedback_error(str(exc))
                         last_poll = now
-                        last_keepalive = now
                     if now - last_keepalive >= 5.0:
                         await client.get_node("i=2258").read_value()
                         last_keepalive = now
@@ -211,6 +217,7 @@ class OPCUABridge:
                     self._received.clear()
                     self._initial_complete = False
                     self._feedback_epoch += 1
+                    self._connection_epoch += 1
                     self._discard_queue_locked("disconnected")
                     for record in self._pending.values():
                         record["ack_status"] = "disconnected"
@@ -291,16 +298,19 @@ class OPCUABridge:
 
     def _set_feedback_error(self, message: str):
         with self._lock:
+            was_available = self._feedback_active or self._initial_complete or bool(self._received)
             self._feedback_error = message
             self._feedback_active = False
             self._feedback_mode = "polling"
             self._initial_complete = False
             self._received.clear()
-            self._feedback_epoch += 1
+            if was_available:
+                self._feedback_epoch += 1
             for record in self._pending.values():
                 record["ack_status"] = "feedback_lost"
             self._pending.clear()
-            self._discard_queue_locked("feedback_lost")
+            # A missing return interface must not cancel writes in local test mode.
+            # Transport/endpoint changes still invalidate queued commands separately.
 
     async def _send_command(self, client, record: dict):
         command = record["command"]
@@ -383,6 +393,7 @@ class OPCUABridge:
                 "feedback_mode": self._feedback_mode,
                 "feedback_active": self._feedback_active,
                 "feedback_epoch": self._feedback_epoch,
+                "connection_epoch": self._connection_epoch,
                 "feedback_sequence": self._feedback_sequence,
                 "initial_complete": self._initial_complete,
                 "last_valid_read": self._last_valid_read,

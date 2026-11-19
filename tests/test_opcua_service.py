@@ -42,17 +42,28 @@ class OPCUAOfflineTests(unittest.TestCase):
         self.assertEqual(bridge.timing_records()[0]["ack_status"], "superseded_by_stop")
         self.assertEqual(bridge._queue.get_nowait()["command"], "STOP")
 
-    def test_feedback_failure_invalidates_values_and_pending_queue(self):
+    def test_feedback_failure_invalidates_values_but_not_send_queue(self):
         with patch.object(opcua_service, "OPCUA_ENABLED", False):
             bridge = opcua_service.OPCUABridge()
         bridge.enabled = bridge._connected = bridge._feedback_active = bridge._initial_complete = True
         bridge._received["system_on"] = True
         bridge.enqueue_command("MOTOR_1_ON", "test")
+        connection_epoch = bridge._connection_epoch
         bridge._set_feedback_error("simulated subscription failure")
         self.assertEqual(bridge.health()["received"], {})
         self.assertFalse(bridge.health()["initial_complete"])
-        self.assertEqual(bridge.timing_records()[0]["ack_status"], "feedback_lost")
-        self.assertTrue(bridge._queue.empty())
+        self.assertEqual(bridge.timing_records()[0]["ack_status"], "queued")
+        self.assertEqual(bridge._queue.get_nowait()["epoch"], connection_epoch)
+        self.assertEqual(bridge.health()["connection_epoch"], connection_epoch)
+
+    def test_repeated_feedback_failure_does_not_advance_epoch(self):
+        with patch.object(opcua_service, "OPCUA_ENABLED", False):
+            bridge = opcua_service.OPCUABridge()
+        bridge._feedback_active = True
+        bridge._set_feedback_error("read failed")
+        feedback_epoch = bridge.health()["feedback_epoch"]
+        bridge._set_feedback_error("read failed again")
+        self.assertEqual(bridge.health()["feedback_epoch"], feedback_epoch)
 
     def test_changing_endpoint_discards_old_queue(self):
         with patch.object(opcua_service, "OPCUA_ENABLED", False):
@@ -251,7 +262,7 @@ class OPCUAIntegrationTests(unittest.IsolatedAsyncioTestCase):
                     "node": COMMAND_TO_NODE["START"], "library": "asyncua", "queue_ms": None,
                     "write_ms": None, "ack_ms": None, "ack_status": "queued",
                     "queued_at": time.monotonic() - 6, "endpoint": self.url,
-                    "epoch": bridge._feedback_epoch,
+                    "epoch": bridge._connection_epoch,
                 }
                 bridge._timings.append(record)
                 bridge._queue.put_nowait(record)
