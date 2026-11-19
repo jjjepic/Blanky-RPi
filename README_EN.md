@@ -55,7 +55,7 @@ You can also ask about groups: `Which motors are on?`, `Which cylinders are exte
 
 Try `Set the volume to 60`, `Increase the volume`, `Speak more slowly`, `Change the voice to Coral`, `Switch to light theme` or `Larger text`. You can also change language, color profile, audio profile, animations, display scale and Text-Bot Online/Offline mode. These preferences work even when the system is stopped, use the same limits as the interface controls, and are logged as `Setting`. They never send anything to the PLC. MQTT/OPC UA parameters and the OpenAI key can only be changed in the Settings menu.
 
-Questions work while the system is stopped, are logged as `Query`, and never send commands to the PLC. Displayed status now comes from PLC-reported returns, never just the last accepted request. Motors and lights reflect logical outputs; A/B use end-position sensors; C/D only confirm extension, not retraction. An OpenAI key alone does not guarantee service availability.
+Questions work while the system is stopped, are logged as `Query`, and never send commands to the PLC. In synchronized mode, displayed status comes from PLC-reported returns, never just the last accepted request. In test mode, answers explicitly identify local, unconfirmed state. Motors and lights reflect logical outputs; A/B use end-position sensors; C/D only confirm extension, not retraction. An OpenAI key alone does not guarantee service availability.
 
 ## Settings
 
@@ -63,6 +63,8 @@ The gear button opens two areas:
 
 - `Audio and Microphone`: profiles, capture, filters, manual adjustments and diagnostics.
 - `Communications and AI`: automatic connection status, MQTT address, port, topic prefix, OPC UA endpoint and a temporary OpenAI key.
+
+In **Communications and AI**, the **Control mode** switch selects **Synchronized PLC** (the startup default, based on return signals) or **Local test** (immediate local state and response, even without a PLC). The header and Operation Panel identify the mode. **Warning:** test-mode commands are still sent to the PLC whenever OPC UA is connected, and existing MQTT command topics remain active; both may actuate the machine. Local state does not prove that this happened. Events and `state_quality/*` mark the state `local`, except a real PLC error signal, which remains visible and blocks commands. `monitor/control_mode` publishes `test` or `plc`. Turn off the switch to return to PLC state; pending requests must finish first. The mode is not persisted across restarts.
 
 Connection fields start locked. Use the pencil icon to unlock them, then apply your changes. MQTT reconnects automatically; changing the OPC UA endpoint reconnects the persistent client to the new server.
 

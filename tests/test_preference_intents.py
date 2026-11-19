@@ -95,6 +95,7 @@ class PreferenceIntentTests(unittest.TestCase):
     def test_setting_event_never_enters_plc_write_path(self):
         writes = []
         bridge = object.__new__(MQTTBridge)
+        bridge._control_mode = "plc"
         bridge._lock = threading.Lock()
         bridge._events = []
         bridge._next_event_id = 1

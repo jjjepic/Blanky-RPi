@@ -67,7 +67,10 @@ class MQTTBridge:
         self._last_known: dict[str, int] = {}
         self._pending_commands: dict[str, dict] = {}
         self._plc_received: dict[str, bool] = {}
+        self._plc_error_latched = False
         self._last_valid_read = ""
+        # Never persist test mode: a fresh process always trusts PLC feedback.
+        self._control_mode = "plc"
 
         self.client = None
         try:
@@ -239,7 +242,9 @@ class MQTTBridge:
         self.client.publish(topic, payload_str, qos=1, retain=retain)
         if topic_suffix.startswith("state/"):
             key = topic_suffix.removeprefix("state/")
-            for monitor_suffix, monitor_payload in state_monitor_updates(self.state, key).items():
+            for monitor_suffix, monitor_payload in state_monitor_updates(
+                self.state, key, local=self.state_quality.get(key) == "local"
+            ).items():
                 self._publish(monitor_suffix, monitor_payload)
 
     def _publish_offline(self, client):
@@ -325,6 +330,7 @@ class MQTTBridge:
     def publish_all_state(self):
         self._synchronize_plc()
         with self._lock:
+            self._publish_control_mode()
             for key, value in self.state.items():
                 self._publish(f"state/{key}", value if value is not None else "unknown", retain=True)
                 self._publish(f"state_quality/{key}", self.state_quality[key], retain=True)
@@ -337,10 +343,34 @@ class MQTTBridge:
         state, quality = project_plc_state(received, available)
         epoch = health.get("feedback_epoch")
         with self._lock:
+            if self._control_mode == "test":
+                self._plc_available = available
+                self._plc_received = received if available else {}
+                self._last_valid_read = str(health.get("last_valid_read") or "")
+                # A real PLC alarm must remain visible even while other states are local.
+                if available:
+                    self._plc_error_latched = bool(received.get("system_error"))
+                alarm = self._plc_error_latched
+                alarm_value = int(alarm)
+                alarm_quality = "confirmed" if available and alarm else "unavailable" if alarm else "local"
+                if self.state["system_error"] != alarm_value or self.state_quality["system_error"] != alarm_quality:
+                    self.state["system_error"] = alarm_value
+                    self.state_quality["system_error"] = alarm_quality
+                    self._publish("state/system_error", alarm_value, retain=True)
+                    self._publish("state_quality/system_error", alarm_quality, retain=True)
+                    if alarm:
+                        self._add_event("PLC_STATE", "plc", True,
+                                        plc_change_message("system_error", 1, self._ui_lang),
+                                        reason="system_error",
+                                        detail_pt=plc_change_message("system_error", 1, "pt"),
+                                        detail_en=plc_change_message("system_error", 1, "en"))
+                return
             new_baseline = epoch != self._plc_epoch or (available and not self._plc_available)
             self._plc_epoch = epoch
             self._plc_available = available
             self._plc_received = received if available else {}
+            if available:
+                self._plc_error_latched = bool(received.get("system_error"))
             self._last_valid_read = str(health.get("last_valid_read") or "")
             if new_baseline or not available:
                 self._last_known = {key: value for key, value in state.items() if value is not None}
@@ -396,6 +426,71 @@ class MQTTBridge:
         with self._lock:
             return {key: dict(value) for key, value in self._pending_commands.items()}
 
+    @property
+    def control_mode(self) -> str:
+        return self._control_mode
+
+    def _publish_control_mode(self):
+        self._publish("monitor/control_mode", self._control_mode)
+        self._publish("monitor/pt/control_mode", "Teste local; sem confirmação do PLC" if self._control_mode == "test"
+                      else "Sincronizado com o PLC")
+        self._publish("monitor/en/control_mode", "Local test; not confirmed by PLC" if self._control_mode == "test"
+                      else "Synchronized with PLC")
+
+    def set_control_mode(self, mode: str) -> bool:
+        if mode not in {"plc", "test"}:
+            return False
+        self._synchronize_plc()
+        health = self._opcua.health() if hasattr(self._opcua, "health") else {}
+        available = bool(health.get("connected") and health.get("feedback_active") and health.get("initial_complete", True))
+        projected, quality = project_plc_state(dict(health.get("received") or {}), available)
+        with self._lock:
+            if mode == self._control_mode:
+                return True
+            # Do not change semantics while a physical write may still be pending.
+            if self._pending_commands:
+                return False
+            self._control_mode = mode
+            self._plc_available = available
+            self._plc_epoch = health.get("feedback_epoch")
+            self._plc_received = dict(health.get("received") or {}) if available else {}
+            if available:
+                self._plc_error_latched = bool(self._plc_received.get("system_error"))
+            self._last_known = {key: value for key, value in projected.items() if value is not None}
+            new_state = {key: 0 for key in STATE_KEYS} if mode == "test" else projected
+            new_quality = {key: "local" for key in STATE_KEYS} if mode == "test" else quality
+            self._publish_control_mode()
+            for key in STATE_KEYS:
+                self.state[key] = new_state[key]
+                self.state_quality[key] = new_quality[key]
+                self._publish(f"state/{key}", new_state[key] if new_state[key] is not None else "unknown", retain=True)
+                self._publish(f"state_quality/{key}", new_quality[key], retain=True)
+            pt = ("Modo de teste ativo. Os comandos continuam a ser enviados ao PLC quando ligado; os estados apresentados são locais, sem confirmação."
+                  if mode == "test" else "Modo sincronizado ativo. Os estados voltam a depender do retorno do PLC.")
+            en = ("Test mode active. Commands are still sent to the PLC when connected; displayed states are local and unconfirmed."
+                  if mode == "test" else "Synchronized mode active. States now depend on PLC feedback again.")
+            self._add_event("CONTROL_MODE", "button", True, pt if self._ui_lang == "pt" else en,
+                            reason="control_mode", detail_pt=pt, detail_en=en)
+        return True
+
+    def _apply_local_command(self, command: str, key: str, value: int):
+        changes = {}
+        if command == "STOP":
+            changes = {item: 0 for item in STATE_KEYS}
+        elif command in {"MODE_FAST", "MODE_IDEAL", "MODE_MANUAL", "MODE_UNSPEC"}:
+            changes = {item: 0 for item in ("mode_fast", "mode_ideal", "mode_manual", "mode_change")}
+            changes[key] = value
+            if command == "MODE_UNSPEC":
+                changes.update({item: 0 for item in STATE_KEYS if item.startswith(("motor_", "cyl_", "light_", "robot_"))})
+        else:
+            changes[key] = value
+            if command in {"ROBOT_TO_METAL", "ROBOT_TO_NONMETAL"}:
+                changes["robot_nonmetal" if key == "robot_metal" else "robot_metal"] = 0
+        for item, new_value in changes.items():
+            if self.state[item] != new_value:
+                self.state[item] = new_value
+                self._publish(f"state/{item}", new_value, retain=True)
+
     def process_command(
         self,
         command: str,
@@ -419,9 +514,9 @@ class MQTTBridge:
                 reason = "cylinder_retract_unavailable"
             elif target is None or command not in COMMAND_TO_NODE:
                 reason = "unknown"
-            elif not self._plc_available and command != "STOP":
+            elif self._control_mode == "plc" and not self._plc_available and command != "STOP":
                 reason = "feedback_unavailable"
-            elif self.state.get("system_error") == 1 and command != "STOP":
+            elif (self.state.get("system_error") == 1 or self._plc_error_latched) and command != "STOP":
                 reason = "system_error"
             else:
                 reason = self._workflow_rejection_reason(command) or ""
@@ -440,13 +535,25 @@ class MQTTBridge:
                 return False, msg
 
             record_id = self._opcua.enqueue_command(command, source=source)
-            if record_id is False:
+            if record_id is False and self._control_mode == "plc":
                 reason = "opcua_unavailable"
                 msg = rejection_message(reason, lang, command)
                 self._publish_rejected(command, reason)
                 self._add_event(command=command, source=source, accepted=False, detail=msg, reason=reason)
                 return False, msg
             key, value = target
+            if self._control_mode == "test":
+                self._apply_local_command(command, key, value)
+                self._emit_for_command(command, emit_pulse)
+                pt = self._response_for_command(command, "pt")
+                en = self._response_for_command(command, "en")
+                if record_id is False:
+                    pt += " Envio OPC UA não realizado; comando não chegou à maquete por esta via."
+                    en += " OPC UA send failed; the command did not reach the machine by this route."
+                self._add_event(command, source, True, pt if lang == "pt" else en,
+                                reason="local_sent" if record_id is not False else "local_only",
+                                detail_pt=pt, detail_en=en)
+                return True, pt if lang == "pt" else en
             if command == "STOP" and "start" in self._pending_commands:
                 self._add_event(self._pending_commands["start"]["command"], "opcua", False,
                                 "Pedido anterior substituído por paragem." if lang == "pt" else "Previous request superseded by stop.",
@@ -573,6 +680,9 @@ class MQTTBridge:
 
     def _response_for_command(self, command: str, lang: str) -> str:
         label = command_label(command, lang)
+        if self._control_mode == "test":
+            return (f"Pedido para {label} aceite. Estado local, não confirmado pelo PLC."
+                    if lang == "pt" else f"Request to {label} accepted. Local state, not confirmed by the PLC.")
         return (f"Pedido para {label} colocado na fila. Aguarda confirmação do PLC."
                 if lang == "pt" else f"Request to {label} queued. Awaiting the PLC state.")
 
@@ -618,6 +728,8 @@ class MQTTBridge:
             return str(event.get(f"detail_{lang}") or event.get("detail") or "")
         if not event["accepted"]:
             return rejection_for_event(event, lang)
+        if event.get(f"detail_{lang}"):
+            return str(event[f"detail_{lang}"])
         if event["command"] == "SYSTEM_RESET":
             return "Sessão reiniciada; o PLC não foi alterado." if lang == "pt" else "Session restarted; PLC state unchanged."
         if event["command"] == "SYSTEM_SHUTDOWN":
@@ -669,7 +781,7 @@ class MQTTBridge:
                     for language in ("pt", "en")
                 }}
             allowed = {command for command in VALID_COMMANDS
-                       if command in COMMAND_TO_NODE and self._plc_available
+                       if command in COMMAND_TO_NODE and (self._plc_available or self._control_mode == "test")
                        and self._workflow_rejection_reason(command) is None}
             previous = dict(self._last_interaction_response)
             answers = {
@@ -741,6 +853,7 @@ class MQTTBridge:
             return {
                 "state": dict(self.state),
                 "state_quality": dict(self.state_quality),
+                "control_mode": self._control_mode,
                 "pending": {key: dict(value) for key, value in self._pending_commands.items()},
                 "plc_received": dict(self._plc_received),
                 "plc_available": self._plc_available,
@@ -762,6 +875,7 @@ class MQTTBridge:
             "mqtt_panel_active": mqtt_panel_active,
             "mqtt_panel_last_rx_seconds": mqtt_panel_last_rx_seconds,
             "opcua_connected": bool(opcua_health.get("connected")),
+            "control_mode": self._control_mode,
             "opcua_last_error": str(opcua_health.get("last_error") or ""),
             "opcua_last_write": str(opcua_health.get("last_write") or ""),
             "opcua_feedback_active": bool(opcua_health.get("feedback_active")),

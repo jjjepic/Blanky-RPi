@@ -178,6 +178,9 @@ class QueryBridgeTests(unittest.TestCase):
         self.writes = []
         self.published = []
         self.bridge = object.__new__(MQTTBridge)
+        self.bridge._control_mode = "plc"
+        self.bridge._plc_received = {}
+        self.bridge._plc_error_latched = False
         self.bridge._lock = threading.Lock()
         self.bridge.state = dict.fromkeys((
             "start", "mode_fast", "mode_ideal", "mode_manual", "mode_change",

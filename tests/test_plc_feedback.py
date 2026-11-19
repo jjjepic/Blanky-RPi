@@ -74,8 +74,10 @@ def make_bridge(opc):
     bridge._last_interaction_response = {"pt": "", "en": ""}
     bridge._pending_commands = {}
     bridge._plc_available = False
+    bridge._control_mode = "plc"
     bridge._plc_epoch = None
     bridge._plc_received = {}
+    bridge._plc_error_latched = False
     bridge._last_valid_read = ""
     bridge._last_known = {}
     bridge.state = {key: None for key in STATE_KEYS}
@@ -253,6 +255,68 @@ class PLCBridgeTests(unittest.TestCase):
         self.bridge.reset_system("pt")
         self.assertEqual(self.bridge.state["start"], 1)
         self.assertEqual(self.bridge.state["mode_manual"], 1)
+
+
+class LocalTestModeTests(unittest.TestCase):
+    def setUp(self):
+        self.opc = FakeOPC()
+        self.bridge = make_bridge(self.opc)
+
+    def test_without_plc_updates_locally_and_does_not_claim_delivery(self):
+        self.opc.connected = self.opc.feedback_active = False
+        self.assertTrue(self.bridge.set_control_mode("test"))
+        for command, source in (("START", "voice"), ("MODE_MANUAL", "text"),
+                                ("MOTOR_1_ON", "button")):
+            self.assertTrue(self.bridge.process_command(command, "pt", source=source)[0])
+        snapshot = self.bridge.get_snapshot()
+        self.assertEqual(snapshot["control_mode"], "test")
+        self.assertEqual(snapshot["state"]["motor_1"], 1)
+        self.assertEqual(snapshot["state_quality"]["motor_1"], "local")
+        self.assertEqual(self.opc.records, [])
+        self.assertIn("não chegou", snapshot["events"][-1]["detail"])
+        self.assertIn("local", self.bridge.answer_status_query("QUERY_COMPONENT", "motor_1", "pt", "voice"))
+
+    def test_connected_test_still_sends_but_ignores_feedback_until_return(self):
+        self.assertTrue(self.bridge.set_control_mode("test"))
+        self.assertTrue(self.bridge.process_command("START", "pt", source="mqtt_panel")[0])
+        self.assertEqual(self.opc.records[0]["command"], "START")
+        self.assertEqual(self.bridge.get_snapshot()["state"]["start"], 1)
+        self.assertEqual(self.bridge.get_snapshot()["pending"], {})
+        self.assertFalse(any(event["reason"] == "state_observed" for event in self.bridge._events))
+        self.assertTrue(self.bridge.set_control_mode("plc"))
+        self.assertEqual(self.bridge.get_snapshot()["state"]["start"], 0)
+        self.assertEqual(self.bridge.get_snapshot()["state_quality"]["start"], "confirmed")
+        self.opc.received.update(system_on=True, system_stopped=False)
+        self.assertEqual(self.bridge.get_snapshot()["state"]["start"], 1)
+
+    def test_pending_request_prevents_mode_change(self):
+        self.bridge.get_snapshot()
+        self.assertTrue(self.bridge.process_command("START", "pt")[0])
+        self.assertFalse(self.bridge.set_control_mode("test"))
+        self.assertEqual(self.bridge.control_mode, "plc")
+
+    def test_test_mode_preserves_validation_and_stop(self):
+        self.assertTrue(self.bridge.set_control_mode("test"))
+        self.assertFalse(self.bridge.process_command("MOTOR_1_ON", "pt")[0])
+        self.assertTrue(self.bridge.process_command("START", "pt")[0])
+        self.assertFalse(self.bridge.process_command("MOTOR_1_ON", "pt")[0])
+        self.assertTrue(self.bridge.process_command("MODE_MANUAL", "pt")[0])
+        self.assertFalse(self.bridge.process_command("CYL_C_RETRACT", "pt")[0])
+        self.assertTrue(self.bridge.process_command("MOTOR_1_ON", "pt")[0])
+        self.assertTrue(self.bridge.process_command("STOP", "pt")[0])
+        self.assertEqual(self.bridge.get_snapshot()["state"]["motor_1"], 0)
+
+    def test_known_plc_error_still_blocks_test_commands(self):
+        self.opc.received["system_error"] = True
+        self.assertTrue(self.bridge.set_control_mode("test"))
+        self.assertEqual(self.bridge.get_snapshot()["state"]["system_error"], 1)
+        self.assertEqual(self.bridge.get_snapshot()["state_quality"]["system_error"], "confirmed")
+        self.assertTrue(any(event["reason"] == "system_error" for event in self.bridge._events))
+        self.assertFalse(self.bridge.process_command("START", "pt")[0])
+        self.assertEqual(self.opc.records, [])
+        self.opc.connected = self.opc.feedback_active = False
+        self.assertEqual(self.bridge.get_snapshot()["state"]["system_error"], 1)
+        self.assertFalse(self.bridge.process_command("START", "pt")[0])
 
 
 if __name__ == "__main__":

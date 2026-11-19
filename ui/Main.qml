@@ -614,19 +614,27 @@ ApplicationWindow {
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.verticalCenter: parent.verticalCenter
                 width: 230
-                height: 42
+                height: 52
                 color: root.panelColor
-                border.color: root.borderColor
+                border.color: blanky.controlMode === "test" ? root.warningColor : root.borderColor
                 border.width: 1
                 radius: 10
 
-                Label {
+                Column {
                     anchors.centerIn: parent
-                    text: blanky.dateTimeText
-                    color: root.textColor
-                    font.pixelSize: 14
-                    font.bold: true
+                    spacing: 1
+                    Label { text: blanky.dateTimeText; color: root.textColor; font.pixelSize: 13; font.bold: true; anchors.horizontalCenter: parent.horizontalCenter }
+                    Label {
+                        text: blanky.controlMode === "test"
+                            ? (blanky.language === "pt" ? "TESTE LOCAL · SEM CONFIRMAÇÃO" : "LOCAL TEST · UNCONFIRMED")
+                            : (blanky.language === "pt" ? "SINCRONIZADO COM PLC" : "SYNCHRONIZED WITH PLC")
+                        color: blanky.controlMode === "test" ? root.warningColor : root.mutedText
+                        font.pixelSize: 10
+                        font.bold: true
+                        anchors.horizontalCenter: parent.horizontalCenter
+                    }
                 }
+                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: communicationsSettingsPanel.open() }
             }
 
             Row {
@@ -1287,6 +1295,14 @@ ApplicationWindow {
                             spacing: 2
                             Label { text: "Blanky"; color: root.accentColor; font.pixelSize: Math.round(48 * root.textScale); font.bold: true }
                             Label { text: blanky.language === "pt" ? "Escolhe a forma de interação" : "Choose how to interact"; color: root.mutedText; font.pixelSize: Math.round(17 * root.textScale) }
+                            Label {
+                                text: blanky.controlMode === "test"
+                                    ? (blanky.language === "pt" ? "TESTE LOCAL · ESTADOS NÃO CONFIRMADOS" : "LOCAL TEST · UNCONFIRMED STATES")
+                                    : (blanky.language === "pt" ? "SINCRONIZADO COM PLC" : "SYNCHRONIZED WITH PLC")
+                                color: blanky.controlMode === "test" ? root.warningColor : root.mutedText
+                                font.pixelSize: Math.round(12 * root.textScale)
+                                font.bold: true
+                            }
                         }
                     }
 
@@ -3441,6 +3457,7 @@ ApplicationWindow {
             mqttPrefixField.text = blanky.mqttTopicPrefix
             opcuaUrlField.text = blanky.opcuaUrl
             openAiKeyField.text = ""
+            testModeSwitch.checked = blanky.controlMode === "test"
             root.popupBackdropVisible = true
             modalBackdrop.scheduleSnapshot()
         }
@@ -3474,6 +3491,67 @@ ApplicationWindow {
             Column {
                 width: Math.max(communicationsSettingsScroll.availableWidth - Math.round(22 * root.textScale), 650)
                 spacing: 12
+
+                Rectangle {
+                    width: parent.width
+                    implicitHeight: modeColumn.implicitHeight + 22
+                    radius: 12
+                    color: root.panelAltColor
+                    border.color: blanky.controlMode === "test" ? root.warningColor : root.borderColor
+                    border.width: 2
+                    ColumnLayout {
+                        id: modeColumn
+                        anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
+                        anchors.margins: 11
+                        spacing: 6
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Label {
+                                text: blanky.language === "pt" ? "Modo de controlo" : "Control mode"
+                                color: root.textColor; font.pixelSize: Math.round(17 * root.textScale); font.bold: true
+                                Layout.fillWidth: true
+                            }
+                            Label {
+                                text: blanky.controlMode === "test" ? (blanky.language === "pt" ? "TESTE LOCAL" : "LOCAL TEST") : (blanky.language === "pt" ? "PLC SINCRONIZADO" : "SYNCHRONIZED PLC")
+                                color: blanky.controlMode === "test" ? root.warningColor : root.successColor
+                                font.pixelSize: Math.round(13 * root.textScale); font.bold: true
+                            }
+                            Switch {
+                                id: testModeSwitch
+                                checked: false
+                                Accessible.name: blanky.language === "pt" ? "Ativar teste local sem confirmação do PLC" : "Enable local test without PLC confirmation"
+                                onClicked: {
+                                    if (!blanky.setTestMode(checked)) {
+                                        checked = blanky.controlMode === "test"
+                                        modeSwitchError.visible = true
+                                    } else {
+                                        modeSwitchError.visible = false
+                                    }
+                                }
+                                Connections {
+                                    target: blanky
+                                    function onControlModeChanged() { testModeSwitch.checked = blanky.controlMode === "test" }
+                                }
+                            }
+                        }
+                        Label {
+                            Layout.fillWidth: true
+                            text: blanky.language === "pt"
+                                ? "Teste: resposta imediata e estados locais, mesmo sem PLC. Se o OPC UA estiver ligado, os comandos CONTINUAM a ser enviados à maquete; os tópicos MQTT de comando também permanecem ativos. Podem acionar atuadores. Sem confirmação física. Ao reiniciar, volta ao modo PLC."
+                                : "Test: immediate response and local states, even without a PLC. When OPC UA is connected, commands ARE STILL sent to the machine; MQTT command topics also remain active. Actuators may move. No physical confirmation. Restarting restores PLC mode."
+                            color: root.mutedText; wrapMode: Text.WordWrap
+                            font.pixelSize: Math.round(13 * root.textScale)
+                        }
+                        Label {
+                            id: modeSwitchError
+                            visible: false
+                            Layout.fillWidth: true
+                            text: blanky.language === "pt" ? "Aguarda a conclusão do pedido pendente antes de mudar de modo." : "Wait for the pending request to finish before switching modes."
+                            color: root.warningColor; wrapMode: Text.WordWrap
+                            font.pixelSize: Math.round(13 * root.textScale)
+                        }
+                    }
+                }
 
                 Rectangle {
                     width: parent.width

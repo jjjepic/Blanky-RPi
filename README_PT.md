@@ -60,7 +60,7 @@ Também podes consultar grupos: `Quais os motores ligados?`, `Que cilindros est�
 
 Podes pedir `Põe o volume a 60`, `Aumenta o volume`, `Fala mais devagar`, `Muda a voz para a Coral`, `Muda para o tema claro` ou `Letra maior`. Também podes alterar idioma, perfil cromático, perfil de áudio, animações, escala do ecrã e modo Online/Offline do Text-Bot. Estas definições funcionam mesmo com o sistema parado, usam os mesmos limites dos controlos da interface e ficam registadas como `Definição`. Não enviam nada ao PLC. Parâmetros MQTT/OPC UA e a chave OpenAI só podem ser alterados no menu de definições.
 
-As consultas funcionam com o sistema parado, são registadas como `Consulta` e não enviam comandos ao PLC. O estado apresentado provém agora do retorno comunicado pelo PLC, nunca apenas do último pedido aceite. Motores e luzes refletem saídas lógicas; A/B refletem sensores de fim de curso; C/D só confirmam avanço, não recuo. A disponibilidade da OpenAI não é garantida só por existir uma chave configurada.
+As consultas funcionam com o sistema parado, são registadas como `Consulta` e não enviam comandos ao PLC. No modo sincronizado, o estado apresentado provém do retorno comunicado pelo PLC, nunca apenas do último pedido aceite. No modo de teste, as consultas identificam explicitamente os estados como locais e não confirmados. Motores e luzes refletem saídas lógicas; A/B refletem sensores de fim de curso; C/D só confirmam avanço, não recuo. A disponibilidade da OpenAI não é garantida só por existir uma chave configurada.
 
 ## Definições
 
@@ -68,6 +68,8 @@ O botão de engrenagem abre duas áreas independentes:
 
 - `Áudio e Microfone`: perfis, captação, filtros, ajustes manuais e diagnóstico.
 - `Comunicações e IA`: estado das ligações automáticas, endereço MQTT, porta, prefixo de tópicos, endpoint OPC UA e chave OpenAI temporária.
+
+Em **Comunicações e IA**, o switch **Modo de controlo** alterna entre **PLC sincronizado** (padrão em cada arranque, depende do retorno) e **Teste local** (resposta e estados locais imediatos, mesmo sem PLC). O cabeçalho e o Painel de Operação identificam o modo. **Atenção:** no teste, os comandos continuam a ser enviados ao PLC sempre que a ligação OPC UA existir, e os tópicos MQTT de comando permanecem ativos; ambos podem acionar a maquete. O estado local não prova que isso ocorreu. O histórico e os tópicos `state_quality/*` assinalam `local`, exceto um erro ativo recebido do PLC, que continua a ser apresentado e bloqueia comandos. `monitor/control_mode` publica `test` ou `plc`. Para regressar aos estados reais, desliga o switch; qualquer pedido pendente tem de terminar antes da mudança. Esta opção não é guardada entre arranques.
 
 Os campos que podem alterar uma ligação começam bloqueados. Use o ícone de lápis para os desbloquear e aplique as alterações quando terminar. MQTT reconecta automaticamente; ao mudar o endereço OPC UA, a ligação persistente é restabelecida no novo servidor.
 

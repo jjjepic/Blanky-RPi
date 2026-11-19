@@ -83,6 +83,9 @@ class CommandMessageTests(unittest.TestCase):
 class WorkflowMessageTests(unittest.TestCase):
     def _bridge(self):
         bridge = object.__new__(MQTTBridge)
+        bridge._control_mode = "plc"
+        bridge._plc_received = {}
+        bridge._plc_error_latched = False
         bridge._lock = threading.Lock()
         bridge._events = []
         bridge._next_event_id = 1

@@ -158,7 +158,8 @@ Rectangle {
             Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: panel.borderColor }
             Label {
                 text: panel.t("operationPanel").toUpperCase()
-                color: panel.accentColor
+                    + (panel.controller && panel.controller.controlMode === "test" ? (panel.language === "pt" ? " · TESTE LOCAL" : " · LOCAL TEST") : "")
+                color: panel.controller && panel.controller.controlMode === "test" ? panel.warningColor : panel.accentColor
                 font.pixelSize: Math.round(14 * panel.readabilityScale)
                 font.bold: true
             }
@@ -242,7 +243,7 @@ Rectangle {
                         Layout.minimumHeight: Math.round((panel.compact ? 136 : 140) * panel.readabilityScale)
                         running: panel.systemStarted
                         textScale: panel.readabilityScale
-                        title: panel.t("systemMonitor")
+                        title: panel.t("systemMonitor") + (panel.controller && panel.controller.controlMode === "test" ? " · LOCAL" : "")
                         modeLabel: panel.t("activeMode")
                         systemLabel: panel.t("systemState")
                         processLabel: panel.t("process")

@@ -28,6 +28,8 @@ def _component(component: str, state: dict, health: dict, lang: str) -> str:
         letter = component[-1].upper()
         label = _say(lang, f"O cilindro {letter}", f"Cylinder {letter}")
         on, off = _say(lang, "avançado, segundo o sensor", "extended according to its sensor"), _say(lang, "recolhido, segundo o sensor", "retracted according to its sensor")
+        if health.get("control_mode") == "test":
+            on, off = _say(lang, "avançado", "extended"), _say(lang, "recolhido", "retracted")
     else:
         color = component.removeprefix("light_")
         label = _say(lang, f"A saída lógica da luz {'verde' if color == 'green' else 'vermelha'}",
@@ -56,6 +58,9 @@ def _group_parts(target: str, value: str, lang: str, state: dict, health: dict |
     if target == "robot":
         if any(state.get(key) is None for key in keys):
             message = _say(lang, "Não consigo confirmar os pedidos de recolha.", "I cannot confirm the pickup requests.")
+        elif health and health.get("control_mode") == "test":
+            message = _say(lang, "Pedidos locais de recolha: " + ("metal e não metal" if state[keys[0]] and state[keys[1]] else "metal" if state[keys[0]] else "não metal" if state[keys[1]] else "nenhum") + ".",
+                           "Local pickup requests: " + ("metal and non-metal" if state[keys[0]] and state[keys[1]] else "metal" if state[keys[0]] else "non-metal" if state[keys[1]] else "none") + ".")
         elif state["robot_metal"] and state["robot_nonmetal"]:
             message = _say(lang, "O PLC pede recolha manual nos Tapetes 2 e 3. Não há robô físico em operação.",
                            "The PLC requests manual pickup on Conveyors 2 and 3. No physical robot is operating.")
@@ -93,8 +98,9 @@ def _group_parts(target: str, value: str, lang: str, state: dict, health: dict |
                 status = _say(lang, "saída ligada" if state[key] else "saída desligada",
                               "output on" if state[key] else "output off")
             parts.append(f"{label}: {status}")
-    message = "; ".join(parts) + "." if parts else _say(lang, "Nenhum estado confirmado corresponde à pergunta.",
-                                                        "No confirmed state matches the question.")
+    message = "; ".join(parts) + "." if parts else _say(
+        lang, "Nenhum estado local corresponde à pergunta." if health and health.get("control_mode") == "test" else "Nenhum estado confirmado corresponde à pergunta.",
+        "No local state matches the question." if health and health.get("control_mode") == "test" else "No confirmed state matches the question.")
     if target == "all" and len(parts) > 4:
         active = sum(state.get(key) == 1 for key in keys)
         unknown = sum(state.get(key) is None for key in keys)
@@ -108,9 +114,16 @@ def _group_parts(target: str, value: str, lang: str, state: dict, health: dict |
 def answer_query_parts(name: str, target: str, value: str, lang: str, state: dict, health: dict,
                        events: list[dict], allowed: set[str], last_response: str) -> dict[str, str]:
     if name in {"QUERY_COMPONENT_GROUP", "QUERY_ACTIVE"}:
-        return _group_parts("all" if name == "QUERY_ACTIVE" else target, value, lang, state, health)
-    detail = answer_query(name, target, lang, state, health, events, allowed, last_response)
-    return {"speech": detail, "detail": detail}
+        answer = _group_parts("all" if name == "QUERY_ACTIVE" else target, value, lang, state, health)
+    else:
+        detail = answer_query(name, target, lang, state, health, events, allowed, last_response)
+        answer = {"speech": detail, "detail": detail}
+    if health.get("control_mode") == "test" and name in {
+        "QUERY_SYSTEM", "QUERY_MODE", "QUERY_COMPONENT", "QUERY_COMPONENT_GROUP", "QUERY_ACTIVE", "QUERY_OPTIONS"
+    }:
+        prefix = _say(lang, "Em teste, estado local do Blanky: ", "In test mode, Blanky's local state: ")
+        return {part: prefix + content for part, content in answer.items()}
+    return answer
 
 
 def answer_query(name: str, component: str, lang: str, state: dict, health: dict,

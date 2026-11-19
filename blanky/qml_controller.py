@@ -89,6 +89,7 @@ class BlankyController(QObject):
     audioDiagnosticLogTextChanged = Signal()
     stateCompactChanged = Signal()
     communicationSettingsChanged = Signal()
+    controlModeChanged = Signal()
     openAiKeyConfiguredChanged = Signal()
     textCommandsResolved = Signal(object, str, str, str)
     textCommandsFailed = Signal(str, str, str)
@@ -612,6 +613,18 @@ class BlankyController(QObject):
     @Property(str, notify=stateCompactChanged)
     def stateCompact(self):
         return self._state_compact
+
+    @Property(str, notify=controlModeChanged)
+    def controlMode(self):
+        return self._bridge.control_mode
+
+    @Slot(bool, result=bool)
+    def setTestMode(self, enabled: bool) -> bool:
+        changed = self._bridge.set_control_mode("test" if enabled else "plc")
+        if changed:
+            self.controlModeChanged.emit()
+            self._refresh()
+        return changed
 
     # ---------- QML Slots ----------
     @Slot()
@@ -1967,7 +1980,7 @@ class BlankyController(QObject):
                     command = str(ev.get("command") or "")
                     spoken = operational_speech(command, bool(ev.get("accepted")), detail, self._language)
                     other = "en" if self._language == "pt" else "pt"
-                    other_detail = (self._bridge.response_for_command(command, other) if ev.get("accepted")
+                    other_detail = (str(ev.get(f"detail_{other}") or self._bridge.response_for_command(command, other)) if ev.get("accepted")
                                     else rejection_for_event(ev, other))
                     localized = {self._language: spoken,
                                  other: operational_speech(command, bool(ev.get("accepted")), other_detail, other)}

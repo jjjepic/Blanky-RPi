@@ -39,7 +39,7 @@ _MODE_TEXT = {
 }
 
 
-def state_monitor_updates(state: dict, key: str) -> dict[str, str]:
+def state_monitor_updates(state: dict, key: str, local: bool = False) -> dict[str, str]:
     """Return only the presentation topics affected by one legacy state update."""
     updates = {}
     if key == "start":
@@ -81,6 +81,12 @@ def state_monitor_updates(state: dict, key: str) -> dict[str, str]:
         updates["monitor/pt/system_error"] = "Não confirmado" if state[key] is None else "Erro ativo" if state[key] else "Sem erro ativo"
         updates["monitor/en/system_error"] = "Unconfirmed" if state[key] is None else "Error active" if state[key] else "No active error"
 
+    if local:
+        for topic, payload in list(updates.items()):
+            if topic.startswith("monitor/pt/"):
+                updates[topic] = f"Local: {payload}"
+            elif topic.startswith("monitor/en/"):
+                updates[topic] = f"Local: {payload}"
     return updates
 
 

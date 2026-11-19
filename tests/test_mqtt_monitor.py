@@ -53,6 +53,11 @@ class MonitorPayloadTests(unittest.TestCase):
         state["robot_metal"] = 0
         self.assertEqual(state_monitor_updates(state, "robot_metal")["monitor/pt/robot"], "Sem pedido de recolha")
 
+    def test_test_mode_monitor_text_is_marked_local(self):
+        updates = state_monitor_updates(_state(start=1, motor_1=1), "motor_1", local=True)
+        self.assertEqual(updates["monitor/pt/motor_1"], "Local: Ligado")
+        self.assertEqual(updates["monitor/en/motor_1"], "Local: On")
+
     def test_opcua_connection_and_feedback_are_not_conflated(self):
         topics = health_monitor_updates({"opcua_connected": True, "opcua_feedback_active": False})
         self.assertEqual(topics["monitor/opcua"], "connected")
@@ -111,6 +116,7 @@ class MonitorBridgeTests(unittest.TestCase):
         bridge._next_event_id = 1
         bridge._event_generation = 0
         bridge._last_mqtt_panel_rx = 0.0
+        bridge._control_mode = "plc"
         bridge._opcua = types.SimpleNamespace(health=lambda: {"connected": False}, enqueue_command=lambda *a, **k: None)
         bridge.state = _state()
         bridge.state_quality = {key: "confirmed" for key in bridge.state}
