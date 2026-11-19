@@ -3494,13 +3494,13 @@ ApplicationWindow {
 
                 Rectangle {
                     width: parent.width
-                    implicitHeight: modeColumn.implicitHeight + 22
+                    implicitHeight: communicationsModeColumn.implicitHeight + 22
                     radius: 12
                     color: root.panelAltColor
                     border.color: blanky.controlMode === "test" ? root.warningColor : root.borderColor
                     border.width: 2
                     ColumnLayout {
-                        id: modeColumn
+                        id: communicationsModeColumn
                         anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
                         anchors.margins: 11
                         spacing: 6
