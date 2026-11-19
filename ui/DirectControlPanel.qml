@@ -73,7 +73,11 @@ Rectangle {
     function toggleStateText(key, onText, offText) {
         if (pending(key))
             return t("awaitingConfirmation")
-        return stateValue(key) < 0 ? t("unconfirmed") : stateValue(key) === 1 ? onText : offText
+        if (key === "cyl_c" || key === "cyl_d")
+            return stateValue(key) === 1 ? onText : t("backward")
+        if (stateValue(key) < 0)
+            return t("unconfirmedShort")
+        return stateValue(key) === 1 ? onText : offText
     }
 
     function activeModeText() {
@@ -329,8 +333,8 @@ Rectangle {
                         Layout.preferredHeight: panel.actionButtonHeight
                         spacing: panel.compact ? 5 : 8
 
-                        ManualCommandButton { width: (parent.width - parent.spacing) / 2; height: panel.actionButtonHeight; commandEnabled: panel.controllable("robot_metal") && !active; label: panel.t("robotMetal"); iconText: "▣"; command: "ROBOT_TO_METAL"; active: panel.stateValue("robot_metal") === 1; stateUnknown: panel.stateValue("robot_metal") < 0; statePending: panel.pending("robot_metal"); stateText: panel.toggleStateText("robot_metal", "ON", "OFF"); iconColor: panel.accentColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
-                        ManualCommandButton { width: (parent.width - parent.spacing) / 2; height: panel.actionButtonHeight; commandEnabled: panel.controllable("robot_nonmetal") && !active; label: panel.t("robotNonMetal"); iconText: "▣"; command: "ROBOT_TO_NONMETAL"; active: panel.stateValue("robot_nonmetal") === 1; stateUnknown: panel.stateValue("robot_nonmetal") < 0; statePending: panel.pending("robot_nonmetal"); stateText: panel.toggleStateText("robot_nonmetal", "ON", "OFF"); iconColor: panel.accentColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
+                        ManualCommandButton { width: (parent.width - parent.spacing) / 2; height: panel.actionButtonHeight; commandEnabled: panel.controllable("robot_metal") && !active; label: panel.t("robotMetal"); iconText: panel.monochrome ? "▣" : "\uD83E\uDD16"; command: "ROBOT_TO_METAL"; active: panel.stateValue("robot_metal") === 1; stateUnknown: panel.stateValue("robot_metal") < 0; statePending: panel.pending("robot_metal"); stateText: panel.toggleStateText("robot_metal", "ON", "OFF"); toolTip: panel.language === "pt" ? "Pedido de recolha manual no Tapete 2; não há robô físico." : "Manual pickup request on Conveyor 2; no physical robot."; iconColor: panel.accentColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
+                        ManualCommandButton { width: (parent.width - parent.spacing) / 2; height: panel.actionButtonHeight; commandEnabled: panel.controllable("robot_nonmetal") && !active; label: panel.t("robotNonMetal"); iconText: panel.monochrome ? "▣" : "\uD83E\uDD16"; command: "ROBOT_TO_NONMETAL"; active: panel.stateValue("robot_nonmetal") === 1; stateUnknown: panel.stateValue("robot_nonmetal") < 0; statePending: panel.pending("robot_nonmetal"); stateText: panel.toggleStateText("robot_nonmetal", "ON", "OFF"); toolTip: panel.language === "pt" ? "Pedido de recolha manual no Tapete 3; não há robô físico." : "Manual pickup request on Conveyor 3; no physical robot."; iconColor: panel.accentColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
                     }
                 }
             }

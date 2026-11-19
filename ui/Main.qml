@@ -108,16 +108,6 @@ ApplicationWindow {
         return luminance > 0.62 ? "#101010" : "#ffffff"
     }
 
-    function eventsHeaderText() {
-        if (blanky.language === "en")
-            return "ID    | Time     | Source     | Command            | State     | Description"
-        return "ID    | Hora     | Origem     | Comando            | Estado    | Descri\u00e7\u00e3o"
-    }
-
-    function eventsHeaderDivider() {
-        return "----- | -------- | ---------- | ------------------ | --------- | --------------------------------------------------------"
-    }
-
     function t(key, values) {
         return I18n.text(blanky.language, key, values)
     }
@@ -363,14 +353,14 @@ ApplicationWindow {
                 { icon: "\u2699", color: root.accentColor, title: pt ? "Controlar motores" : "Control motors", code: "MOTOR_n_ON / MOTOR_n_OFF", input: pt ? "ligar motor 1" : "turn on motor 1", description: pt ? "Liga ou desliga o motor indicado." : "Turns the selected motor on or off.", examples: pt ? "ligar motor 1 · desligar motor 2 · ativar motor 3" : "turn on motor 1 · disable motor 2 · start motor 3" }
             ]},
             { title: pt ? "Cilindros" : "Cylinders", commands: [
-                { icon: "\u25B0", color: root.accentColor, title: pt ? "Controlar cilindros" : "Control cylinders", code: "CYL_X_EXTEND / CYL_X_RETRACT", input: pt ? "ligar cilindro A" : "turn on cylinder A", description: pt ? "Avan\u00e7a ou recolhe o cilindro indicado." : "Extends or retracts the selected cylinder.", examples: pt ? "avan\u00e7ar cilindro A · recolher cilindro B · cilindro C recuar" : "extend cylinder A · retract cylinder B · cylinder C back" }
+                { icon: "\u25B0", color: root.accentColor, title: pt ? "Controlar cilindros" : "Control cylinders", code: "CYL_X_EXTEND / CYL_X_RETRACT", input: pt ? "ligar cilindro A" : "turn on cylinder A", description: pt ? "A/B avançam e recolhem; C/D só aceitam avanço. O recuo de C/D não é confirmado." : "A/B extend and retract; C/D only accept extension. C/D retraction is unconfirmed.", examples: pt ? "avançar cilindro A · recolher cilindro B · avançar cilindro C" : "extend cylinder A · retract cylinder B · extend cylinder C" }
             ]},
             { title: pt ? "Luzes" : "Lights", commands: [
                 { icon: "\u25CF", color: root.successColor, title: pt ? "Luz verde" : "Green light", code: "GREEN_ON / GREEN_OFF", input: pt ? "ligar luz verde" : "turn on green light", description: pt ? "Liga ou desliga a luz verde." : "Turns the green light on or off.", examples: pt ? "ligar luz verde · apagar verde · ativar verde" : "turn on green light · switch green off · enable green" },
                 { icon: "\u25CF", color: root.errorColor, title: pt ? "Luz vermelha" : "Red light", code: "RED_ON / RED_OFF", input: pt ? "ligar luz vermelha" : "turn on red light", description: pt ? "Liga ou desliga a luz vermelha." : "Turns the red light on or off.", examples: pt ? "ligar luz vermelha · apagar vermelha · desativar vermelho" : "turn on red light · switch red off · disable red" }
             ]},
             { title: pt ? "Rob\u00f4" : "Robot", commands: [
-                { icon: blanky.appearanceMode === "monochrome" ? "▣" : "\uD83E\uDD16", color: root.successColor, title: pt ? "Enviar rob\u00f4" : "Move robot", code: "ROBOT_TO_METAL / ROBOT_TO_NONMETAL", input: pt ? "rob\u00f4 vai metal" : "send robot to metal", description: pt ? "Envia o rob\u00f4 para metal ou n\u00e3o metal." : "Sends the robot to metal or non-metal.", examples: pt ? "rob\u00f4 para metal · mandar rob\u00f4 para n\u00e3o metal · rob\u00f4 vai para metal" : "robot to metal · send robot to non-metal · move robot to metal" }
+                { icon: blanky.appearanceMode === "monochrome" ? "▣" : "\uD83E\uDD16", color: root.successColor, title: pt ? "Robô metal / não metal" : "Metal / non-metal robot", code: "ROBOT_TO_METAL / ROBOT_TO_NONMETAL", input: pt ? "robô vai metal" : "send robot to metal", description: pt ? "Pede recolha manual no Tapete 2 ou 3; não há robô físico." : "Requests manual pickup on Conveyor 2 or 3; no physical robot operates.", examples: pt ? "robô para metal · robô para não metal" : "robot to metal · robot to non-metal" }
             ]}
         ]
     }
@@ -964,9 +954,9 @@ ApplicationWindow {
 
                                     Text {
                                         anchors.verticalCenter: parent.verticalCenter
-                                        text: root.eventsHeaderText() + "\n" + root.eventsHeaderDivider()
+                                        text: blanky.monitorEventsHeader
                                         color: root.mutedText
-                                        font.family: "Consolas"
+                                        font.family: "DejaVu Sans Mono"
                                         font.pixelSize: Math.round(12 * root.textScale)
                                         font.bold: true
                                         textFormat: Text.PlainText
@@ -1019,7 +1009,7 @@ ApplicationWindow {
                                 selectByMouse: true
                                 wrapMode: TextEdit.NoWrap
                                 color: root.textColor
-                                font.family: "Consolas"
+                                font.family: "DejaVu Sans Mono"
                                 font.pixelSize: Math.round(12 * root.textScale)
                                 textFormat: TextEdit.RichText
                             }
@@ -3536,11 +3526,28 @@ ApplicationWindow {
                         }
                         Label {
                             Layout.fillWidth: true
-                            text: blanky.language === "pt"
-                                ? "Teste: resposta imediata e estados locais, mesmo sem PLC. Se o OPC UA estiver ligado, os comandos CONTINUAM a ser enviados à maquete; os tópicos MQTT de comando também permanecem ativos. Podem acionar atuadores. Sem confirmação física. Ao reiniciar, volta ao modo PLC."
-                                : "Test: immediate response and local states, even without a PLC. When OPC UA is connected, commands ARE STILL sent to the machine; MQTT command topics also remain active. Actuators may move. No physical confirmation. Restarting restores PLC mode."
+                            text: blanky.controlMode === "test"
+                                ? (blanky.language === "pt" ? "Teste: resposta imediata; estados locais sem confirmação." : "Test: immediate response; unconfirmed local states.")
+                                : (blanky.language === "pt" ? "PLC: os estados são atualizados pelo retorno da maquete." : "PLC: states are updated from machine feedback.")
                             color: root.mutedText; wrapMode: Text.WordWrap
                             font.pixelSize: Math.round(13 * root.textScale)
+                        }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 7
+                            Rectangle {
+                                Layout.preferredWidth: 20; Layout.preferredHeight: 20
+                                radius: 10; color: root.warningColor
+                                Label { anchors.centerIn: parent; text: "!"; color: root.panelColor; font.bold: true; font.pixelSize: 14 }
+                            }
+                            Label {
+                                Layout.fillWidth: true
+                                text: blanky.language === "pt"
+                                    ? "Mesmo em teste, OPC UA e MQTT podem acionar a maquete."
+                                    : "Even in test mode, OPC UA and MQTT may actuate the machine."
+                                color: root.warningColor; wrapMode: Text.WordWrap
+                                font.pixelSize: Math.round(12 * root.textScale); font.bold: true
+                            }
                         }
                         Label {
                             id: modeSwitchError

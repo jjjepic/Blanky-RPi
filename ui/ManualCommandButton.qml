@@ -9,6 +9,7 @@ Rectangle {
     property string iconText: ""
     property string command: ""
     property string stateText: ""
+    property string toolTip: ""
     property color iconColor: "#63cbff"
     property color textColor: "#def2ff"
     property color mutedText: "#9dd9ff"
@@ -53,6 +54,13 @@ Rectangle {
 
     Behavior on color { ColorAnimation { duration: 140 } }
     Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+
+    HoverHandler { id: hintHover }
+    ToolTip.visible: hintHover.hovered && (control.toolTip.length > 0 || control.stateUnknown)
+    ToolTip.delay: 650
+    ToolTip.text: (control.stateUnknown
+        ? (typeof blanky !== "undefined" && blanky.language === "en" ? "State not confirmed by the PLC." : "Estado não confirmado pelo PLC.")
+        : "") + (control.toolTip.length > 0 ? (control.stateUnknown ? " " : "") + control.toolTip : "")
 
     TextMetrics {
         id: titleMetrics

@@ -48,6 +48,7 @@ from blanky.command_messages import rejection_for_event, rejection_message
 from blanky.audio_coordinator import AudioCoordinator
 from blanky.audio_messages import command_group_key, operational_speech
 from blanky.preference_intents import handle_preference
+from blanky.event_columns import DESCRIPTION_WIDTH, event_divider, event_header, event_prefix
 
 
 _LOG = logging.getLogger(__name__)
@@ -412,6 +413,10 @@ class BlankyController(QObject):
     @Property(str, notify=monitorEventsTextChanged)
     def monitorEventsRichText(self):
         return self._monitor_events_rich_text
+
+    @Property(str, notify=languageChanged)
+    def monitorEventsHeader(self):
+        return event_header(self._language) + "\n" + event_divider()
 
     @Property(bool, notify=listeningChanged)
     def listening(self):
@@ -1592,11 +1597,6 @@ class BlankyController(QObject):
         return colors["normal"]
 
     def _build_monitor_events_rich_text(self, snapshot: dict) -> str:
-        id_w = 5
-        time_w = 8
-        source_w = 10
-        command_w = 18
-        status_w = 9
         current_generation = int(snapshot.get("event_generation", 0) or 0)
         rich_rows = []
         for ev in snapshot.get("events", []):
@@ -1612,13 +1612,10 @@ class BlankyController(QObject):
             is_previous_session = int(ev.get("generation", 0) or 0) < current_generation
             color = "#6d8290" if is_previous_session else self._event_visual_color(command, bool(ev.get("accepted")))
             detail_lines = textwrap.wrap(
-                self._localized_event_detail(ev), width=44,
+                self._localized_event_detail(ev), width=DESCRIPTION_WIDTH,
                 break_long_words=False, break_on_hyphens=False,
             ) or [""]
-            prefix = (
-                f"{event_label:<{id_w}} | {event_time:<{time_w}} | "
-                f"{source:<{source_w}} | {command:<{command_w}} | {status:<{status_w}} | "
-            )
+            prefix = event_prefix(event_label, event_time, source, command, status)
             # Continuations begin under Description only; repeating separators
             # makes wrapped rows look like misaligned columns.
             continuation = " " * len(prefix)
@@ -1629,7 +1626,7 @@ class BlankyController(QObject):
                 for row in event_rows
             )
         event_font_size = round(12 * self._appearance_text_scale)
-        return f"<pre style='font-family:Consolas; font-size:{event_font_size}px;'>" + "\n".join(rich_rows) + "</pre>"
+        return f"<pre style='font-family:DejaVu Sans Mono, monospace; font-size:{event_font_size}px;'>" + "\n".join(rich_rows) + "</pre>"
 
     def _event_status_label(self, event: dict) -> str:
         reason = event.get("reason")
@@ -1649,6 +1646,9 @@ class BlankyController(QObject):
         return "✓ OK" if event.get("accepted") else "✕ REJECT"
 
     def _localized_event_detail(self, event: dict) -> str:
+        localized = event.get(f"detail_{self._language}")
+        if localized:
+            return self._repair_display_text(str(localized))
         if event.get("kind") in {"query", "setting"}:
             return str(event.get(f"detail_{self._language}") or event.get("detail") or "")
         if event.get("source") in {"plc", "opcua"}:
