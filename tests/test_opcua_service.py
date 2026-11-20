@@ -32,6 +32,11 @@ def _run_without_io(coroutine):
             return result.value
 
 
+def _data_value(value, status="Good"):
+    return SimpleNamespace(Value=SimpleNamespace(Value=value),
+                           StatusCode=SimpleNamespace(name=status, is_good=lambda: status == "Good"))
+
+
 class OPCUAOfflineTests(unittest.TestCase):
     def test_stop_discards_commands_not_yet_written(self):
         with patch.object(opcua_service, "OPCUA_ENABLED", False):
@@ -80,9 +85,8 @@ class OPCUAOfflineTests(unittest.TestCase):
         nodes = {name: object() for name in RECEIVE_NODE_IDENTIFIERS}
 
         class FakeClient:
-            async def read_values(self, requested):
-                self_count = len(requested)
-                return [False] * self_count
+            async def read_attributes(self, requested):
+                return [_data_value(False)] * len(requested)
 
         _run_without_io(bridge._read_feedback(FakeClient(), nodes))
         health = bridge.health()
@@ -111,8 +115,8 @@ class OPCUAOfflineTests(unittest.TestCase):
         self.assertEqual(record["ack_status"], "pending")
 
         class FakeClient:
-            async def read_values(self, requested):
-                return [True]
+            async def read_attributes(self, requested):
+                return [_data_value(True)]
 
         bridge._set_feedback_error("temporarily unavailable")
         bridge._record_feedback_locked("system_on", True, sample_started=record["started"] - 1)
@@ -120,18 +124,77 @@ class OPCUAOfflineTests(unittest.TestCase):
         _run_without_io(bridge._read_feedback(FakeClient(), {"system_on": object()}))
         self.assertEqual(record["ack_status"], "state_observed")
 
-    def test_read_does_not_promote_missing_feedback_to_false(self):
+    def test_bad_node_does_not_discard_other_nodes_or_keep_a_stale_value(self):
         with patch.object(opcua_service, "OPCUA_ENABLED", False):
             bridge = opcua_service.OPCUABridge()
 
         class FakeClient:
-            async def read_values(self, requested):
-                return [None]
+            async def read_attributes(self, requested):
+                return [_data_value(True), _data_value(False), _data_value(True, "BadNodeIdUnknown")]
 
-        with self.assertRaises(ValueError):
-            _run_without_io(bridge._read_feedback(FakeClient(), {"system_on": object()}))
-        self.assertFalse(bridge.health()["initial_complete"])
-        self.assertEqual(bridge.health()["received"], {})
+        bridge._received["robot_metal"] = True
+        nodes = {"system_on": "ns=5;i=2", "system_stopped": "ns=5;i=3", "robot_metal": "ns=5;i=24"}
+        with self.assertLogs("blanky.opcua_service", level="WARNING"):
+            self.assertFalse(_run_without_io(bridge._read_feedback(FakeClient(), nodes)))
+        health = bridge.health()
+        self.assertFalse(health["initial_complete"])
+        self.assertTrue(health["feedback_active"])
+        self.assertEqual(health["received"], {"system_on": True, "system_stopped": False})
+        self.assertIn("ns=5;i=24", health["feedback_error"])
+        self.assertIn("BadNodeIdUnknown", health["feedback_error"])
+
+    def test_read_reduces_batch_size_on_server_operation_limit(self):
+        with patch.object(opcua_service, "OPCUA_ENABLED", False):
+            bridge = opcua_service.OPCUABridge()
+        nodes = dict(RECEIVE_NODE_IDENTIFIERS)
+        sizes = []
+
+        class FakeClient:
+            async def read_attributes(self, requested):
+                sizes.append(len(requested))
+                if len(requested) > 2:
+                    raise type("BadTooManyOperations", (Exception,), {"code": 123})()
+                return [_data_value(False)] * len(requested)
+
+        fake_ua = SimpleNamespace(StatusCodes=SimpleNamespace(BadTooManyOperations=123))
+        with patch.object(opcua_service, "ua", fake_ua):
+            self.assertTrue(_run_without_io(bridge._read_feedback(FakeClient(), nodes)))
+            sizes.clear()
+            self.assertTrue(_run_without_io(bridge._read_feedback(FakeClient(), nodes)))
+        self.assertLessEqual(max(sizes), 2)
+        self.assertEqual(bridge.health()["feedback_count"], len(nodes))
+
+    def test_subscription_partial_rejection_keeps_read_values_and_uses_polling(self):
+        with patch.object(opcua_service, "OPCUA_ENABLED", False):
+            bridge = opcua_service.OPCUABridge()
+        deleted = []
+
+        class FakeSubscription:
+            async def subscribe_data_change(self, nodes):
+                return ["BadTooManyMonitoredItems"] + list(range(1, len(nodes)))
+
+            async def delete(self):
+                deleted.append(True)
+
+        class FakeClient:
+            async def get_namespace_index(self, uri):
+                return 5
+
+            def get_node(self, nodeid):
+                return SimpleNamespace(nodeid=nodeid)
+
+            async def read_attributes(self, requested):
+                return [_data_value(False)] * len(requested)
+
+            async def create_subscription(self, period, handler):
+                return FakeSubscription()
+
+        with self.assertLogs("blanky.opcua_service", level="WARNING"):
+            subscription, nodes = _run_without_io(bridge._start_feedback(FakeClient()))
+        self.assertIsNone(subscription)
+        self.assertEqual(deleted, [True])
+        self.assertEqual(bridge.health()["feedback_mode"], "polling")
+        self.assertEqual(bridge.health()["feedback_count"], len(nodes))
 
     def test_pulse_resets_after_success_and_failed_true_write(self):
         variant = types.SimpleNamespace(Int16="i16", Int32="i32", Int64="i64", Float="f32", Double="f64", Boolean="bool")
@@ -258,6 +321,27 @@ class OPCUAIntegrationTests(unittest.IsolatedAsyncioTestCase):
             await self._wait_for(lambda: bridge.health()["last_ack_ms"] is not None)
             self.assertEqual(bridge.timing_records()[0]["source"], "test")
             self.assertEqual(bridge.timing_records()[0]["ack_status"], "state_observed")
+        finally:
+            await asyncio.to_thread(bridge.close)
+
+    async def test_missing_return_node_does_not_block_start_confirmation(self):
+        await self.received_nodes["robot_metal"].delete()
+        await self.received_nodes["system_stopped"].write_value(True)
+        with patch.object(opcua_service, "OPCUA_URL", self.url), patch.object(
+            opcua_service, "OPCUA_PULSE_SECONDS", 0.1
+        ):
+            bridge = opcua_service.OPCUABridge()
+        try:
+            await self._wait_for(lambda: bridge.health()["feedback_active"])
+            self.assertEqual(bridge.health()["feedback_count"], 24)
+            self.assertIn("BadNodeIdUnknown", bridge.health()["feedback_error"])
+            self.assertTrue(bridge.enqueue_command("START"))
+            await self._wait_for(lambda: bridge.health()["last_write_ms"] is not None)
+            await self.received_nodes["system_stopped"].write_value(False)
+            await self.received_nodes["system_on"].write_value(True)
+            await self._wait_for(lambda: bridge.timing_records()[0]["ack_status"] == "state_observed")
+            self.assertTrue(bridge.health()["received"]["system_on"])
+            self.assertFalse(bridge.health()["received"]["system_stopped"])
         finally:
             await asyncio.to_thread(bridge.close)
 

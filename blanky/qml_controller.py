@@ -1520,6 +1520,9 @@ class BlankyController(QObject):
             return "Sem ligação ao PLC" if is_pt else "No PLC connection"
         if not health.get("opcua_feedback_active"):
             return "Servidor ligado; estados indisponíveis" if is_pt else "Server connected; states unavailable"
+        count, total = health.get("opcua_feedback_count", 0), health.get("opcua_feedback_total", 0)
+        if count < total:
+            return f"Retorno parcial: {count}/{total} sinais" if is_pt else f"Partial feedback: {count}/{total} signals"
         ack_ms = health.get("opcua_last_ack_ms")
         if ack_ms is not None and health.get("opcua_feedback_active"):
             return (f"Retorno observado: {ack_ms:.0f} ms" if is_pt else f"Observed return: {ack_ms:.0f} ms")

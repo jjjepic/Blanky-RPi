@@ -32,7 +32,8 @@ class FakeOPC:
     def health(self):
         return {
             "connected": self.connected, "feedback_active": self.feedback_active,
-            "initial_complete": self.feedback_active, "feedback_epoch": self.epoch,
+            "initial_complete": self.feedback_active and RECEIVE_NODE_IDENTIFIERS.keys() <= self.received.keys(),
+            "feedback_epoch": self.epoch,
             "received": dict(self.received), "last_valid_read": "2026-11-16T12:00:00",
         }
 
@@ -113,6 +114,16 @@ class PLCProjectionTests(unittest.TestCase):
         self.assertIsNone(state["motor_1"])
         self.assertIsNone(state["cyl_a"])
 
+    def test_missing_or_inconsistent_system_pair_is_not_confirmed(self):
+        for raw, expected_quality in (
+            ({"system_on": True}, "unavailable"),
+            ({"system_on": True, "system_stopped": True}, "inconsistent"),
+        ):
+            with self.subTest(raw=raw):
+                state, quality = project_plc_state(raw, True)
+                self.assertIsNone(state["start"])
+                self.assertEqual(quality["start"], expected_quality)
+
     def test_c_d_advanced_sensor_and_robot_pickup_request(self):
         values = plc_values()
         values["cyl_c_advance_signal"] = True
@@ -179,6 +190,28 @@ class PLCBridgeTests(unittest.TestCase):
         self.assertEqual(snapshot["state_quality"]["start"], "confirmed")
         self.assertNotIn("start", snapshot["pending"])
         self.assertEqual(snapshot["events"][-1]["reason"], "state_observed")
+
+    def test_start_confirms_from_partial_return_and_hmi_can_stop(self):
+        self.opc.received = {"system_on": False, "system_stopped": True}
+        self.assertTrue(self.bridge.process_command("START", "pt", source="button")[0])
+        self.opc.write()
+        self.opc.received["system_stopped"] = False
+        self.opc.observe("system_on")
+        snapshot = self.bridge.get_snapshot()
+        self.assertEqual(snapshot["state"]["start"], 1)
+        self.assertIsNone(snapshot["state"]["motor_1"])
+        self.assertNotIn("start", snapshot["pending"])
+        self.assertEqual(snapshot["events"][-1]["reason"], "state_observed")
+        self.opc.received.update(system_on=False, system_stopped=True)
+        self.assertEqual(self.bridge.get_snapshot()["state"]["start"], 0)
+        self.assertEqual(len(self.opc.records), 1)
+
+    def test_missing_alarm_return_does_not_clear_a_known_alarm(self):
+        self.opc.received["system_error"] = True
+        self.bridge.get_snapshot()
+        del self.opc.received["system_error"]
+        self.assertFalse(self.bridge.process_command("START", "pt")[0])
+        self.assertEqual(self.bridge.get_snapshot()["events"][-1]["reason"], "system_error")
 
     def test_pending_start_and_mode_allow_sequence_without_claiming_state(self):
         self.opc.feedback_active = False

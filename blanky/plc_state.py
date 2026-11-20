@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-from blanky.opcua_nodes import RECEIVE_NODE_IDENTIFIERS
-
-
 STATE_KEYS = (
     "start", "mode_fast", "mode_ideal", "mode_manual", "mode_change",
     "motor_1", "motor_2", "motor_3", "cyl_a", "cyl_b", "cyl_c", "cyl_d",
@@ -45,7 +42,7 @@ def project_plc_state(received: dict[str, bool], available: bool) -> tuple[dict[
     """Return confirmed values and quality; None never means a confirmed OFF."""
     state = {key: None for key in STATE_KEYS}
     quality = {key: "unavailable" for key in STATE_KEYS}
-    if not available or not all(name in received for name in RECEIVE_NODE_IDENTIFIERS):
+    if not available:
         return state, quality
 
     pairs = {
@@ -59,25 +56,31 @@ def project_plc_state(received: dict[str, bool], available: bool) -> tuple[dict[
         "light_red": ("red_on", "red_off"),
     }
     for key, (positive, negative) in pairs.items():
+        if positive not in received or negative not in received:
+            continue
         state[key] = _pair(received, positive, negative)
         quality[key] = "confirmed" if state[key] is not None else "inconsistent"
 
-    active_modes = [key for key in ("mode_fast", "mode_ideal", "mode_manual", "mode_change") if received[key]]
-    if len(active_modes) <= 1:
-        for key in ("mode_fast", "mode_ideal", "mode_manual", "mode_change"):
-            state[key] = int(key in active_modes)
-            quality[key] = "confirmed"
-    else:
-        for key in ("mode_fast", "mode_ideal", "mode_manual", "mode_change"):
-            quality[key] = "inconsistent"
+    modes = ("mode_fast", "mode_ideal", "mode_manual", "mode_change")
+    if all(key in received for key in modes):
+        if sum(received[key] for key in modes) <= 1:
+            for key in modes:
+                state[key] = int(received[key])
+                quality[key] = "confirmed"
+        else:
+            for key in modes:
+                quality[key] = "inconsistent"
 
     for key, signal in (("cyl_c", "cyl_c_advance_signal"), ("cyl_d", "cyl_d_advance_signal")):
+        if signal not in received:
+            continue
         if received[signal]:
             state[key], quality[key] = 1, "confirmed"
         else:
             quality[key] = "position_unknown"
 
     for key in ("robot_metal", "robot_nonmetal", "system_error"):
-        state[key] = int(received[key])
-        quality[key] = "confirmed"
+        if key in received:
+            state[key] = int(received[key])
+            quality[key] = "confirmed"
     return state, quality

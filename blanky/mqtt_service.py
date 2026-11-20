@@ -347,9 +347,10 @@ class MQTTBridge:
     def _synchronize_plc(self):
         health = self._opcua.health() if hasattr(self._opcua, "health") else {}
         records = self._opcua.timing_records() if hasattr(self._opcua, "timing_records") else []
-        available = bool(health.get("connected") and health.get("feedback_active") and health.get("initial_complete", True))
+        available = bool(health.get("connected") and health.get("feedback_active"))
         received = dict(health.get("received") or {})
         state, quality = project_plc_state(received, available)
+        alarm_known = state["system_error"] is not None
         epoch = health.get("feedback_epoch")
         with self._lock:
             if self._control_mode == "test":
@@ -357,11 +358,11 @@ class MQTTBridge:
                 self._plc_received = received if available else {}
                 self._last_valid_read = str(health.get("last_valid_read") or "")
                 # A real PLC alarm must remain visible even while other states are local.
-                if available:
+                if alarm_known:
                     self._plc_error_latched = bool(received.get("system_error"))
                 alarm = self._plc_error_latched
                 alarm_value = int(alarm)
-                alarm_quality = "confirmed" if available and alarm else "unavailable" if alarm else "local"
+                alarm_quality = "confirmed" if alarm_known and alarm else "unavailable" if alarm else "local"
                 if self.state["system_error"] != alarm_value or self.state_quality["system_error"] != alarm_quality:
                     self.state["system_error"] = alarm_value
                     self.state_quality["system_error"] = alarm_quality
@@ -378,7 +379,7 @@ class MQTTBridge:
             self._plc_epoch = epoch
             self._plc_available = available
             self._plc_received = received if available else {}
-            if available:
+            if alarm_known:
                 self._plc_error_latched = bool(received.get("system_error"))
             self._last_valid_read = str(health.get("last_valid_read") or "")
             if new_baseline or not available:
@@ -452,7 +453,7 @@ class MQTTBridge:
             return False
         self._synchronize_plc()
         health = self._opcua.health() if hasattr(self._opcua, "health") else {}
-        available = bool(health.get("connected") and health.get("feedback_active") and health.get("initial_complete", True))
+        available = bool(health.get("connected") and health.get("feedback_active"))
         projected, quality = project_plc_state(dict(health.get("received") or {}), available)
         with self._lock:
             if mode == self._control_mode:
@@ -465,7 +466,7 @@ class MQTTBridge:
             self._plc_available = available
             self._plc_epoch = health.get("feedback_epoch")
             self._plc_received = dict(health.get("received") or {}) if available else {}
-            if available:
+            if projected["system_error"] is not None:
                 self._plc_error_latched = bool(self._plc_received.get("system_error"))
             self._last_known = {key: value for key, value in projected.items() if value is not None}
             new_state = {key: 0 for key in STATE_KEYS} if mode == "test" else projected
@@ -925,6 +926,8 @@ class MQTTBridge:
             "opcua_last_error": str(opcua_health.get("last_error") or ""),
             "opcua_last_write": str(opcua_health.get("last_write") or ""),
             "opcua_feedback_active": bool(opcua_health.get("feedback_active")),
+            "opcua_feedback_count": opcua_health.get("feedback_count", 0),
+            "opcua_feedback_total": opcua_health.get("feedback_total", 0),
             "opcua_initial_complete": bool(opcua_health.get("initial_complete")),
             "opcua_last_valid_read": str(opcua_health.get("last_valid_read") or ""),
             "opcua_plc_path_verified": False,

@@ -18,6 +18,8 @@ Os PDFs documentam `DB100` (comandos) e `DB4` (retorno) nos dois PLCs, com `TRCV
 3. Se o `DB4` no S&R acompanha o Maquete mas o diagnóstico OPC UA não lê os 25 nós, a falha está na interface OPC UA, no mapeamento dos nós ou nas permissões. Se o retorno lê bem mas os comandos do Blanky falham, compara os BrowseNames apresentados pelo diagnóstico com o mapa `ns=4`, observa `DB100` no S&R durante o impulso OPC UA de 300 ms e verifica `TSEND_C` no S&R (`%M21.2` ERROR, `%MW26` STATUS) e `TRCV_C` no Maquete (`%M110.2` ERROR, `%MW112` STATUS, `%MW114` RCVD_LEN).
 4. No modo **PLC sincronizado**, com o servidor ligado, testa **Iniciar** sem uma leitura inicial de retorno. A escrita deve avançar sem o retorno; o indicador fica incerto ou pendente até o PLC comunicar um estado coerente. Se não chegar retorno, o histórico distingue a escrita da falta de confirmação. No modo **Teste local**, o estado muda imediatamente, mas não é confirmação do PLC ou da posição física.
 
+Se o `DB4` do S&R já indicar «Sistema Ligado» mas o Blanky não confirmar, usa `python tools/diagnose_plc_opcua.py --system-only --url opc.tcp://192.168.30.3:4840` (ou o endpoint configurado). Compara `i=2` e `i=3` do namespace de retorno com `DB4.DBX0.0` e `DB4.DBX0.1`. A leitura de `TRUE`/`FALSE` confirma ligado; se um nó estiver indisponível ou os dois sinais coincidirem, o estado permanece incerto. Nó em falta fora deste par não deve bloquear o estado do sistema: o cartão apresenta o número de sinais válidos e o terminal identifica o nó e a qualidade inválida.
+
 ## Matriz de ensaios
 
 | Ensaio | Ação | Observação esperada |

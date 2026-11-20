@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import queue
 import threading
 import time
@@ -28,6 +29,8 @@ except ImportError:  # Keep the UI usable when optional PLC packages are absent.
     Client = None
     ua = None
 
+_LOG = logging.getLogger(__name__)
+
 
 class _FeedbackHandler:
     def __init__(self, bridge: "OPCUABridge", names_by_node: dict[str, str]):
@@ -37,13 +40,15 @@ class _FeedbackHandler:
     def datachange_notification(self, node, value, data):
         name = self._names_by_node.get(str(node.nodeid))
         if name is not None:
-            if type(value) is bool:
+            status = getattr(data.monitored_item.Value, "StatusCode", None)
+            if status is not None and status.is_good() and type(value) is bool:
                 self._bridge._record_feedback(name, value)
             else:
-                self._bridge._set_feedback_error(f"Non-Boolean PLC feedback for {name}")
+                self._bridge._reject_feedback_signal(name, f"{node.nodeid}: {status}, value={value!r}")
 
     def status_change_notification(self, status):
-        self._bridge._set_feedback_error(f"Subscription status: {status}")
+        if not status.Status.is_good():
+            self._bridge._set_feedback_error(f"Subscription status: {status.Status.name}")
 
 
 class OPCUABridge:
@@ -63,6 +68,7 @@ class OPCUABridge:
         self._feedback_error = ""
         self._feedback_active = False
         self._feedback_mode = "unavailable"
+        self._feedback_batch_size = 8
         self._received: dict[str, bool] = {}
         self._feedback_epoch = 0
         self._connection_epoch = 0
@@ -153,6 +159,7 @@ class OPCUABridge:
                     self._last_error = ""
                     self._feedback_epoch += 1
                     self._connection_epoch += 1
+                    self._feedback_batch_size = 8
                 retry_seconds = 1.0
                 feedback_task = asyncio.create_task(self._run_feedback(client))
                 last_keepalive = time.monotonic()
@@ -224,86 +231,140 @@ class OPCUABridge:
                 with self._lock:
                     polling = self._feedback_mode == "polling"
                 if polling and nodes:
+                    if subscription is not None:
+                        old_subscription, subscription = subscription, None
+                        await self._delete_subscription(old_subscription)
                     try:
                         await self._read_feedback(client, nodes)
                     except Exception as exc:
-                        self._set_feedback_error(str(exc))
+                        self._set_feedback_error(f"Reading return nodes: {type(exc).__name__}: {exc}")
                 elif polling:
                     await asyncio.sleep(5.0)
                     subscription, nodes = await self._start_feedback(client)
                 await asyncio.sleep(0.5)
         finally:
             if subscription is not None:
-                try:
-                    await subscription.delete()
-                except Exception:
-                    pass
+                await self._delete_subscription(subscription)
+
+    @staticmethod
+    async def _delete_subscription(subscription):
+        try:
+            await subscription.delete()
+        except Exception:
+            _LOG.debug("Could not delete OPC UA feedback subscription", exc_info=True)
 
     async def _start_feedback(self, client):
-        subscription = None
         try:
             namespace = await client.get_namespace_index(self._receive_namespace_uri)
-            nodes = {
-                name: client.get_node(f"ns={namespace};i={identifier}")
-                for name, identifier in RECEIVE_NODE_IDENTIFIERS.items()
-            }
-            nodes.update({name: client.get_node(node_id) for name, node_id in self._sensor_node_ids.items()})
+        except Exception as exc:
+            self._set_feedback_error(f"Return namespace {self._receive_namespace_uri!r}: {exc}")
+            return None, {}
+
+        nodes = {
+            name: client.get_node(f"ns={namespace};i={identifier}")
+            for name, identifier in RECEIVE_NODE_IDENTIFIERS.items()
+        }
+        for name, node_id in self._sensor_node_ids.items():
+            try:
+                nodes[name] = client.get_node(node_id)
+            except Exception as exc:
+                _LOG.warning("Invalid optional OPC UA sensor %s (%s): %s", name, node_id, exc)
+        with self._lock:
+            self._feedback_mode = "polling"
+        try:
+            complete = await self._read_feedback(client, nodes)
+        except Exception as exc:
+            self._set_feedback_error(f"Reading return nodes: {type(exc).__name__}: {exc}")
+            return None, nodes
+        if not complete:
+            return None, nodes
+
+        subscription = None
+        try:
+            with self._lock:
+                self._feedback_mode = "subscription"
             subscription = await client.create_subscription(
                 200, _FeedbackHandler(self, {str(node.nodeid): name for name, node in nodes.items()})
             )
-            try:
-                await subscription.subscribe_data_change(list(nodes.values()))
-                with self._lock:
-                    self._feedback_mode = "subscription"
-                    self._feedback_error = ""
-                    self._feedback_active = False
-            except Exception:
-                await subscription.delete()
-                subscription = None
-                with self._lock:
-                    self._feedback_mode = "polling"
-                    self._feedback_active = False
-            await self._read_feedback(client, nodes)
+            handles = await subscription.subscribe_data_change(list(nodes.values()))
+            if len(handles) != len(nodes) or any(not isinstance(handle, int) for handle in handles):
+                rejected = [f"{name}: {handle}" for name, handle in zip(nodes, handles)
+                            if not isinstance(handle, int)]
+                raise ValueError(", ".join(rejected) or "Incomplete monitored item results")
             return subscription, nodes
         except (Exception, asyncio.CancelledError) as exc:
+            with self._lock:
+                self._feedback_mode = "polling"
             if subscription is not None:
-                try:
-                    await subscription.delete()
-                except Exception:
-                    pass
+                await self._delete_subscription(subscription)
             if isinstance(exc, asyncio.CancelledError):
                 raise
-            self._set_feedback_error(str(exc))
-            return None, locals().get("nodes", {})
+            _LOG.warning("OPC UA subscription unavailable; using polling: %s", exc)
+            return None, nodes
+
+    async def _read_return_batch(self, client, nodes: list):
+        try:
+            result = await client.read_attributes(nodes)
+        except Exception as exc:
+            if (len(nodes) < 2 or ua is None
+                    or getattr(exc, "code", None) != ua.StatusCodes.BadTooManyOperations):
+                raise
+            middle = len(nodes) // 2
+            self._feedback_batch_size = min(self._feedback_batch_size, middle)
+            return (await self._read_return_batch(client, nodes[:middle])
+                    + await self._read_return_batch(client, nodes[middle:]))
+        return [result[index] if index < len(result) else None for index in range(len(nodes))]
 
     async def _read_feedback(self, client, nodes: dict):
         if not nodes:
-            return
+            return False
         sample_started = time.monotonic()
-        values = await client.read_values(list(nodes.values()))
-        if len(values) != len(nodes) or any(type(value) is not bool for value in values):
-            raise ValueError("Incomplete or non-Boolean PLC feedback")
+        results = []
+        requested = list(nodes.values())
+        batch_size = self._feedback_batch_size
+        for offset in range(0, len(requested), batch_size):
+            results.extend(await self._read_return_batch(client, requested[offset:offset + batch_size]))
+        errors = []
         with self._lock:
-            for name, value in zip(nodes, values):
-                self._record_feedback_locked(name, value, sample_started=sample_started)
-            self._initial_complete = True
-            self._feedback_active = True
-            self._feedback_error = ""
-            self._last_valid_read = datetime.now().isoformat(timespec="seconds")
+            for (name, node), result in zip(nodes.items(), results):
+                status = result.StatusCode if result is not None else None
+                value = result.Value.Value if result is not None and result.Value is not None else None
+                if status is not None and status.is_good() and type(value) is bool:
+                    self._record_feedback_locked(name, value, sample_started=sample_started)
+                else:
+                    detail = status.name if status is not None and not status.is_good() else f"invalid value {value!r}"
+                    errors.append(f"{name} ({node}): {detail}")
+                    self._received.pop(name, None)
+            self._update_feedback_availability_locked()
+            self._set_feedback_detail_locked("; ".join(errors))
+        return not errors
 
     def _record_feedback(self, name: str, value: bool):
         now = time.monotonic()
         with self._lock:
-            self._record_feedback_locked(name, value, now=now, allow_confirmation=self._initial_complete)
+            if self._feedback_mode != "polling":
+                self._record_feedback_locked(name, value, now=now)
+
+    def _update_feedback_availability_locked(self):
+        self._initial_complete = RECEIVE_NODE_IDENTIFIERS.keys() <= self._received.keys()
+        self._feedback_active = bool(RECEIVE_NODE_IDENTIFIERS.keys() & self._received.keys())
+
+    def _reject_feedback_signal(self, name: str, detail: str):
+        with self._lock:
+            if self._feedback_mode == "subscription":
+                self._feedback_mode = "polling"
+                self._received.pop(name, None)
+                self._update_feedback_availability_locked()
+                self._set_feedback_detail_locked(f"{name}: {detail}")
 
     def _record_feedback_locked(self, name: str, value: bool, now: float | None = None,
-                                allow_confirmation: bool = True, sample_started: float | None = None):
+                                sample_started: float | None = None):
         old_value = self._received.get(name)
         self._received[name] = value
         self._last_valid_read = datetime.now().isoformat(timespec="seconds")
         pending = self._pending.get(name)
-        if (allow_confirmation and value and pending is not None
-                and (old_value is False or pending["baseline_missing"])
+        # Only requests whose return was false or unknown are tracked here.
+        if (value and pending is not None
                 and (sample_started is None or sample_started >= pending["started"])):
             del self._pending[name]
             latency = round(((now or time.monotonic()) - pending["started"]) * 1000, 2)
@@ -314,20 +375,23 @@ class OPCUABridge:
             return
         self._feedback_sequence += 1
         self._last_feedback = f"{datetime.now().strftime('%H:%M:%S')} {name}={int(value)}"
+
+    def _set_feedback_detail_locked(self, message: str):
+        if message and message != self._feedback_error:
+            _LOG.warning("OPC UA feedback: %s", message)
+        self._feedback_error = message
+
     def _set_feedback_error(self, message: str):
         with self._lock:
             was_available = self._feedback_active or self._initial_complete or bool(self._received)
-            self._feedback_error = message
+            self._set_feedback_detail_locked(message)
             self._feedback_active = False
             self._feedback_mode = "polling"
             self._initial_complete = False
             self._received.clear()
             if was_available:
                 self._feedback_epoch += 1
-            # No writes are cancelled by a return-only failure. A fresh read can
-            # still observe the requested state before the normal timeout.
-            for record in self._pending.values():
-                record["baseline_missing"] = True
+            # A fresh read can still observe pending requests before their timeout.
 
     async def _send_command(self, client, record: dict):
         command = record["command"]
@@ -344,7 +408,6 @@ class OPCUABridge:
                 if old is not None:
                     old["ack_status"] = "superseded"
                 record["started"] = start
-                record["baseline_missing"] = baseline is None
                 record["ack_status"] = "pending"
                 self._pending[signal] = record
             else:
@@ -401,7 +464,7 @@ class OPCUABridge:
 
     def timing_records(self) -> list[dict]:
         with self._lock:
-            return [{key: value for key, value in item.items() if key not in {"started", "queued_at", "endpoint", "epoch", "baseline_missing"}} for item in self._timings]
+            return [{key: value for key, value in item.items() if key not in {"started", "queued_at", "endpoint", "epoch"}} for item in self._timings]
 
     def health(self) -> dict:
         with self._lock:
@@ -413,6 +476,8 @@ class OPCUABridge:
                 "feedback_error": self._feedback_error,
                 "feedback_mode": self._feedback_mode,
                 "feedback_active": self._feedback_active,
+                "feedback_count": len(RECEIVE_NODE_IDENTIFIERS.keys() & self._received.keys()),
+                "feedback_total": len(RECEIVE_NODE_IDENTIFIERS),
                 "feedback_epoch": self._feedback_epoch,
                 "connection_epoch": self._connection_epoch,
                 "feedback_sequence": self._feedback_sequence,
