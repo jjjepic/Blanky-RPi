@@ -85,11 +85,15 @@ Rectangle {
         return stateValue(key) === 1 ? offCommand : onCommand
     }
 
+    function cylinderAdvanceInactive(key) {
+        return stateValue(key) === 0 || panel.stateMap["inactive_" + key] === 1
+    }
+
     function toggleStateText(key, onText, offText) {
         if (pending(key))
             return t("awaitingConfirmation")
-        if ((key === "cyl_c" || key === "cyl_d") && panel.controller && panel.controller.controlMode === "test")
-            return stateValue(key) === 1 ? onText : t("backward")
+        if ((key === "cyl_c" || key === "cyl_d") && cylinderAdvanceInactive(key))
+            return offText
         if (stateValue(key) < 0)
             return t("unconfirmedShort")
         return stateValue(key) === 1 ? onText : offText
@@ -327,8 +331,8 @@ Rectangle {
 
                         ComponentStatusButton { width: (parent.width - parent.spacing) / 2; commandEnabled: panel.controllable("cyl_a"); label: panel.t("cylinder", { letter: "A" }); iconText: "\u25B0"; command: panel.toggleCommand("cyl_a", "CYL_A_EXTEND", "CYL_A_RETRACT"); active: panel.stateValue("cyl_a") === 1; stateUnknown: panel.stateValue("cyl_a") < 0; statePending: panel.pending("cyl_a"); stateText: panel.toggleStateText("cyl_a", panel.t("forward"), panel.t("backward")); iconColor: panel.accentColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
                         ComponentStatusButton { width: (parent.width - parent.spacing) / 2; commandEnabled: panel.controllable("cyl_b"); label: panel.t("cylinder", { letter: "B" }); iconText: "\u25B0"; command: panel.toggleCommand("cyl_b", "CYL_B_EXTEND", "CYL_B_RETRACT"); active: panel.stateValue("cyl_b") === 1; stateUnknown: panel.stateValue("cyl_b") < 0; statePending: panel.pending("cyl_b"); stateText: panel.toggleStateText("cyl_b", panel.t("forward"), panel.t("backward")); iconColor: panel.accentColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
-                        ComponentStatusButton { width: (parent.width - parent.spacing) / 2; commandEnabled: panel.controllable("cyl_c") && panel.stateValue("cyl_c") !== 1; label: panel.t("cylinder", { letter: "C" }); iconText: "\u25B0"; command: "CYL_C_EXTEND"; active: panel.stateValue("cyl_c") === 1; stateUnknown: panel.stateValue("cyl_c") < 0; statePending: panel.pending("cyl_c"); stateText: panel.toggleStateText("cyl_c", panel.t("forward"), panel.t("unconfirmed")); iconColor: panel.accentColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
-                        ComponentStatusButton { width: (parent.width - parent.spacing) / 2; commandEnabled: panel.controllable("cyl_d") && panel.stateValue("cyl_d") !== 1; label: panel.t("cylinder", { letter: "D" }); iconText: "\u25B0"; command: "CYL_D_EXTEND"; active: panel.stateValue("cyl_d") === 1; stateUnknown: panel.stateValue("cyl_d") < 0; statePending: panel.pending("cyl_d"); stateText: panel.toggleStateText("cyl_d", panel.t("forward"), panel.t("unconfirmed")); iconColor: panel.accentColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
+                        ComponentStatusButton { width: (parent.width - parent.spacing) / 2; commandEnabled: panel.controllable("cyl_c") && panel.stateValue("cyl_c") !== 1; label: panel.t("cylinder", { letter: "C" }); iconText: "\u25B0"; command: "CYL_C_EXTEND"; active: panel.stateValue("cyl_c") === 1; stateUnknown: panel.stateValue("cyl_c") < 0 && !panel.cylinderAdvanceInactive("cyl_c"); statePending: panel.pending("cyl_c"); stateText: panel.toggleStateText("cyl_c", panel.t("forward"), "OFF"); toolTip: panel.cylinderAdvanceInactive("cyl_c") ? panel.t("inactiveCylinderHint") : ""; iconColor: panel.accentColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
+                        ComponentStatusButton { width: (parent.width - parent.spacing) / 2; commandEnabled: panel.controllable("cyl_d") && panel.stateValue("cyl_d") !== 1; label: panel.t("cylinder", { letter: "D" }); iconText: "\u25B0"; command: "CYL_D_EXTEND"; active: panel.stateValue("cyl_d") === 1; stateUnknown: panel.stateValue("cyl_d") < 0 && !panel.cylinderAdvanceInactive("cyl_d"); statePending: panel.pending("cyl_d"); stateText: panel.toggleStateText("cyl_d", panel.t("forward"), "OFF"); toolTip: panel.cylinderAdvanceInactive("cyl_d") ? panel.t("inactiveCylinderHint") : ""; iconColor: panel.accentColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
                     }
 
                     Label { text: panel.t("motors"); color: panel.mutedText; font.bold: true; font.pixelSize: Math.round((panel.compact ? 11 : 12) * panel.readabilityScale); horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }

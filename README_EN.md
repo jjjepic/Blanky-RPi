@@ -66,7 +66,9 @@ The gear button opens two areas:
 
 In **Communications and AI**, the **Control mode** switch selects **Synchronized PLC** (the startup default, based on return signals) or **Local test** (immediate local state and response, even without a PLC). The header and Operation Panel identify the mode. **Warning:** test-mode commands are still sent to the PLC whenever OPC UA is connected, and existing MQTT command topics remain active; both may actuate the machine. Local state does not prove that this happened. Events and `state_quality/*` mark the state `local`, except a real PLC error signal, which remains visible and blocks commands. `monitor/control_mode` publishes `test` or `plc`. Turn off the switch to return to PLC state; pending requests must finish first. The mode is not persisted across restarts.
 
-In test mode, C/D extension and robot pickup requests use a two-second local/MQTT pulse, after which the button becomes inactive so another request can be made. This **does not confirm physical retraction**. OPC UA keeps its normal 0.3-second pulse, and C/D still have no dedicated retract node. In synchronized mode, C/D without confirmed extension show `? Unknown`.
+In test mode, C/D extension and robot pickup requests use a two-second local/MQTT pulse, after which the button becomes inactive so another request can be made. This **does not confirm physical retraction**. OPC UA keeps its normal 0.3-second pulse, and C/D still have no dedicated retract node. In synchronized mode, C/D show `OFF` when the PLC reports a valid but inactive extension signal, and `? Unknown` when no valid reading is available. `OFF` does not prove retraction.
+
+In **Events**, the simple view shows one row per request and updates it with the result. **View details** opens all technical stages, which remain available in exports and are not read out one by one.
 
 Connection fields start locked. Use the pencil icon to unlock them, then apply your changes. MQTT reconnects automatically; changing the OPC UA endpoint reconnects the persistent client to the new server.
 

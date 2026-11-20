@@ -174,6 +174,9 @@ class PLCBridgeTests(unittest.TestCase):
         self.assertNotIn("start", snapshot["pending"])
         self.assertEqual([e["reason"] for e in snapshot["events"] if e["command"] == "START"],
                          ["queued", "written", "state_observed"])
+        correlated = [event for event in snapshot["events"] if event["request_id"] == 1]
+        self.assertEqual([event["reason"] for event in correlated],
+                         ["queued", "written", "state_change", "state_observed"])
 
     def test_start_sends_without_initial_feedback_and_later_confirms(self):
         self.opc.feedback_active = False

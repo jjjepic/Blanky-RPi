@@ -47,6 +47,7 @@ from blanky.color_vision_profiles import get_profile_tokens
 from blanky.command_messages import rejection_for_event, rejection_message
 from blanky.audio_coordinator import AudioCoordinator
 from blanky.audio_messages import command_group_key, operational_speech
+from blanky.operator_events import operator_message, pending_message, summarize_events
 from blanky.preference_intents import handle_preference
 from blanky.event_columns import DESCRIPTION_WIDTH, event_divider, event_header, event_prefix
 
@@ -263,6 +264,7 @@ class BlankyController(QObject):
         self._custom_contrast = self._saved_appearance_value("customContrast", 88.0, 60.0, 100.0)
         self._dark_mode = self._appearance_mode != "light"
         self._monitor_events_rich_text = ""
+        self._monitor_events_summary = ""
         self._language = "pt"
         self._tts_voice = set_tts_voice("", self._language)
         self._tts_speed = 1.0
@@ -413,6 +415,10 @@ class BlankyController(QObject):
     @Property(str, notify=monitorEventsTextChanged)
     def monitorEventsRichText(self):
         return self._monitor_events_rich_text
+
+    @Property(str, notify=monitorEventsTextChanged)
+    def monitorEventsSummary(self):
+        return self._monitor_events_summary
 
     @Property(str, notify=languageChanged)
     def monitorEventsHeader(self):
@@ -1056,6 +1062,7 @@ class BlankyController(QObject):
 
         item, source, language, request_id, is_last = self._text_command_queue.pop(0)
         other_language = "en" if language == "pt" else "pt"
+        other_response = None
         if item["type"] == "setting" or item["name"] in {"QUERY_SETTING", "QUERY_CLARIFY"}:
             try:
                 answers = handle_preference(self, item, language)
@@ -1081,11 +1088,14 @@ class BlankyController(QObject):
         else:
             command = item["name"]
             accepted, response = self._bridge.process_command(command, language, source=source)
-            if accepted and not response:
-                response = self._bridge.last_event_message(language)
-            speech = operational_speech(command, accepted, response, language)
-            other_detail = self._bridge.last_event_message(other_language)
-            other_speech = operational_speech(command, accepted, other_detail, other_language)
+            if accepted and response is None:
+                response = pending_message(command, language)
+                other_response = pending_message(command, other_language)
+                speech = other_speech = ""
+            else:
+                speech = operational_speech(command, accepted, response, language)
+                other_detail = self._bridge.last_event_message(other_language)
+                other_speech = operational_speech(command, accepted, other_detail, other_language)
             if command in {"UNKNOWN", "NO_AUDIO"}:
                 self._set_status(self._tr("text_no_commands"))
             else:
@@ -1094,12 +1104,12 @@ class BlankyController(QObject):
             self._text_response_parts[request_id][language].append(response)
             self._text_response_parts[request_id][f"spoken_{language}"].append(speech)
             self._text_response_parts[request_id][f"spoken_{other_language}"].append(other_speech)
-            self._text_response_parts[request_id][other_language].append(self._bridge.last_event_message(other_language))
+            self._text_response_parts[request_id][other_language].append(other_response or self._bridge.last_event_message(other_language))
         if is_last:
             responses = self._text_response_parts.pop(request_id)
             effective_language = self._language
             combined = " ".join(responses[effective_language])
-            localized = {lang: " ".join(responses[f"spoken_{lang}"]) for lang in ("pt", "en")}
+            localized = {lang: " ".join(filter(None, responses[f"spoken_{lang}"])) for lang in ("pt", "en")}
             spoken = localized[effective_language]
             if combined:
                 self._set_recognized(combined)
@@ -1121,8 +1131,11 @@ class BlankyController(QObject):
             self._language,
             source="button",
         )
-        response = mqtt_message or (self._bridge.response_for_command(command, self._language) if accepted else "")
         self._set_command_interaction("button_status", command)
+        if accepted and mqtt_message is None:
+            self._set_recognized(pending_message(command, self._language))
+            return
+        response = mqtt_message or ""
         if not accepted and response:
             self._set_recognized(response)
         if response:
@@ -1288,9 +1301,10 @@ class BlankyController(QObject):
             self._datetime_text = text
             self.dateTimeTextChanged.emit()
 
-    def _set_monitor_events_rich_text(self, rich_text: str):
-        if self._monitor_events_rich_text != rich_text:
+    def _set_monitor_events_rich_text(self, rich_text: str, summary: str):
+        if self._monitor_events_rich_text != rich_text or self._monitor_events_summary != summary:
             self._monitor_events_rich_text = rich_text
+            self._monitor_events_summary = summary
             self.monitorEventsTextChanged.emit()
 
     def _set_listening(self, value: bool):
@@ -1603,7 +1617,7 @@ class BlankyController(QObject):
 
     def _build_monitor_events_rich_text(self, snapshot: dict) -> str:
         current_generation = int(snapshot.get("event_generation", 0) or 0)
-        rich_rows = []
+        rich_rows = [f"<b>{html.escape(event_header(self._language))}\n{html.escape(event_divider())}</b>"]
         for ev in snapshot.get("events", []):
             event_id = int(ev.get("id", 0) or 0)
             event_label = f"[{event_id:03d}]"
@@ -1632,6 +1646,17 @@ class BlankyController(QObject):
             )
         event_font_size = round(12 * self._appearance_text_scale)
         return f"<pre style='font-family:DejaVu Sans Mono, monospace; font-size:{event_font_size}px;'>" + "\n".join(rich_rows) + "</pre>"
+
+    def _build_monitor_events_summary(self, snapshot: dict) -> str:
+        rows = []
+        for event in summarize_events(snapshot.get("events", [])):
+            detail = operator_message(event, self._language) or self._localized_event_detail(event)
+            if not detail:
+                continue
+            color = self._event_visual_color(str(event.get("command") or ""), bool(event.get("accepted")))
+            time = html.escape(str(event.get("time") or ""))
+            rows.append(f"<p style='margin:0 0 4px 0;color:{color};'>{time} &nbsp; {html.escape(detail)}</p>")
+        return "".join(rows)
 
     def _event_status_label(self, event: dict) -> str:
         reason = event.get("reason")
@@ -1940,8 +1965,9 @@ class BlankyController(QObject):
         with open(path, "wb") as f:
             f.write(document)
 
-    def _update_state_compact(self, state: dict, pending: dict, workflow: dict):
+    def _update_state_compact(self, state: dict, pending: dict, workflow: dict, quality: dict):
         values = [f"{key}={-1 if state.get(key) is None else int(state[key])}" for key in self._STATE_ORDER]
+        values.extend(f"inactive_{key}=1" for key in ("cyl_c", "cyl_d") if quality.get(key) == "position_unknown")
         values.extend(f"pending_{key}=1" for key in pending)
         values.extend(f"workflow_{key}={-1 if value is None else int(value)}" for key, value in workflow.items())
         compact = "|".join(values)
@@ -1958,11 +1984,13 @@ class BlankyController(QObject):
         mic = audio_info()
         health["microphone_ready"] = bool(mic.get("ready"))
         health["openai_activity"] = activity_snapshot()
-        self._update_state_compact(snapshot.get("state", {}), snapshot.get("pending", {}), snapshot.get("workflow", {}))
+        self._update_state_compact(snapshot.get("state", {}), snapshot.get("pending", {}),
+                                   snapshot.get("workflow", {}), snapshot.get("state_quality", {}))
 
         self._set_comm_status_compact(self._build_comm_status_compact(health))
         self._set_comm_details_compact(self._build_comm_details_compact(health))
-        self._set_monitor_events_rich_text(self._build_monitor_events_rich_text(snapshot))
+        self._set_monitor_events_rich_text(self._build_monitor_events_rich_text(snapshot),
+                                           self._build_monitor_events_summary(snapshot))
 
         if not self._listening:
             for ev in self._wakeword.get_events():
@@ -1979,6 +2007,9 @@ class BlankyController(QObject):
 
             if ev.get("source") == "mqtt_panel":
                 self._set_command_interaction("mqtt_status", str(ev.get("command") or ""))
+                if ev.get("reason") == "queued":
+                    self._set_recognized(pending_message(str(ev.get("command") or ""), self._language))
+                    continue
                 detail = self._localized_event_detail(ev)
                 if not ev.get("accepted"):
                     self._set_recognized(detail)
@@ -2000,13 +2031,21 @@ class BlankyController(QObject):
                     and ev.get("plc_value") == 1
                 )):
                     continue
-                detail = self._localized_event_detail(ev)
+                detail = operator_message(ev, self._language) or self._localized_event_detail(ev)
+                if ev.get("reason") in {"state_observed", "system_error"}:
+                    self._set_recognized(detail)
                 self._enqueue_tts(detail, priority="critical" if ev.get("reason") == "system_error" else "operational",
                                   group=ev.get("reason") != "system_error",
                                   group_key=str(ev.get("plc_key") or command_group_key(str(ev.get("command") or ""))),
-                                  localized={lang: str(ev.get(f"detail_{lang}") or detail) for lang in ("pt", "en")})
+                                  localized={lang: operator_message(ev, lang) or str(ev.get(f"detail_{lang}") or detail)
+                                             for lang in ("pt", "en")})
             elif ev.get("source") == "opcua" and not ev.get("accepted"):
-                self._enqueue_tts(self._localized_event_detail(ev), priority="critical")
+                detail = operator_message(ev, self._language) or self._localized_event_detail(ev)
+                self._set_recognized(detail)
+                if ev.get("reason") not in {"superseded", "superseded_by_stop"}:
+                    self._enqueue_tts(detail, priority="critical", localized={
+                        lang: operator_message(ev, lang) or str(ev.get(f"detail_{lang}") or detail)
+                        for lang in ("pt", "en")})
 
     @Slot()
     def shutdown(self):

@@ -71,6 +71,7 @@ ApplicationWindow {
     property var ttsVoiceModel: blanky.ttsVoiceOptions ? blanky.ttsVoiceOptions.split("|") : []
     property var stateMap: ({})
     property var commStateMap: ({})
+    property bool technicalEvents: false
     property bool popupBackdropVisible: false
     property bool systemTransitionActive: false
     property string systemTransitionAction: ""
@@ -946,20 +947,26 @@ ApplicationWindow {
                                 Layout.fillWidth: true
                                 spacing: 8
 
-                                Item {
-                                    Layout.fillWidth: true
-                                    Layout.minimumWidth: 0
-                                    Layout.preferredHeight: Math.round(38 * root.controlScale)
-                                    clip: true
+                                Item { Layout.fillWidth: true; Layout.minimumWidth: 0 }
 
-                                    Text {
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: blanky.monitorEventsHeader
-                                        color: root.mutedText
-                                        font.family: "DejaVu Sans Mono"
-                                        font.pixelSize: Math.round(12 * root.textScale)
-                                        font.bold: true
-                                        textFormat: Text.PlainText
+                                MenuActionButton {
+                                    text: t(root.technicalEvents ? "hideEventDetails" : "showEventDetails")
+                                    Layout.preferredWidth: Math.round(116 * root.controlScale)
+                                    Layout.preferredHeight: Math.round(38 * root.controlScale)
+                                    accentColor: root.accentColor
+                                    textColor: root.textColor
+                                    mutedText: root.mutedText
+                                    borderColor: root.borderColor
+                                    panelColor: root.panelAltColor
+                                    activeFocusOnTab: true
+                                    Accessible.role: Accessible.Button
+                                    Accessible.name: text
+                                    Accessible.onPressAction: clicked()
+                                    Keys.onSpacePressed: clicked()
+                                    Keys.onReturnPressed: clicked()
+                                    onClicked: {
+                                        root.technicalEvents = !root.technicalEvents
+                                        eventsAutoscrollTimer.restart()
                                     }
                                 }
 
@@ -997,19 +1004,19 @@ ApplicationWindow {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
                             clip: true
-                            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                            ScrollBar.horizontal.policy: root.technicalEvents ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
                             ScrollBar.vertical.policy: ScrollBar.AlwaysOn
 
                             TextEdit {
                                 id: eventsContent
-                                width: eventsScroll.availableWidth
+                                width: root.technicalEvents ? Math.max(eventsScroll.availableWidth, contentWidth + 4) : eventsScroll.availableWidth
                                 height: Math.max(eventsScroll.availableHeight, contentHeight + 6)
-                                text: blanky.monitorEventsRichText
+                                text: root.technicalEvents ? blanky.monitorEventsRichText : blanky.monitorEventsSummary
                                 readOnly: true
                                 selectByMouse: true
-                                wrapMode: TextEdit.NoWrap
+                                wrapMode: root.technicalEvents ? TextEdit.NoWrap : TextEdit.Wrap
                                 color: root.textColor
-                                font.family: "DejaVu Sans Mono"
+                                font.family: root.technicalEvents ? "DejaVu Sans Mono" : root.font.family
                                 font.pixelSize: Math.round(12 * root.textScale)
                                 textFormat: TextEdit.RichText
                             }

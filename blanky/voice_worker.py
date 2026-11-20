@@ -11,6 +11,7 @@ from blanky.speech_service import is_openai_configured, stt_transcribe
 from blanky.command_parser import interpret_online_items, parse_offline_items
 from blanky.mqtt_service import get_mqtt_bridge
 from blanky.audio_messages import operational_speech
+from blanky.operator_events import pending_message
 
 
 _LOG = logging.getLogger(__name__)
@@ -47,7 +48,7 @@ class VoiceWorker(QThread):
         if message:
             return message
         if accepted:
-            return bridge.response_for_command(command, self.lang)
+            return pending_message(command, self.lang)
         return ""
 
     def _emit_diagnostic(
@@ -185,9 +186,12 @@ class VoiceWorker(QThread):
                             response_part = self._response_for_result(
                                 mqtt_bridge, command, accepted, mqtt_message
                             )
-                            spoken_part = operational_speech(command, accepted, response_part, self.lang)
-                            other_detail = mqtt_bridge.last_event_message(other_language)
-                            other_spoken = operational_speech(command, accepted, other_detail, other_language)
+                            if accepted and mqtt_message is None:
+                                spoken_part = other_spoken = ""
+                            else:
+                                spoken_part = operational_speech(command, accepted, response_part, self.lang)
+                                other_detail = mqtt_bridge.last_event_message(other_language)
+                                other_spoken = operational_speech(command, accepted, other_detail, other_language)
                             diagnostic_name = command
                         if response_part:
                             responses.append(response_part)
@@ -205,7 +209,7 @@ class VoiceWorker(QThread):
                         if index < len(items) - 1:
                             time.sleep(0.3)
                     response = " ".join(responses)
-                    speech_map = {lang: " ".join(spoken_parts[lang]) for lang in ("pt", "en")}
+                    speech_map = {lang: " ".join(filter(None, spoken_parts[lang])) for lang in ("pt", "en")}
                     speech = speech_map[self.lang]
             if response:
                 self._emit_status("Resposta pronta." if self.lang == "pt" else "Answer ready.")

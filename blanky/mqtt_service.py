@@ -384,6 +384,7 @@ class MQTTBridge:
             self._last_valid_read = str(health.get("last_valid_read") or "")
             if new_baseline or not available:
                 self._last_known = {key: value for key, value in state.items() if value is not None}
+            by_id = {record.get("id"): record for record in records}
             for key, value in state.items():
                 previous = self.state[key]
                 previous_quality = self.state_quality[key]
@@ -395,15 +396,19 @@ class MQTTBridge:
                 if available and not new_baseline and value is not None:
                     before = self._last_known.get(key)
                     if before != value:
+                        pending = self._pending_commands.get(key, {})
+                        record_id = pending.get("record_id")
+                        matching_return = (pending.get("target") == value and quality[key] == "confirmed"
+                                           and by_id.get(record_id, {}).get("ack_status") == "state_observed")
                         self._add_event("PLC_STATE", "plc", True, plc_change_message(key, value, self._ui_lang),
                                         detail_pt=plc_change_message(key, value, "pt"),
                                         detail_en=plc_change_message(key, value, "en"),
                                         plc_key=key, plc_value=value,
                                         request_pending=key in self._pending_commands,
+                                        request_id=record_id if matching_return else None,
                                         reason="system_error" if key == "system_error" and value else "state_change")
                     self._last_known[key] = value
 
-            by_id = {record.get("id"): record for record in records}
             for key, pending in list(self._pending_commands.items()):
                 record = by_id.get(pending["record_id"])
                 status = record.get("ack_status") if record else "queued"
@@ -415,21 +420,21 @@ class MQTTBridge:
                                     "Escrita OPC UA concluída; a aguardar o estado do PLC."
                                     if self._ui_lang == "pt" else "OPC UA write completed; awaiting PLC state.",
                                     reason="written", detail_pt="Escrita OPC UA concluída; a aguardar o estado do PLC.",
-                                    detail_en="OPC UA write completed; awaiting PLC state.")
+                                    detail_en="OPC UA write completed; awaiting PLC state.", request_id=pending["record_id"])
                 if (status == "state_observed" and pending["stage"] == "written"
                         and state[key] == pending["target"] and quality[key] == "confirmed"):
                     self._add_event(pending["command"], "plc", True,
                                     plc_observation_message(pending["command"], self._ui_lang),
                                     reason="state_observed",
                                     detail_pt=plc_observation_message(pending["command"], "pt"),
-                                    detail_en=plc_observation_message(pending["command"], "en"))
+                                    detail_en=plc_observation_message(pending["command"], "en"), request_id=pending["record_id"])
                     del self._pending_commands[key]
                 elif status in {"timeout", "write_error", "reset_error", "disconnected", "endpoint_changed", "feedback_lost", "stale_or_endpoint_changed", "superseded", "superseded_by_stop", "no_fresh_transition"}:
                     detail = ("Não foi possível confirmar o pedido pelo estado do PLC."
                               if self._ui_lang == "pt" else "The request could not be confirmed by the PLC state.")
                     self._add_event(pending["command"], "opcua", False, detail, reason=status,
                                     detail_pt="Não foi possível confirmar o pedido pelo estado do PLC.",
-                                    detail_en="The request could not be confirmed by the PLC state.")
+                                    detail_en="The request could not be confirmed by the PLC state.", request_id=pending["record_id"])
                     del self._pending_commands[key]
 
     def pending_snapshot(self) -> dict[str, dict]:
@@ -604,7 +609,7 @@ class MQTTBridge:
             if command == "STOP" and "start" in self._pending_commands:
                 self._add_event(self._pending_commands["start"]["command"], "opcua", False,
                                 "Pedido anterior substituído por paragem." if lang == "pt" else "Previous request superseded by stop.",
-                                reason="superseded_by_stop")
+                                reason="superseded_by_stop", request_id=self._pending_commands["start"]["record_id"])
             self._pending_commands[key] = {
                 "command": command, "target": value, "record_id": record_id or 0,
                 "source": source, "stage": "queued", "created_at": time.monotonic(),
@@ -612,7 +617,7 @@ class MQTTBridge:
             self._emit_for_command(command, emit_pulse)
             self._add_event(
                 command=command, source=source, accepted=True,
-                detail=self._response_for_command(command, lang), reason="queued",
+                detail=self._response_for_command(command, lang), reason="queued", request_id=record_id,
             )
             return True, None
 
@@ -731,7 +736,7 @@ class MQTTBridge:
 
     def _add_event(self, command: str, source: str, accepted: bool, detail: Optional[str], reason: str = "",
                    detail_pt: str = "", detail_en: str = "", plc_key: str = "", plc_value: int | None = None,
-                   request_pending: bool = False):
+                   request_pending: bool = False, request_id: int | None = None):
         event = {
             "id": self._next_event_id,
             "time": datetime.now().strftime("%H:%M:%S"),
@@ -744,6 +749,7 @@ class MQTTBridge:
             "plc_key": plc_key,
             "plc_value": plc_value,
             "request_pending": request_pending,
+            "request_id": request_id,
             "reason": reason,
             "generation": self._event_generation,
         }
