@@ -24,6 +24,12 @@ Se o `DB4` do S&R já indicar «Sistema Ligado» mas o Blanky não confirmar, us
 
 `Good/Null` indica que a leitura encontrou o nó, mas não recebeu um valor Boolean. A monitorização do DB4 no TIA não verifica a publicação OPC UA. No PLC **Send&Receive**, abre **OPC UA communication → Server interfaces → OPC UA Receber**, compara a coluna **Local data** de `i=2` e `i=3` com os campos «Sistema Ligado» e «Sistema Parado» do `DB4` desse PLC e verifica a consistência da interface. Se houver diferença, corrige a associação simbólica, mantendo os NodeIds, e valida que a interface compilada e descarregada corresponde ao projeto, segundo o procedimento seguro de manutenção da maquete. Não é necessário forçar bits nem alterar a interface de envio. Volta a ler os dois nós com o diagnóstico enquanto acompanhas a mesma transição no TIA; depois confirma os restantes sinais.
 
+### Motor ligado pela HMI não desliga pelo Blanky
+
+No programa da Maquete, `FC9` (redes 7 e 9) repõe `Dados Modo Manual.Motor 1/2` quando chega `Motor 1/2 Off`. Essa reposição não altera `HMI_Manual.M1/M2`, que é um pedido paralelo: `FC8`, rede 1, para o tapete 1 e redes 4/6 de `Tapete_2_Saídas` para o tapete 2 (páginas 129, 136–137 e 188 da exportação). Se a entrada da HMI estiver ativa, a saída pode continuar ligada.
+
+Em condições de ensaio seguras, monitoriza sem forçar bits: o impulso `DB100.DBX0.7`/`DB100.DBX1.1` nos dois PLCs, `Dados Modo Manual.Motor 1/2`, `HMI_Manual.M1/M2` e `%Q0.0`/`%Q0.1` na Maquete. Se o impulso não chegar à Maquete, investiga a ligação entre PLCs antes de mudar a lógica. Se chegar e a HMI mantiver a saída, a resolução deve arbitrar os pedidos das duas origens no PLC Maquete: um estado manual partilhado, paragem prioritária em conflito e sem rearranque por um pedido antigo. Mantém os interbloqueios e a lógica automática. Valida HMI → Blanky e Blanky → HMI antes de colocar a alteração em serviço.
+
 ## Matriz de ensaios
 
 | Ensaio | Ação | Observação esperada |

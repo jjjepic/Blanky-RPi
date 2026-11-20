@@ -257,6 +257,25 @@ class PLCBridgeTests(unittest.TestCase):
         self.assertIn(("state/motor_1", 1), published)
         self.assertIn(("state_quality/motor_1", "confirmed"), published)
 
+    def test_motor_started_on_hmi_can_be_commanded_off_by_blanky(self):
+        self.start_manual()
+        for index, source in ((1, "button"), (2, "text")):
+            with self.subTest(motor=index, source=source):
+                key = f"motor_{index}"
+                self.opc.received.update({f"{key}_on": True, f"{key}_off": False})
+                self.assertEqual(self.bridge.get_snapshot()["state"][key], 1)
+                command = f"MOTOR_{index}_OFF"
+                self.assertEqual(self.bridge.process_command(command, "pt", source=source), (True, None))
+                self.assertEqual(self.opc.records[-1]["command"], command)
+                self.opc.write(record_id=index)
+                self.assertEqual(self.bridge.get_snapshot()["state"][key], 1)
+                self.opc.received[f"{key}_on"] = False
+                self.opc.observe(f"{key}_off", record_id=index)
+                snapshot = self.bridge.get_snapshot()
+                self.assertEqual(snapshot["state"][key], 0)
+                self.assertEqual(snapshot["state_quality"][key], "confirmed")
+                self.assertEqual(snapshot["events"][-1]["reason"], "state_observed")
+
     def test_pending_duplicate_and_timeout_do_not_fake_state(self):
         self.start_manual()
         self.assertTrue(self.bridge.process_command("MOTOR_1_ON", "pt")[0])

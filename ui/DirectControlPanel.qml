@@ -26,6 +26,8 @@ Rectangle {
     readonly property bool systemStarted: stateValue("start") === 1
     readonly property bool manualAvailable: stateValue("mode_manual") === 1
     readonly property bool automaticMode: stateValue("mode_fast") === 1 || stateValue("mode_ideal") === 1
+    readonly property bool manualControlsEnabled: systemStarted && manualAvailable && !automaticMode
+        && startRequested && workflowValue("mode_manual") === 1
     readonly property bool modeChangeActive: stateValue("mode_change") === 1
     readonly property bool modeRequestPending: pending("mode_fast") || pending("mode_ideal")
         || pending("mode_manual") || pending("mode_change")
@@ -71,12 +73,12 @@ Rectangle {
     }
 
     function controllable(key) {
-        return !panel.automaticMode && panel.startRequested && workflowValue("mode_manual") === 1 && !pending(key)
+        return panel.manualControlsEnabled && !pending(key)
     }
 
     component ComponentStatusButton: ManualCommandButton {
-        monitorOnly: panel.automaticMode
-        monitorHint: panel.t("automaticMonitorHint")
+        monitorOnly: !panel.manualControlsEnabled
+        monitorHint: panel.t(panel.automaticMode ? "automaticMonitorHint" : "manualControlLockedHint")
     }
 
     function toggleCommand(key, onCommand, offCommand) {
@@ -285,8 +287,8 @@ Rectangle {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 color: panel.panelAltColor
-                border.color: panel.manualAvailable ? panel.successColor : panel.borderColor
-                border.width: panel.manualAvailable ? 2 : 1
+                border.color: panel.manualControlsEnabled ? panel.successColor : panel.borderColor
+                border.width: panel.manualControlsEnabled ? 2 : 1
                 radius: 9
 
                 ColumnLayout {
@@ -300,7 +302,7 @@ Rectangle {
                         Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: panel.borderColor }
                         Label {
                             text: panel.t(panel.automaticMode ? "componentMonitor" : "manualControl")
-                            color: panel.manualAvailable ? panel.successColor : panel.mutedText
+                            color: panel.manualControlsEnabled ? panel.successColor : panel.mutedText
                             font.pixelSize: Math.round(14 * panel.readabilityScale)
                             font.bold: true
                         }
