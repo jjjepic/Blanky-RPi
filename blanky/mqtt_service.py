@@ -927,6 +927,7 @@ class MQTTBridge:
             "opcua_last_write": str(opcua_health.get("last_write") or ""),
             "opcua_feedback_active": bool(opcua_health.get("feedback_active")),
             "opcua_feedback_count": opcua_health.get("feedback_count", 0),
+            "opcua_feedback_null_count": opcua_health.get("feedback_null_count", 0),
             "opcua_feedback_total": opcua_health.get("feedback_total", 0),
             "opcua_initial_complete": bool(opcua_health.get("initial_complete")),
             "opcua_last_valid_read": str(opcua_health.get("last_valid_read") or ""),

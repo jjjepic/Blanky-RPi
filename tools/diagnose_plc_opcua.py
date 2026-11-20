@@ -62,10 +62,14 @@ async def diagnose(url: str, receive_uri: str, *, system_only: bool = False) -> 
                     continue
                 node_id = f"ns={receive_index};i={identifier}"
                 try:
-                    value = await client.get_node(node_id).read_value()
-                    if not isinstance(value, bool):
+                    data = await client.get_node(node_id).read_data_value(raise_on_bad_status=False)
+                    status = data.StatusCode
+                    value = data.Value.Value if data.Value is not None else None
+                    variant = data.Value.VariantType.name if data.Value is not None else "Null"
+                    if status is None or not status.is_good() or type(value) is not bool:
                         errors += 1
-                        print(f"  ERRO {signal:24} {node_id:14} tipo {type(value).__name__}, esperado Bool")
+                        quality = status.name if status is not None else "Sem status"
+                        print(f"  ERRO {signal:24} {node_id:14} {quality}/{variant}, esperado Boolean válido")
                     else:
                         values[signal] = value
                         print(f"  OK  {signal:24} {node_id:14} {value}")

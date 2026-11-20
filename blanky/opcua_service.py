@@ -66,6 +66,7 @@ class OPCUABridge:
         self._connected = False
         self._last_error = ""
         self._feedback_error = ""
+        self._feedback_null_count = 0
         self._feedback_active = False
         self._feedback_mode = "unavailable"
         self._feedback_batch_size = 8
@@ -121,6 +122,7 @@ class OPCUABridge:
             if url != self._url:
                 self._url = url
                 self._received.clear()
+                self._feedback_null_count = 0
                 self._feedback_active = False
                 self._initial_complete = False
                 self._feedback_epoch += 1
@@ -211,6 +213,7 @@ class OPCUABridge:
                     self._feedback_active = False
                     self._feedback_mode = "unavailable"
                     self._received.clear()
+                    self._feedback_null_count = 0
                     self._initial_complete = False
                     self._feedback_epoch += 1
                     self._connection_epoch += 1
@@ -325,6 +328,7 @@ class OPCUABridge:
         for offset in range(0, len(requested), batch_size):
             results.extend(await self._read_return_batch(client, requested[offset:offset + batch_size]))
         errors = []
+        null_count = 0
         with self._lock:
             for (name, node), result in zip(nodes.items(), results):
                 status = result.StatusCode if result is not None else None
@@ -332,10 +336,15 @@ class OPCUABridge:
                 if status is not None and status.is_good() and type(value) is bool:
                     self._record_feedback_locked(name, value, sample_started=sample_started)
                 else:
-                    detail = status.name if status is not None and not status.is_good() else f"invalid value {value!r}"
+                    if status is not None and status.is_good() and value is None:
+                        detail = "Good/Null (no Boolean value)"
+                        null_count += name in RECEIVE_NODE_IDENTIFIERS
+                    else:
+                        detail = status.name if status is not None and not status.is_good() else f"invalid value {value!r}"
                     errors.append(f"{name} ({node}): {detail}")
                     self._received.pop(name, None)
             self._update_feedback_availability_locked()
+            self._feedback_null_count = null_count
             self._set_feedback_detail_locked("; ".join(errors))
         return not errors
 
@@ -389,6 +398,7 @@ class OPCUABridge:
             self._feedback_mode = "polling"
             self._initial_complete = False
             self._received.clear()
+            self._feedback_null_count = 0
             if was_available:
                 self._feedback_epoch += 1
             # A fresh read can still observe pending requests before their timeout.
@@ -477,6 +487,7 @@ class OPCUABridge:
                 "feedback_mode": self._feedback_mode,
                 "feedback_active": self._feedback_active,
                 "feedback_count": len(RECEIVE_NODE_IDENTIFIERS.keys() & self._received.keys()),
+                "feedback_null_count": self._feedback_null_count,
                 "feedback_total": len(RECEIVE_NODE_IDENTIFIERS),
                 "feedback_epoch": self._feedback_epoch,
                 "connection_epoch": self._connection_epoch,

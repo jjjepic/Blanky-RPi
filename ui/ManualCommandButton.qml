@@ -19,6 +19,8 @@ Rectangle {
     property bool stateUnknown: false
     property bool statePending: false
     property bool commandEnabled: true
+    property bool monitorOnly: false
+    property string monitorHint: ""
     property bool singleLineTitle: false
     property bool centeredContent: false
     readonly property real readabilityScale: typeof blanky !== "undefined" ? blanky.appearanceTextScale : 1.0
@@ -36,7 +38,8 @@ Rectangle {
     )
     readonly property bool hovered: commandMouse.containsMouse
     readonly property bool hoverAnimationsEnabled: typeof blanky === "undefined" || blanky.hoverAnimationsEnabled
-    readonly property bool strongHover: hovered && commandEnabled && hoverAnimationsEnabled
+    readonly property bool interactive: commandEnabled && !monitorOnly
+    readonly property bool strongHover: hovered && interactive && hoverAnimationsEnabled
     readonly property color hoverColor: active ? iconColor : borderColor
     readonly property real hoverLuminance: 0.2126 * hoverColor.r + 0.7152 * hoverColor.g + 0.0722 * hoverColor.b
     readonly property color hoverTextColor: hoverLuminance > 0.62 ? "#101010" : "#ffffff"
@@ -45,12 +48,15 @@ Rectangle {
 
     radius: 8
     height: parent && parent.controlButtonHeight !== undefined ? parent.controlButtonHeight : 42
-    color: strongHover ? hoverColor : (hovered && commandEnabled ? Qt.lighter(panelColor, 1.16) : (active ? Qt.lighter(panelColor, 1.45) : panelColor))
-    opacity: commandEnabled || active ? 1.0 : 0.62
+    color: strongHover ? hoverColor : (hovered && interactive ? Qt.lighter(panelColor, 1.16) : (active ? Qt.lighter(panelColor, monitorOnly ? 1.18 : 1.45) : panelColor))
+    opacity: monitorOnly ? 0.82 : (interactive || active ? 1.0 : 0.62)
     border.color: strongHover ? Qt.lighter(hoverColor, 1.12) : (active ? iconColor : borderColor)
-    border.width: active || strongHover ? 2 : 1
+    border.width: (active && !monitorOnly) || strongHover ? 2 : 1
     scale: strongHover ? 1.012 : 1.0
     z: hovered ? 1 : 0
+    Accessible.role: monitorOnly ? Accessible.StaticText : Accessible.NoRole
+    Accessible.name: monitorOnly ? label + ": " + formattedStateText : ""
+    Accessible.description: monitorOnly ? monitorHint : ""
 
     Behavior on color { ColorAnimation { duration: 140 } }
     Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
@@ -58,10 +64,11 @@ Rectangle {
     HoverHandler { id: hintHover }
     BlankyToolTip {
         parent: control
-        visible: hintHover.hovered && (control.toolTip.length > 0 || control.stateUnknown)
+        visible: hintHover.hovered && (control.toolTip.length > 0 || control.stateUnknown || control.monitorOnly)
         text: (control.stateUnknown
             ? (typeof blanky !== "undefined" && blanky.language === "en" ? "State not confirmed by the PLC." : "Estado não confirmado pelo PLC.")
             : "") + (control.toolTip.length > 0 ? (control.stateUnknown ? " " : "") + control.toolTip : "")
+            + (control.monitorOnly ? ((control.stateUnknown || control.toolTip.length > 0) ? " " : "") + control.monitorHint : "")
         surfaceColor: control.panelColor
         outlineColor: control.borderColor
         foregroundColor: control.textColor
@@ -115,6 +122,7 @@ Rectangle {
                 color: control.strongHover ? control.hoverTextColor : control.textColor
                 font.pixelSize: control.titlePixelSize
                 font.bold: control.active
+                opacity: control.monitorOnly ? 0.74 : 1.0
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
                 wrapMode: Text.NoWrap
@@ -158,6 +166,7 @@ Rectangle {
                 color: control.strongHover ? control.hoverTextColor : control.textColor
                 font.pixelSize: control.titlePixelSize
                 font.bold: control.active
+                opacity: control.monitorOnly ? 0.74 : 1.0
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
                 wrapMode: Text.NoWrap
@@ -190,9 +199,9 @@ Rectangle {
     MouseArea {
         id: commandMouse
         anchors.fill: parent
-        enabled: control.commandEnabled
+        enabled: control.interactive
         hoverEnabled: true
-        cursorShape: control.commandEnabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+        cursorShape: control.interactive ? Qt.PointingHandCursor : Qt.ArrowCursor
         onClicked: control.triggered(control.command)
     }
 }

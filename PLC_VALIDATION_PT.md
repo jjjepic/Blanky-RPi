@@ -20,6 +20,10 @@ Os PDFs documentam `DB100` (comandos) e `DB4` (retorno) nos dois PLCs, com `TRCV
 
 Se o `DB4` do S&R já indicar «Sistema Ligado» mas o Blanky não confirmar, usa `python tools/diagnose_plc_opcua.py --system-only --url opc.tcp://192.168.30.3:4840` (ou o endpoint configurado). Compara `i=2` e `i=3` do namespace de retorno com `DB4.DBX0.0` e `DB4.DBX0.1`. A leitura de `TRUE`/`FALSE` confirma ligado; se um nó estiver indisponível ou os dois sinais coincidirem, o estado permanece incerto. Nó em falta fora deste par não deve bloquear o estado do sistema: o cartão apresenta o número de sinais válidos e o terminal identifica o nó e a qualidade inválida.
 
+### Servidor responde `Good/Null`
+
+`Good/Null` indica que a leitura encontrou o nó, mas não recebeu um valor Boolean. A monitorização do DB4 no TIA não verifica a publicação OPC UA. No PLC **Send&Receive**, abre **OPC UA communication → Server interfaces → OPC UA Receber**, compara a coluna **Local data** de `i=2` e `i=3` com os campos «Sistema Ligado» e «Sistema Parado» do `DB4` desse PLC e verifica a consistência da interface. Se houver diferença, corrige a associação simbólica, mantendo os NodeIds, e valida que a interface compilada e descarregada corresponde ao projeto, segundo o procedimento seguro de manutenção da maquete. Não é necessário forçar bits nem alterar a interface de envio. Volta a ler os dois nós com o diagnóstico enquanto acompanhas a mesma transição no TIA; depois confirma os restantes sinais.
+
 ## Matriz de ensaios
 
 | Ensaio | Ação | Observação esperada |

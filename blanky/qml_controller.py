@@ -1519,6 +1519,8 @@ class BlankyController(QObject):
         if not health.get("opcua_connected"):
             return "Sem ligação ao PLC" if is_pt else "No PLC connection"
         if not health.get("opcua_feedback_active"):
+            if health.get("opcua_feedback_null_count"):
+                return "Servidor ligado; retorno sem valores" if is_pt else "Server connected; no return values"
             return "Servidor ligado; estados indisponíveis" if is_pt else "Server connected; states unavailable"
         count, total = health.get("opcua_feedback_count", 0), health.get("opcua_feedback_total", 0)
         if count < total:

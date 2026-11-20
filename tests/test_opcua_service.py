@@ -164,6 +164,29 @@ class OPCUAOfflineTests(unittest.TestCase):
         self.assertLessEqual(max(sizes), 2)
         self.assertEqual(bridge.health()["feedback_count"], len(nodes))
 
+    def test_good_null_is_reported_without_inventing_a_plc_state(self):
+        with patch.object(opcua_service, "OPCUA_ENABLED", False):
+            bridge = opcua_service.OPCUABridge()
+
+        class FakeClient:
+            async def read_attributes(self, requested):
+                return [_data_value(self.value)] * len(requested)
+
+        client = FakeClient()
+        client.value = None
+        nodes = dict(RECEIVE_NODE_IDENTIFIERS)
+        with self.assertLogs("blanky.opcua_service", level="WARNING"):
+            self.assertFalse(_run_without_io(bridge._read_feedback(client, nodes)))
+        health = bridge.health()
+        self.assertEqual(health["feedback_null_count"], 25)
+        self.assertIn("Good/Null", health["feedback_error"])
+        self.assertEqual(health["received"], {})
+        self.assertFalse(health["feedback_active"])
+        client.value = False
+        self.assertTrue(_run_without_io(bridge._read_feedback(client, nodes)))
+        self.assertTrue(bridge.health()["feedback_active"])
+        self.assertEqual(bridge.health()["feedback_null_count"], 0)
+
     def test_subscription_partial_rejection_keeps_read_values_and_uses_polling(self):
         with patch.object(opcua_service, "OPCUA_ENABLED", False):
             bridge = opcua_service.OPCUABridge()
