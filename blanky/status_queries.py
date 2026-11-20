@@ -225,9 +225,12 @@ def answer_query(name: str, component: str, lang: str, state: dict, health: dict
         return _say(lang, f"Último evento por {source[0]}: {action}, {result}. {detail}".strip(),
                     f"Last event from {source[1]}: {action}, {result}. {detail}".strip())
     if name == "QUERY_OPTIONS":
-        if state.get("start") is None:
+        if not allowed:
             return _say(lang, "Podes consultar o estado, mas aguarda pela ligação ao PLC antes de comandar.",
                         "You can ask for status, but wait for the PLC connection before sending commands.")
+        if allowed == {"STOP"}:
+            return _say(lang, "Podes parar o sistema ou consultar o seu estado.",
+                        "You can stop the system or ask for its status.")
         if "START" in allowed and not state.get("start"):
             return _say(lang, "Podes iniciar o sistema ou consultar o seu estado.",
                         "You can start the system or ask for its status.")

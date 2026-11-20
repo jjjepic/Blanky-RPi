@@ -28,10 +28,12 @@ Rectangle {
     readonly property bool modeChangeActive: stateValue("mode_change") === 1
     readonly property bool modeRequestPending: pending("mode_fast") || pending("mode_ideal")
         || pending("mode_manual") || pending("mode_change")
-    readonly property bool modeSelected: stateValue("mode_fast") === 1
-        || stateValue("mode_ideal") === 1 || manualAvailable
-    readonly property bool canSelectMode: systemStarted && !modeRequestPending && (!modeSelected || modeChangeActive)
-    readonly property bool canRequestModeChange: systemStarted && !modeRequestPending && modeSelected && !modeChangeActive
+    readonly property bool startRequested: workflowValue("start") === 1
+    readonly property bool modeSelected: workflowValue("mode_fast") === 1
+        || workflowValue("mode_ideal") === 1 || workflowValue("mode_manual") === 1
+    readonly property bool modeChangeRequested: workflowValue("mode_change") === 1
+    readonly property bool canSelectMode: startRequested && !modeRequestPending && (!modeSelected || modeChangeRequested)
+    readonly property bool canRequestModeChange: startRequested && !modeRequestPending && modeSelected && !modeChangeRequested
     readonly property color fastModeColor: warningColor
     readonly property color idealModeColor: accentColor
     readonly property color manualModeColor: successColor
@@ -62,8 +64,13 @@ Rectangle {
         return panel.stateMap["pending_" + key] === 1
     }
 
+    function workflowValue(key) {
+        var value = panel.stateMap["workflow_" + key]
+        return value === undefined ? stateValue(key) : Number(value)
+    }
+
     function controllable(key) {
-        return panel.manualAvailable && stateValue(key) >= 0 && !pending(key)
+        return panel.startRequested && workflowValue("mode_manual") === 1 && !pending(key)
     }
 
     function toggleCommand(key, onCommand, offCommand) {
@@ -207,12 +214,12 @@ Rectangle {
                     ManualCommandButton {
                         Layout.fillWidth: true
                         Layout.preferredHeight: panel.actionButtonHeight
-                        commandEnabled: panel.stateValue("start") >= 0 && !panel.pending("start")
-                        label: panel.stateValue("start") === 1 ? panel.t("stopAction") : panel.t("startAction")
+                        commandEnabled: panel.startRequested || !panel.pending("start")
+                        label: panel.startRequested ? panel.t("stopAction") : panel.t("startAction")
                         singleLineTitle: true
                         centeredContent: true
-                        iconText: panel.stateValue("start") === 1 ? "\u23F9" : "\u25B6"
-                        command: panel.toggleCommand("start", "START", "STOP")
+                        iconText: panel.startRequested ? "\u23F9" : "\u25B6"
+                        command: panel.startRequested ? "STOP" : "START"
                         active: panel.stateValue("start") === 1
                         stateUnknown: panel.stateValue("start") < 0
                         statePending: panel.pending("start")
@@ -312,8 +319,8 @@ Rectangle {
 
                         ManualCommandButton { width: (parent.width - parent.spacing) / 2; commandEnabled: panel.controllable("cyl_a"); label: panel.t("cylinder", { letter: "A" }); iconText: "\u25B0"; command: panel.toggleCommand("cyl_a", "CYL_A_EXTEND", "CYL_A_RETRACT"); active: panel.stateValue("cyl_a") === 1; stateUnknown: panel.stateValue("cyl_a") < 0; statePending: panel.pending("cyl_a"); stateText: panel.toggleStateText("cyl_a", panel.t("forward"), panel.t("backward")); iconColor: panel.accentColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
                         ManualCommandButton { width: (parent.width - parent.spacing) / 2; commandEnabled: panel.controllable("cyl_b"); label: panel.t("cylinder", { letter: "B" }); iconText: "\u25B0"; command: panel.toggleCommand("cyl_b", "CYL_B_EXTEND", "CYL_B_RETRACT"); active: panel.stateValue("cyl_b") === 1; stateUnknown: panel.stateValue("cyl_b") < 0; statePending: panel.pending("cyl_b"); stateText: panel.toggleStateText("cyl_b", panel.t("forward"), panel.t("backward")); iconColor: panel.accentColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
-                        ManualCommandButton { width: (parent.width - parent.spacing) / 2; commandEnabled: panel.manualAvailable && !panel.pending("cyl_c") && panel.stateValue("cyl_c") !== 1; label: panel.t("cylinder", { letter: "C" }); iconText: "\u25B0"; command: "CYL_C_EXTEND"; active: panel.stateValue("cyl_c") === 1; stateUnknown: panel.stateValue("cyl_c") < 0; statePending: panel.pending("cyl_c"); stateText: panel.toggleStateText("cyl_c", panel.t("forward"), panel.t("unconfirmed")); iconColor: panel.accentColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
-                        ManualCommandButton { width: (parent.width - parent.spacing) / 2; commandEnabled: panel.manualAvailable && !panel.pending("cyl_d") && panel.stateValue("cyl_d") !== 1; label: panel.t("cylinder", { letter: "D" }); iconText: "\u25B0"; command: "CYL_D_EXTEND"; active: panel.stateValue("cyl_d") === 1; stateUnknown: panel.stateValue("cyl_d") < 0; statePending: panel.pending("cyl_d"); stateText: panel.toggleStateText("cyl_d", panel.t("forward"), panel.t("unconfirmed")); iconColor: panel.accentColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
+                        ManualCommandButton { width: (parent.width - parent.spacing) / 2; commandEnabled: panel.controllable("cyl_c") && panel.stateValue("cyl_c") !== 1; label: panel.t("cylinder", { letter: "C" }); iconText: "\u25B0"; command: "CYL_C_EXTEND"; active: panel.stateValue("cyl_c") === 1; stateUnknown: panel.stateValue("cyl_c") < 0; statePending: panel.pending("cyl_c"); stateText: panel.toggleStateText("cyl_c", panel.t("forward"), panel.t("unconfirmed")); iconColor: panel.accentColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
+                        ManualCommandButton { width: (parent.width - parent.spacing) / 2; commandEnabled: panel.controllable("cyl_d") && panel.stateValue("cyl_d") !== 1; label: panel.t("cylinder", { letter: "D" }); iconText: "\u25B0"; command: "CYL_D_EXTEND"; active: panel.stateValue("cyl_d") === 1; stateUnknown: panel.stateValue("cyl_d") < 0; statePending: panel.pending("cyl_d"); stateText: panel.toggleStateText("cyl_d", panel.t("forward"), panel.t("unconfirmed")); iconColor: panel.accentColor; textColor: panel.textColor; mutedText: panel.mutedText; borderColor: panel.borderColor; panelColor: panel.panelAltColor; onTriggered: function(command) { panel.controller.submitButtonCommand(command) } }
                     }
 
                     Label { text: panel.t("motors"); color: panel.mutedText; font.bold: true; font.pixelSize: Math.round((panel.compact ? 11 : 12) * panel.readabilityScale); horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }

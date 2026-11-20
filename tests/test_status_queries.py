@@ -241,6 +241,7 @@ class QueryBridgeTests(unittest.TestCase):
         self.assertEqual(self.writes, [])
 
     def test_options_follow_existing_workflow(self):
+        self.bridge.health = lambda: {"opcua_connected": True}
         self.assertIn("iniciar", self.bridge.answer_status_query("QUERY_OPTIONS", "", "pt", "text"))
         self.bridge.state["start"] = 1
         self.assertIn("modo rápido", self.bridge.answer_status_query("QUERY_OPTIONS", "", "pt", "text"))

@@ -1935,9 +1935,10 @@ class BlankyController(QObject):
         with open(path, "wb") as f:
             f.write(document)
 
-    def _update_state_compact(self, state: dict, pending: dict):
+    def _update_state_compact(self, state: dict, pending: dict, workflow: dict):
         values = [f"{key}={-1 if state.get(key) is None else int(state[key])}" for key in self._STATE_ORDER]
         values.extend(f"pending_{key}=1" for key in pending)
+        values.extend(f"workflow_{key}={-1 if value is None else int(value)}" for key, value in workflow.items())
         compact = "|".join(values)
         if compact != self._state_compact:
             self._state_compact = compact
@@ -1952,7 +1953,7 @@ class BlankyController(QObject):
         mic = audio_info()
         health["microphone_ready"] = bool(mic.get("ready"))
         health["openai_activity"] = activity_snapshot()
-        self._update_state_compact(snapshot.get("state", {}), snapshot.get("pending", {}))
+        self._update_state_compact(snapshot.get("state", {}), snapshot.get("pending", {}), snapshot.get("workflow", {}))
 
         self._set_comm_status_compact(self._build_comm_status_compact(health))
         self._set_comm_details_compact(self._build_comm_details_compact(health))

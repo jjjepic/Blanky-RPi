@@ -37,7 +37,10 @@ class _FeedbackHandler:
     def datachange_notification(self, node, value, data):
         name = self._names_by_node.get(str(node.nodeid))
         if name is not None:
-            self._bridge._record_feedback(name, bool(value))
+            if type(value) is bool:
+                self._bridge._record_feedback(name, value)
+            else:
+                self._bridge._set_feedback_error(f"Non-Boolean PLC feedback for {name}")
 
     def status_change_notification(self, status):
         self._bridge._set_feedback_error(f"Subscription status: {status}")
@@ -141,7 +144,7 @@ class OPCUABridge:
             with self._lock:
                 url = self._url
             client = None
-            subscription = None
+            feedback_task = None
             try:
                 client = Client(url=url, timeout=5)
                 await client.connect()
@@ -151,13 +154,11 @@ class OPCUABridge:
                     self._feedback_epoch += 1
                     self._connection_epoch += 1
                 retry_seconds = 1.0
-                subscription, feedback_nodes = await self._start_feedback(client)
-                last_poll = time.monotonic()
+                feedback_task = asyncio.create_task(self._run_feedback(client))
                 last_keepalive = time.monotonic()
                 while not self._stop.is_set():
                     with self._lock:
                         endpoint_changed = self._url != url
-                        feedback_mode = self._feedback_mode
                     if endpoint_changed:
                         break
 
@@ -181,16 +182,6 @@ class OPCUABridge:
                                 raise
 
                     now = time.monotonic()
-                    if feedback_mode == "polling" and not feedback_nodes and now - last_poll >= 5.0:
-                        subscription, feedback_nodes = await self._start_feedback(client)
-                        last_poll = now
-                    if feedback_mode == "polling" and now - last_poll >= 0.5:
-                        try:
-                            await self._read_feedback(client, feedback_nodes)
-                            last_keepalive = now
-                        except Exception as exc:
-                            self._set_feedback_error(str(exc))
-                        last_poll = now
                     if now - last_keepalive >= 5.0:
                         await client.get_node("i=2258").read_value()
                         last_keepalive = now
@@ -200,11 +191,9 @@ class OPCUABridge:
                 with self._lock:
                     self._last_error = str(exc)
             finally:
-                if subscription is not None:
-                    try:
-                        await subscription.delete()
-                    except Exception:
-                        pass
+                if feedback_task is not None:
+                    feedback_task.cancel()
+                    await asyncio.gather(feedback_task, return_exceptions=True)
                 if client is not None:
                     try:
                         await client.disconnect()
@@ -226,6 +215,29 @@ class OPCUABridge:
             if not self._stop.is_set():
                 await asyncio.sleep(retry_seconds)
                 retry_seconds = min(retry_seconds * 2, 10.0)
+
+    async def _run_feedback(self, client):
+        subscription = None
+        try:
+            subscription, nodes = await self._start_feedback(client)
+            while not self._stop.is_set():
+                with self._lock:
+                    polling = self._feedback_mode == "polling"
+                if polling and nodes:
+                    try:
+                        await self._read_feedback(client, nodes)
+                    except Exception as exc:
+                        self._set_feedback_error(str(exc))
+                elif polling:
+                    await asyncio.sleep(5.0)
+                    subscription, nodes = await self._start_feedback(client)
+                await asyncio.sleep(0.5)
+        finally:
+            if subscription is not None:
+                try:
+                    await subscription.delete()
+                except Exception:
+                    pass
 
     async def _start_feedback(self, client):
         subscription = None
@@ -253,23 +265,27 @@ class OPCUABridge:
                     self._feedback_active = False
             await self._read_feedback(client, nodes)
             return subscription, nodes
-        except Exception as exc:
+        except (Exception, asyncio.CancelledError) as exc:
             if subscription is not None:
                 try:
                     await subscription.delete()
                 except Exception:
                     pass
+            if isinstance(exc, asyncio.CancelledError):
+                raise
             self._set_feedback_error(str(exc))
             return None, locals().get("nodes", {})
 
     async def _read_feedback(self, client, nodes: dict):
         if not nodes:
             return
+        sample_started = time.monotonic()
         values = await client.read_values(list(nodes.values()))
+        if len(values) != len(nodes) or any(type(value) is not bool for value in values):
+            raise ValueError("Incomplete or non-Boolean PLC feedback")
         with self._lock:
-            initial = not self._initial_complete
             for name, value in zip(nodes, values):
-                self._record_feedback_locked(name, bool(value), allow_confirmation=not initial)
+                self._record_feedback_locked(name, value, sample_started=sample_started)
             self._initial_complete = True
             self._feedback_active = True
             self._feedback_error = ""
@@ -280,22 +296,24 @@ class OPCUABridge:
         with self._lock:
             self._record_feedback_locked(name, value, now=now, allow_confirmation=self._initial_complete)
 
-    def _record_feedback_locked(self, name: str, value: bool, now: float | None = None, allow_confirmation: bool = True):
+    def _record_feedback_locked(self, name: str, value: bool, now: float | None = None,
+                                allow_confirmation: bool = True, sample_started: float | None = None):
         old_value = self._received.get(name)
         self._received[name] = value
         self._last_valid_read = datetime.now().isoformat(timespec="seconds")
+        pending = self._pending.get(name)
+        if (allow_confirmation and value and pending is not None
+                and (old_value is False or pending["baseline_missing"])
+                and (sample_started is None or sample_started >= pending["started"])):
+            del self._pending[name]
+            latency = round(((now or time.monotonic()) - pending["started"]) * 1000, 2)
+            pending["ack_ms"] = latency
+            pending["ack_status"] = "state_observed"
+            self._last_ack_ms = latency
         if old_value == value:
             return
         self._feedback_sequence += 1
         self._last_feedback = f"{datetime.now().strftime('%H:%M:%S')} {name}={int(value)}"
-        if allow_confirmation and value and old_value is False:
-            pending = self._pending.pop(name, None)
-            if pending is not None:
-                latency = round(((now or time.monotonic()) - pending["started"]) * 1000, 2)
-                pending["ack_ms"] = latency
-                pending["ack_status"] = "state_observed"
-                self._last_ack_ms = latency
-
     def _set_feedback_error(self, message: str):
         with self._lock:
             was_available = self._feedback_active or self._initial_complete or bool(self._received)
@@ -306,11 +324,10 @@ class OPCUABridge:
             self._received.clear()
             if was_available:
                 self._feedback_epoch += 1
+            # No writes are cancelled by a return-only failure. A fresh read can
+            # still observe the requested state before the normal timeout.
             for record in self._pending.values():
-                record["ack_status"] = "feedback_lost"
-            self._pending.clear()
-            # A missing return interface must not cancel writes in local test mode.
-            # Transport/endpoint changes still invalidate queued commands separately.
+                record["baseline_missing"] = True
 
     async def _send_command(self, client, record: dict):
         command = record["command"]
@@ -321,11 +338,13 @@ class OPCUABridge:
             record["queue_ms"] = round((start - record["queued_at"]) * 1000, 2)
             self._last_command = command
             self._last_ack_ms = None
-            if signal and self._feedback_active and self._received.get(signal) is False:
+            baseline = self._received.get(signal) if self._feedback_active else None
+            if signal and baseline is not True:
                 old = self._pending.pop(signal, None)
                 if old is not None:
                     old["ack_status"] = "superseded"
                 record["started"] = start
+                record["baseline_missing"] = baseline is None
                 record["ack_status"] = "pending"
                 self._pending[signal] = record
             else:
@@ -355,6 +374,8 @@ class OPCUABridge:
                 except Exception as exc:
                     with self._lock:
                         record["ack_status"] = "reset_error"
+                        if signal and self._pending.get(signal) is record:
+                            del self._pending[signal]
                         self._last_error = f"{command}: pulse reset failed: {exc}"
                     raise
 
@@ -380,7 +401,7 @@ class OPCUABridge:
 
     def timing_records(self) -> list[dict]:
         with self._lock:
-            return [{key: value for key, value in item.items() if key not in {"started", "queued_at", "endpoint", "epoch"}} for item in self._timings]
+            return [{key: value for key, value in item.items() if key not in {"started", "queued_at", "endpoint", "epoch", "baseline_missing"}} for item in self._timings]
 
     def health(self) -> dict:
         with self._lock:

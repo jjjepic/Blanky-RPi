@@ -164,6 +164,52 @@ class PLCBridgeTests(unittest.TestCase):
         self.assertEqual([e["reason"] for e in snapshot["events"] if e["command"] == "START"],
                          ["queued", "written", "state_observed"])
 
+    def test_start_sends_without_initial_feedback_and_later_confirms(self):
+        self.opc.feedback_active = False
+        self.assertIsNone(self.bridge.get_snapshot()["state"]["start"])
+        self.assertEqual(self.bridge.process_command("START", "pt", source="button"), (True, None))
+        self.assertEqual(self.opc.records[0]["command"], "START")
+        self.opc.write()
+        self.assertIsNone(self.bridge.get_snapshot()["state"]["start"])
+        self.opc.feedback_active = True
+        self.opc.received["system_stopped"] = False
+        self.opc.observe("system_on")
+        snapshot = self.bridge.get_snapshot()
+        self.assertEqual(snapshot["state"]["start"], 1)
+        self.assertEqual(snapshot["state_quality"]["start"], "confirmed")
+        self.assertNotIn("start", snapshot["pending"])
+        self.assertEqual(snapshot["events"][-1]["reason"], "state_observed")
+
+    def test_pending_start_and_mode_allow_sequence_without_claiming_state(self):
+        self.opc.feedback_active = False
+        self.assertFalse(self.bridge.process_command("MODE_MANUAL", "pt")[0])
+        for command, source in (("START", "mqtt_panel"), ("MODE_MANUAL", "text"), ("MOTOR_1_ON", "voice")):
+            self.assertTrue(self.bridge.process_command(command, "pt", source=source)[0])
+        snapshot = self.bridge.get_snapshot()
+        self.assertEqual(snapshot["workflow"]["mode_manual"], 1)
+        self.assertTrue(all(snapshot["state"][key] is None for key in ("start", "mode_manual", "motor_1")))
+        self.assertTrue(self.bridge.process_command("STOP", "pt", source="button")[0])
+        self.assertFalse(self.bridge.process_command("MOTOR_2_ON", "pt")[0])
+
+    def test_start_with_inconsistent_bits_and_hmi_return(self):
+        self.opc.received["system_stopped"] = False
+        self.assertIsNone(self.bridge.get_snapshot()["state"]["start"])
+        self.opc.received.update(system_on=True, mode_manual=True)
+        snapshot = self.bridge.get_snapshot()
+        self.assertEqual(snapshot["state"]["start"], 1)
+        self.assertEqual(snapshot["workflow"]["mode_manual"], 1)
+        self.assertTrue(any(event["plc_key"] == "start" for event in snapshot["events"]))
+        self.assertEqual(self.opc.records, [])
+
+    def test_unconfirmed_start_expires_and_disconnected_start_is_rejected(self):
+        self.opc.feedback_active = False
+        self.assertTrue(self.bridge.process_command("START", "pt")[0])
+        self.opc.records[0]["ack_status"] = "timeout"
+        self.assertIsNone(self.bridge.get_snapshot()["workflow"]["start"])
+        self.opc.connected = False
+        self.assertFalse(self.bridge.process_command("START", "pt")[0])
+        self.assertEqual(self.bridge.get_snapshot()["events"][-1]["reason"], "opcua_unavailable")
+
     def test_mqtt_state_is_published_only_after_confirmed_return(self):
         published = []
         self.bridge._publish = lambda topic, value, **kwargs: published.append((topic, value))

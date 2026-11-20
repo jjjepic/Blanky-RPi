@@ -393,7 +393,7 @@ class MQTTBridge:
                     self._publish(f"state_quality/{key}", quality[key], retain=True)
                 if available and not new_baseline and value is not None:
                     before = self._last_known.get(key)
-                    if before is not None and before != value:
+                    if before != value:
                         self._add_event("PLC_STATE", "plc", True, plc_change_message(key, value, self._ui_lang),
                                         detail_pt=plc_change_message(key, value, "pt"),
                                         detail_en=plc_change_message(key, value, "en"),
@@ -415,7 +415,8 @@ class MQTTBridge:
                                     if self._ui_lang == "pt" else "OPC UA write completed; awaiting PLC state.",
                                     reason="written", detail_pt="Escrita OPC UA concluída; a aguardar o estado do PLC.",
                                     detail_en="OPC UA write completed; awaiting PLC state.")
-                if status == "state_observed" and state[key] == pending["target"] and quality[key] == "confirmed":
+                if (status == "state_observed" and pending["stage"] == "written"
+                        and state[key] == pending["target"] and quality[key] == "confirmed"):
                     self._add_event(pending["command"], "plc", True,
                                     plc_observation_message(pending["command"], self._ui_lang),
                                     reason="state_observed",
@@ -557,8 +558,6 @@ class MQTTBridge:
                 reason = "cylinder_retract_unavailable"
             elif target is None or command not in COMMAND_TO_NODE:
                 reason = "unknown"
-            elif self._control_mode == "plc" and not self._plc_available and command != "STOP":
-                reason = "feedback_unavailable"
             elif (self.state.get("system_error") == 1 or self._plc_error_latched) and command != "STOP":
                 reason = "system_error"
             else:
@@ -652,17 +651,6 @@ class MQTTBridge:
             retain=False
         )
 
-    def _current_mode(self) -> str:
-        if self.state["mode_fast"] == 1:
-            return "fast"
-        if self.state["mode_ideal"] == 1:
-            return "ideal"
-        if self.state["mode_manual"] == 1:
-            return "manual"
-        if self.state["mode_change"] == 1:
-            return "change"
-        return "none"
-
     def _is_component_command(self, command: str) -> bool:
         return (
             bool(re.match(r"^MOTOR_([123])_(ON|OFF)$", command))
@@ -670,23 +658,30 @@ class MQTTBridge:
             or command in {"GREEN_ON", "GREEN_OFF", "RED_ON", "RED_OFF", "ROBOT_TO_METAL", "ROBOT_TO_NONMETAL"}
         )
 
-    def _workflow_rejection_reason(self, command: str) -> Optional[str]:
-        if command in {"UNKNOWN", "NO_AUDIO"}:
-            return None
-        if command == "STOP":
-            return None
+    def _workflow_state(self) -> dict:
+        # Pending intent guides command order, but never changes the displayed PLC state.
+        keys = ("start", "mode_fast", "mode_ideal", "mode_manual", "mode_change")
+        state = {key: self.state[key] for key in keys}
+        if self._control_mode == "plc":
+            for key in keys:
+                pending = self._pending_commands.get(key)
+                if pending is None:
+                    continue
+                if key.startswith("mode_"):
+                    for mode_key in keys[1:]:
+                        state[mode_key] = 0
+                state[key] = pending["target"]
+        return state
 
-        if self.state["start"] is None:
-            return "feedback_unavailable"
-        if command != "STOP" and any(self.state[key] is None for key in ("mode_fast", "mode_ideal", "mode_manual", "mode_change")):
-            return "feedback_unavailable"
-        if self.state["start"] == 0 and command not in {"START", "STOP"}:
+    def _workflow_rejection_reason(self, command: str) -> Optional[str]:
+        if command in {"UNKNOWN", "NO_AUDIO", "START", "STOP"}:
+            return None
+        state = self._workflow_state()
+        if state["start"] != 1:
             return "before_start"
 
-        if command in {"START", "STOP"}:
-            return None
-
-        mode = self._current_mode()
+        mode = next((key[5:] for key in ("mode_fast", "mode_ideal", "mode_manual", "mode_change")
+                     if state[key] == 1), "none")
 
         if mode == "none":
             if command in {"MODE_FAST", "MODE_IDEAL", "MODE_MANUAL"}:
@@ -828,8 +823,11 @@ class MQTTBridge:
                     for language in ("pt", "en")
                 }}
             allowed = {command for command in VALID_COMMANDS
-                       if command in COMMAND_TO_NODE and (self._plc_available or self._control_mode == "test")
+                       if command in COMMAND_TO_NODE and (health.get("opcua_connected") or self._control_mode == "test")
+                       and (not self._plc_error_latched or command == "STOP")
                        and self._workflow_rejection_reason(command) is None}
+            if name == "QUERY_OPTIONS":
+                state.update(self._workflow_state())
             previous = dict(self._last_interaction_response)
             answers = {
                 language: answer_query_parts(name, component, value, language, state, health, events, allowed,
@@ -899,6 +897,7 @@ class MQTTBridge:
         with self._lock:
             return {
                 "state": dict(self.state),
+                "workflow": self._workflow_state(),
                 "state_quality": dict(self.state_quality),
                 "control_mode": self._control_mode,
                 "pending": {key: dict(value) for key, value in self._pending_commands.items()},
