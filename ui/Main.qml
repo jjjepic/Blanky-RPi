@@ -361,7 +361,7 @@ ApplicationWindow {
                 { icon: "\u25CF", color: root.errorColor, title: pt ? "Luz vermelha" : "Red light", code: "RED_ON / RED_OFF", input: pt ? "ligar luz vermelha" : "turn on red light", description: pt ? "Liga ou desliga a luz vermelha." : "Turns the red light on or off.", examples: pt ? "ligar luz vermelha · apagar vermelha · desativar vermelho" : "turn on red light · switch red off · disable red" }
             ]},
             { title: pt ? "Rob\u00f4" : "Robot", commands: [
-                { icon: blanky.appearanceMode === "monochrome" ? "▣" : "\uD83E\uDD16", color: root.successColor, title: pt ? "Robô metal / não metal" : "Metal / non-metal robot", code: "ROBOT_TO_METAL / ROBOT_TO_NONMETAL", input: pt ? "robô vai metal" : "send robot to metal", description: pt ? "Pede recolha manual no Tapete 2 ou 3; não há robô físico." : "Requests manual pickup on Conveyor 2 or 3; no physical robot operates.", examples: pt ? "robô para metal · robô para não metal" : "robot to metal · robot to non-metal" }
+                { icon: blanky.appearanceMode === "monochrome" ? "▣" : "\uD83E\uDD16", color: root.successColor, title: pt ? "Robô / recolha" : "Robot / pickup", code: "ROBOT_TO_METAL / ROBOT_TO_NONMETAL", input: pt ? "pede recolha no Tapete 2" : "request pickup on Conveyor 2", description: pt ? "Pede recolha manual no Tapete 2 ou 3; não há robô físico." : "Requests manual pickup on Conveyor 2 or 3; no physical robot operates.", examples: pt ? "recolha no Tapete 3 · envia o robô para metal" : "pickup on Conveyor 3 · send the robot to metal" }
             ]}
         ]
     }
@@ -737,6 +737,7 @@ ApplicationWindow {
 
         Rectangle {
             id: statusPanel
+            objectName: "recognitionStatusPanel"
             Layout.fillWidth: true
             Layout.rightMargin: root.rightPanelWidth + 12
             // Text, phone and operation views reserve enough vertical space for Communications.
@@ -758,6 +759,9 @@ ApplicationWindow {
                     font.bold: true
                     horizontalAlignment: Text.AlignHCenter
                     Layout.fillWidth: true
+                    Layout.leftMargin: recognitionAudioLogs.visible ? 44 : 0
+                    Layout.rightMargin: Layout.leftMargin
+                    elide: Text.ElideRight
                 }
 
                 Label {
@@ -787,6 +791,31 @@ ApplicationWindow {
                         font.bold: true
                     }
                 }
+            }
+
+            MenuActionButton {
+                id: recognitionAudioLogs
+                objectName: "recognitionAudioLogs"
+                anchors.top: parent.top
+                anchors.right: parent.right
+                anchors.margins: 12
+                width: 40
+                height: 40
+                visible: root.activeView === "general" || root.activeView === "voice"
+                iconText: "\u2261"
+                textPixelSize: 19
+                accentColor: activeFocus ? root.accentColor : root.borderColor
+                textColor: root.mutedText
+                panelColor: root.panelAltColor
+                toolTip: t("audioLogs")
+                activeFocusOnTab: true
+                Accessible.role: Accessible.Button
+                Accessible.name: toolTip
+                Accessible.onPressAction: clicked()
+                Keys.onSpacePressed: clicked()
+                Keys.onReturnPressed: clicked()
+                Keys.onEnterPressed: clicked()
+                onClicked: audioLogsPanel.open()
             }
         }
 
@@ -3776,6 +3805,7 @@ ApplicationWindow {
 
     FloatingPanel {
         id: audioLogsPanel
+        objectName: "audioLogsPanel"
         width: Math.min(760, Math.max(360, root.width - 24))
         height: Math.min(520, Math.max(360, root.height - 24))
         panelTitle: t("audioLogs")

@@ -17,11 +17,6 @@
     "light_green": ["luz verde", "verde", "luz de cor verde"],
     "light_red": ["luz vermelha", "vermelha", "luz de cor vermelha"],
 
-    "robot_word": ["robo"],
-    "robot_go": ["trabalha", "trabalhar", "vai", "manda", "mandar"],
-    "metal": ["metal", "metais", "metalica", "metalicas", "metalico", "metalicos"],
-    "nonmetal": ["nao metal", "nao-metal"],
-
     "mode_fast_ph": ["modo rapido", "modo rapida", "modo rapidez", "alta velocidade", "modo de alta velocidade", "modo acelerado", "modo veloz"],
     "mode_ideal_ph": ["modo ideal", "modo idial", "modo automatico", "modo auto", "modo normal", "modo otimizado"],
     "mode_manual_ph": ["modo manual", "modo manuais", "modo de operacao manual", "operacao manual"],
@@ -65,11 +60,6 @@
 
     "light_green": ["green light", "green"],
     "light_red": ["red light", "red"],
-
-    "robot_word": ["robot"],
-    "robot_go": ["go", "move", "send", "advance", "run", "work"],
-    "nonmetal": ["non metal", "non-metal", "nonmetal", "non metallic", "non-metallic", "nonmetallic"],
-    "metal": ["metal", "metallic"],
 
     "mode_fast_ph": ["fast mode", "quick mode", "high speed", "high speed mode", "rapid mode"],
     "mode_ideal_ph": ["ideal mode", "idealized mode", "optimal mode", "normal mode", "auto mode", "automatic mode"],

@@ -63,6 +63,60 @@ class QueryParserTests(unittest.TestCase):
         self.assertEqual(parse_offline_items("can you start the system?", "en")[0]["name"], "START")
         self.assertEqual(parse_offline_items("avança o cilindro A", "pt")[0]["name"], "CYL_A_EXTEND")
 
+    def test_operating_mode_is_distinct_from_speech_speed(self):
+        for lang, mode, speech in (
+            ("pt", "Ativa o modo rápido", "Fala mais rápido"),
+            ("pt", "Seleciona o modo rápido", "Fala mais depressa"),
+            ("en", "Activate fast mode", "Speak faster"),
+        ):
+            with self.subTest(lang=lang, mode=mode, speech=speech):
+                items = parse_offline_items(f"{mode}; {speech}", lang)
+                self.assertEqual([(i["type"], i["name"], i["target"], i["value"]) for i in items], [
+                    ("command", "MODE_FAST", "", ""),
+                    ("setting", "SET_SETTING", "speech_speed", "fast"),
+                ])
+        self.assertEqual(parse_offline_items("Estamos no modo rápido?", "pt")[0]["name"], "QUERY_MODE")
+        self.assertEqual(parse_offline_items("Não atives o modo rápido", "pt")[0]["name"], "UNKNOWN")
+
+    def test_pickup_accepts_robot_and_conveyor_aliases(self):
+        examples = (
+            ("pt", "Envia o robô para metal", "ROBOT_TO_METAL"),
+            ("pt", "Robô para não metal", "ROBOT_TO_NONMETAL"),
+            ("pt", "Pede recolha no Tapete 2", "ROBOT_TO_METAL"),
+            ("pt", "Recolha no tapete três", "ROBOT_TO_NONMETAL"),
+            ("pt", "Podes pedir a recolha no Tapete 3?", "ROBOT_TO_NONMETAL"),
+            ("pt", "Envia o robô para o tapete dois", "ROBOT_TO_METAL"),
+            ("en", "Send the robot to non-metal", "ROBOT_TO_NONMETAL"),
+            ("en", "Request pickup on Conveyor two", "ROBOT_TO_METAL"),
+        )
+        for lang, phrase, expected in examples:
+            with self.subTest(phrase=phrase):
+                self.assertEqual(parse_offline_items(phrase, lang)[0]["name"], expected)
+        mixed = parse_offline_items("Ativa o modo rápido e pede recolha no Tapete 2", "pt")
+        self.assertEqual([item["name"] for item in mixed], ["MODE_FAST", "ROBOT_TO_METAL"])
+        for phrase in ("Robô", "Pede recolha", "Pede recolha no Tapete 1", "Não envies o robô para metal",
+                       "Pede recolha no Tapete 2 ou 3"):
+            with self.subTest(phrase=phrase):
+                self.assertEqual(parse_offline_items(phrase, "pt")[0]["name"], "UNKNOWN")
+        for phrase, expected in (("Há recolha no Tapete 2?", "QUERY_COMPONENT"),
+                                 ("O robô vai para metal?", "QUERY_COMPONENT_GROUP")):
+            with self.subTest(phrase=phrase):
+                item = parse_offline_items(phrase, "pt")[0]
+                self.assertEqual((item["type"], item["name"], item["target"]), ("query", expected, "robot"))
+
+    def test_online_preserves_explicit_operational_aliases(self):
+        fake_openai = types.SimpleNamespace(OpenAI=lambda: self.fail("Explicit alias should not call AI"))
+        with patch.dict(sys.modules, {"openai": fake_openai}):
+            for phrase, expected in (
+                ("Ativa o modo rápido", "MODE_FAST"),
+                ("Envia o robô para metal", "ROBOT_TO_METAL"),
+                ("Pede recolha no Tapete 3", "ROBOT_TO_NONMETAL"),
+            ):
+                with self.subTest(phrase=phrase):
+                    self.assertEqual(interpret_online_items(phrase, "pt")[0]["name"], expected)
+            items = interpret_online_items("Ativa o modo rápido e pede recolha no Tapete 3", "pt")
+            self.assertEqual([item["name"] for item in items], ["MODE_FAST", "ROBOT_TO_NONMETAL"])
+
     def test_model_output_must_use_known_intents_and_components(self):
         items = validate_items([
             {"type": "command", "name": "START"},

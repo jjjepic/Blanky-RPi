@@ -44,11 +44,13 @@ O Text-Bot inicia em modo `Online`. Neste modo, a IA interpreta frases naturais 
 
 O modo `Offline` também pode ser escolhido manualmente. Aceita as variantes previstas na lista local e continua a aplicar as mesmas regras de segurança.
 
+`Ativa o modo rápido` escolhe o modo de funcionamento. Para mudar a velocidade da voz, diz `Fala mais rápido`, `Fala mais depressa` ou `Fala mais devagar`. `Pede recolha no Tapete 2` equivale a `Envia o robô para metal`; o Tapete 3 corresponde a `Envia o robô para não metal`.
+
 No reconhecimento Offline, "avança o cilindro A" seleciona o cilindro, não o arranque do sistema; "para" só significa parar quando surge sozinho ou no início da frase. As recusas e pedidos sem alteração usam frases naturais em PT/EN, iguais na Resposta, nos Eventos e na resposta falada, sem identificadores internos no texto da mensagem. Para escolher outro modo, usa o botão `Mudar de modo`.
 
 O reconhecimento por voz precisa da OpenAI para transcrever o áudio. Se a interpretação Online falhar depois da transcrição, tenta o interpretador Offline. Sem acesso ao serviço de IA para transcrição, a voz não executa pedidos; os controlos diretos, MQTT e Text-Bot Offline continuam disponíveis.
 
-A fala passa por um coordenador único: a síntese não bloqueia a interface, uma nova gravação interrompe respostas antigas antes de captar áudio e confirmações de botões/telemóvel próximas podem ser agrupadas. A fala de um comando aceite confirma apenas o **pedido aceite**, nunca uma posição física. Respostas solicitadas, avisos críticos e confirmações têm prioridades distintas. **Repetir resposta** usa a última fala iniciada, com a voz, velocidade e idioma atuais. Falhas de TTS/reprodução ficam no Diagnóstico de áudio. Consulta [AUDIO_VALIDATION_PT.md](AUDIO_VALIDATION_PT.md) para validar no Raspberry Pi.
+A fala passa por um coordenador único: a síntese não bloqueia a interface, uma nova gravação interrompe respostas antigas antes de captar áudio e confirmações de botões/telemóvel próximas podem ser agrupadas. A fala de um comando aceite confirma apenas o **pedido aceite**, nunca uma posição física. Respostas solicitadas, avisos críticos e confirmações têm prioridades distintas. **Repetir resposta** usa a última fala iniciada, com a voz, velocidade e idioma atuais. O atalho no canto superior direito do cartão de reconhecimento abre o Diagnóstico de áudio, incluindo as falhas de síntese e reprodução. Consulta [AUDIO_VALIDATION_PT.md](AUDIO_VALIDATION_PT.md) para validar no Raspberry Pi.
 
 ## Consultas de estado
 

@@ -65,7 +65,9 @@ formas coloquiais, tempos verbais diferentes e pequenas imperfeições de transc
 Comandos e intenções:
 - START: iniciar, arrancar, começar ou pôr o sistema a trabalhar.
 - STOP: parar, interromper, terminar ou desligar o sistema.
-- MODE_FAST: escolher o modo rápido, acelerado ou de alta velocidade.
+- MODE_FAST: escolher o modo rápido, acelerado ou de alta velocidade. "Ativa o modo rápido"
+  é um comando do sistema; só muda a velocidade da fala quando a frase se refere à fala ou à voz,
+  por exemplo "fala mais rápido", "fala mais depressa" ou "fala mais devagar".
 - MODE_IDEAL: escolher o modo ideal, automático, normal ou otimizado.
 - MODE_MANUAL: escolher operação ou controlo manual.
 - MODE_UNSPEC: pedir para trocar, mudar, alterar, selecionar outro ou escolher o modo sem indicar
@@ -77,7 +79,9 @@ Comandos e intenções:
   Se o utilizador pedir explicitamente recuo de C/D, devolve CYL_C/D_RETRACT para que o
   Blanky explique a indisponibilidade, nunca como ação executada.
 - GREEN_ON/OFF e RED_ON/OFF: acender/ligar ou apagar/desligar a luz verde ou vermelha.
-- ROBOT_TO_METAL e ROBOT_TO_NONMETAL: pedidos de recolha manual nos Tapetes 2/3.
+- ROBOT_TO_METAL: "pede recolha no Tapete 2" ou "envia o robô para metal".
+- ROBOT_TO_NONMETAL: "pede recolha no Tapete 3" ou "envia o robô para não metal".
+  "Robô" e "recolha" são formas alternativas de pedir a mesma ação. Sem destino, não envies comando.
 
 Pedidos de grupo claros devem ser expandidos para os comandos individuais, pela ordem indicada:
 - "todos os motores" liga/desliga MOTOR_1, MOTOR_2 e MOTOR_3.
@@ -98,7 +102,8 @@ different verb forms and minor transcription mistakes.
 Commands and intents:
 - START: start, begin, launch or put the system into operation.
 - STOP: stop, halt, interrupt, finish or shut down the system.
-- MODE_FAST: select fast, quick, accelerated or high-speed mode.
+- MODE_FAST: select fast, quick, accelerated or high-speed mode. "Activate fast mode" sets
+  the system mode; only explicit speech requests such as "speak faster" change speech speed.
 - MODE_IDEAL: select ideal, automatic, normal or optimized mode.
 - MODE_MANUAL: select manual operation or manual control.
 - MODE_UNSPEC: request to change, switch, alter, select another or choose a mode without stating
@@ -109,7 +114,9 @@ Commands and intents:
   If C/D retraction is explicitly requested, return CYL_C/D_RETRACT so Blanky can explain
   that it is unavailable, never as a completed action.
 - GREEN_ON/OFF and RED_ON/OFF: turn on or turn off the green or red light.
-- ROBOT_TO_METAL and ROBOT_TO_NONMETAL: manual pickup requests on Conveyors 2/3.
+- ROBOT_TO_METAL: "request pickup on Conveyor 2" or "send the robot to metal".
+- ROBOT_TO_NONMETAL: "request pickup on Conveyor 3" or "send the robot to non-metal".
+  "Robot" and "pickup" are aliases for the same request. Do not infer a missing destination.
 
 Clear group requests must expand into individual commands in the stated order:
 - "all motors" turns MOTOR_1, MOTOR_2 and MOTOR_3 on or off.
@@ -163,12 +170,18 @@ def validate_items(items) -> list[dict]:
 
 def interpret_online_items(raw_text: str, lang: str) -> list[dict[str, str]]:
     """Map natural text to an ordered, validated list without executing it."""
-    from openai import OpenAI
-
     local = parse_offline_items(raw_text, lang)
     if any(item.get("name") == "BLOCKED_SETTING" for item in local):
         record_interpretation(raw_text, local, "online-blocked")
         return local
+
+    # Keep exact operational aliases deterministic in both interpreter modes.
+    explicit = [_explicit_command(normalize(clause), lang) for clause in _clauses(raw_text)]
+    if local and len(local) == len(explicit) and all(item["name"] == name for item, name in zip(local, explicit)):
+        record_interpretation(raw_text, local, "online-local")
+        return local
+
+    from openai import OpenAI
 
     language = "Portuguese" if lang == "pt" else "English"
     allowed = ", ".join(sorted(VALID_COMMANDS))
@@ -342,6 +355,36 @@ def resolve_change_mode_request(text: str, data: dict) -> bool:
     return False
 
 
+def _pickup_command(text: str, lang: str) -> str:
+    """Require an explicit, single pickup destination."""
+    if lang == "pt":
+        text = re.sub(r"^(?:(?:podes|pode|por favor) )+", "", text)
+        pickup = r"(?:(?:pede|pedir|peco|solicita|solicitar|solicito|quero|queria|faz|fazer) (?:(?:a|uma) )?)?recolha "
+        robot = r"(?:(?:envia|enviar|manda|mandar|move|mover) )?(?:o )?robo(?: (?:vai|ir|trabalha|trabalhar))? "
+        conveyor = r"(?:no |do |em |de |para (?:o )?)?tapete (2|dois|3|tres)"
+        material = r"(?:para |no |nas |com )?(?:(?:o|as) )?(?:pecas )?(nao[ -]?)?metal(?:ica?s?|ico?s?|is)?"
+    else:
+        text = re.sub(r"^(?:(?:can you|could you|please) )+", "", text)
+        pickup = r"(?:(?:request|ask for) (?:(?:a|the) )?)?pick[ -]?up "
+        robot = r"(?:(?:send|move|advance|run) )?(?:the )?robot(?: (?:go|work))? "
+        conveyor = r"(?:(?:on|at|from|to) (?:the )?)?conveyor (2|two|3|three)"
+        material = r"(?:(?:to|for|with) (?:the )?)?(non[ -]?)?metal(?:lic)?(?: pieces)?"
+    text = re.sub(r" (?:por favor|please)$", "", text)
+    belt = re.fullmatch(rf"(?:{pickup}|{robot}){conveyor}", text)
+    if belt:
+        return "ROBOT_TO_METAL" if belt[1] in {"2", "dois", "two"} else "ROBOT_TO_NONMETAL"
+    destination = re.fullmatch(robot + material, text)
+    if destination:
+        return "ROBOT_TO_NONMETAL" if destination[1] else "ROBOT_TO_METAL"
+    return ""
+
+
+def _explicit_command(text: str, lang: str) -> str:
+    fast = (r"(?:(?:ativa|ativar|seleciona|selecionar|escolhe|escolher|liga|ligar|muda para|podes ativar) (?:o )?)?modo rapido"
+            if lang == "pt" else r"(?:(?:activate|enable|select|choose|switch to|turn on|can you activate) (?:the )?)?fast mode")
+    return "MODE_FAST" if re.fullmatch(fast, text) else _pickup_command(text, lang)
+
+
 def _offline_query_items(raw_text: str, lang: str) -> list[dict[str, str]]:
     text = normalize(re.sub(r"\b(?:b[eê]|bee)\b", "b", raw_text, flags=re.IGNORECASE))
     d = DATA.get(lang, DATA["pt"])
@@ -365,7 +408,8 @@ def _offline_query_items(raw_text: str, lang: str) -> list[dict[str, str]]:
     question_words = contains_any_substring(text, q["question"])
     action_words = (d["start"] + d["stop"] + d["activate"] + d["deactivate"]
                     + d.get("activate_ph", []) + d.get("deactivate_ph", []))
-    question = question_words or ("?" in raw_text and not contains_any_substring(text, action_words))
+    polite_pickup = re.match(r"^(podes|pode|can you|could you)\b", text) and _pickup_command(text, lang)
+    question = question_words or ("?" in raw_text and not polite_pickup and not contains_any_substring(text, action_words))
     if not question:
         return []
 
@@ -384,8 +428,9 @@ def _offline_query_items(raw_text: str, lang: str) -> list[dict[str, str]]:
         components.append((text.find("vermelha" if lang == "pt" else "red"), "light_red"))
     if not any(component.startswith("light_") for _, component in components) and contains_any_substring(text, ["luzes", "lights"]):
         components.append((text.find("luzes" if lang == "pt" else "lights"), "lights"))
-    if contains_any_substring(text, d["robot_word"]):
-        components.append((text.find("robo" if lang == "pt" else "robot"), "robot"))
+    robot = re.search(r"\b(?:robo|robot|recolha|pick[ -]?up)\b", text)
+    if robot:
+        components.append((robot.start(), "robot"))
     if components:
         return [query("QUERY_COMPONENT", component) for _, component in sorted(components)]
 
@@ -409,17 +454,20 @@ def _offline_query_items(raw_text: str, lang: str) -> list[dict[str, str]]:
     return []
 
 
-def parse_offline_items(raw_text: str, lang: str) -> list[dict[str, str]]:
-    """Parse ordered local clauses, giving explicit questions priority over actions."""
-    clauses = re.split(
-        r"[\n;]+|\s+(?:e\s+(?=(?:diz[ -]?me|liga|desliga|acende|apaga|avanca|recua|inicia|para|como|qual)\b)"
-        r"|and\s+(?=(?:tell\s+me|turn|switch|start|stop|how|what|which)\b))",
+def _clauses(raw_text: str) -> list[str]:
+    parts = re.split(
+        r"[\n;]+|\s+(?:e\s+(?=(?:diz[ -]?me|liga|desliga|acende|apaga|avança|avanca|recua|inicia|para|como|qual|"
+        r"ativa|seleciona|fala|pede|solicita|recolha|envia|manda)\b)"
+        r"|and\s+(?=(?:tell\s+me|turn|switch|start|stop|how|what|which|activate|select|speak|request|send)\b))",
         raw_text or "", flags=re.IGNORECASE,
     )
+    return [part for part in parts if part.strip()]
+
+
+def parse_offline_items(raw_text: str, lang: str) -> list[dict[str, str]]:
+    """Parse ordered local clauses, giving explicit questions priority over actions."""
     items = []
-    for clause in clauses:
-        if not clause.strip():
-            continue
+    for clause in _clauses(raw_text):
         preference = parse_preference(clause, lang)
         if preference and preference["type"] == "setting":
             if preference["name"] == "BLOCKED_SETTING":
@@ -451,6 +499,10 @@ def parse_command(raw_text: str, lang: str) -> Tuple[str, str]:
         return "UNKNOWN", rejection_message("unknown", lang)
 
     d = DATA.get(lang, DATA["pt"])
+    if (re.search(r"\b(?:modo rapido|fast mode)\b", text)
+            and re.match(r"^(?:nao|nunca|do not|don t|dont|never)\b", text)):
+        return "UNKNOWN", rejection_message("unknown", lang)
+
     # ============ START/STOP ============
     if contains_any_substring(text, d["start"]):
         return "START", "Iniciado." if lang == "pt" else "Started."
@@ -518,12 +570,10 @@ def parse_command(raw_text: str, lang: str) -> Tuple[str, str]:
             if contains_any_substring(text, light_on):
                 return "RED_ON", "Red light on."
 
-    # ============ ROBOT ============
-    if contains_any_substring(text, d["robot_word"]) and contains_any_substring(text, d["robot_go"]):
-        if contains_any_substring(text, d["nonmetal"]):
-            return "ROBOT_TO_NONMETAL", "Pedido de recolha no Tapete 3." if lang == "pt" else "Pickup request on Conveyor 3."
-        if contains_any_substring(text, d["metal"]):
-            return "ROBOT_TO_METAL", "Pedido de recolha no Tapete 2." if lang == "pt" else "Pickup request on Conveyor 2."
+    pickup = _pickup_command(text, lang)
+    if pickup:
+        conveyor = 2 if pickup == "ROBOT_TO_METAL" else 3
+        return pickup, f"Pedido de recolha no Tapete {conveyor}." if lang == "pt" else f"Pickup request on Conveyor {conveyor}."
 
     # ============ MOTOR 1/2/3 ============
     if contains_any_substring(text, d["motor_word"]):

@@ -43,6 +43,8 @@ In Offline recognition, "advance cylinder A" selects the cylinder rather than st
 
 Voice recognition needs OpenAI to transcribe audio. If Online interpretation fails after transcription, it tries the Offline interpreter. Without the AI service for transcription, voice cannot handle requests; direct controls, MQTT and Text-Bot Offline stay available.
 
+`Activate fast mode` selects the operating mode. Say `Speak faster` or `Speak more slowly` to change speech speed. `Request pickup on Conveyor 2` means the same as `Send the robot to metal`; Conveyor 3 corresponds to `Send the robot to non-metal`. The shortcut in the top-right corner of the recognition card opens the audio diagnostic log.
+
 Speech now uses one coordinator: synthesis does not block the interface, a new recording interrupts stale speech before capture, and nearby button/phone confirmations can be grouped. Spoken acceptance confirms only that a **request was accepted**, never a physical position. Requested replies, critical warnings and operational confirmations have separate priorities. **Repeat answer** uses the last speech that actually started, with the current voice, speed and language. TTS/playback failures appear in Audio Diagnostics. See the [Raspberry Pi validation checklist (Portuguese)](AUDIO_VALIDATION_PT.md).
 
 ## Status questions

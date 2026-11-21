@@ -32,7 +32,6 @@ def _match(text: str, words: tuple[str, ...]) -> bool:
 
 _SETTING_WORDS = {
     "voice": ("voz", "voice"),
-    "speech_speed": ("velocidade", "speed", "devagar", "rapido", "lentamente", "slowly"),
     "volume": ("volume", "som", "alto", "baixo", "louder", "quieter"),
     "language": ("idioma", "lingua", "language", "portugues", "ingles", "english"),
     "appearance": ("tema", "aparencia", "aspecto", "aspeto", "theme", "appearance"),
@@ -54,9 +53,9 @@ def _target(text: str) -> str:
             or "alto contraste" in text or "high contrast" in text
             or re.search(r"\b(muda|mudar|switch|change)\s+(?:para|to)\s+(?:o\s+)?(?:claro|escuro|light mode|dark mode)\b", text)):
         return "appearance"
-    if "velocidade" in text and any(word in text for word in ("fala", "voz")):
-        return "speech_speed"
-    if "speed" in text and ("speech" in text or "voice" in text):
+    speed = r"\b(velocidade|speed|devagar|depressa|rapido|rapida|lentamente|lenta|lento|fast|faster|slow|slower|slowly|quickly)\b"
+    speech = r"\b(fala|falar|voz|le|ler|leitura|speech|speak|voice|read|talk)\b"
+    if re.search(speed, text) and re.search(speech, text):
         return "speech_speed"
     if "perfil" in text and "audio" in text:
         return "audio_profile"
@@ -113,7 +112,7 @@ def parse_preference(text: str, lang: str) -> dict | None:
     elif target == "appearance":
         value = "light" if re.search(r"\b(claro|clara|light)\b", phrase) else "dark" if re.search(r"\b(escuro|escura|dark)\b", phrase) else value
     elif target == "speech_speed":
-        value = "slow" if re.search(r"\b(devagar|lenta|lento|slow|slower|slowly)\b", phrase) else "fast" if re.search(r"\b(rapido|rapida|fast|faster|quickly)\b", phrase) else value
+        value = "slow" if re.search(r"\b(devagar|lentamente|lenta|lento|slow|slower|slowly)\b", phrase) else "fast" if re.search(r"\b(depressa|rapido|rapida|fast|faster|quickly)\b", phrase) else value
         if not value and re.search(r"\b(normal|normalmente)\b", phrase):
             value = "normal"
     elif target == "animations":
