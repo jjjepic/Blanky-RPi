@@ -42,6 +42,8 @@ _TEST_PULSE_COMMANDS = frozenset({
 class MQTTBridge:
     _PHONE_TEXT_TOPICS = {"textbot/online": "online", "textbot/offline": "offline"}
     _MAX_PHONE_TEXT_LENGTH = 1000
+    _MONITOR_SYNC_TOPIC = "monitor/sync"
+    _MONITOR_SYNC_INTERVAL = 2.0
 
     def __init__(self):
         self.enabled = bool(MQTT_ENABLED)
@@ -63,6 +65,7 @@ class MQTTBridge:
         self._ui_lang = "pt"
         self._opcua = get_opcua_bridge()
         self._last_mqtt_panel_rx = 0.0
+        self._last_monitor_sync = float("-inf")
         self._monitor_health_cache: dict[str, str] = {}
         self._mobile_text_handler: Optional[Callable[[str, str], None]] = None
 
@@ -154,6 +157,7 @@ class MQTTBridge:
         self._connected = (rc == 0)
         if self._connected:
             self._monitor_health_cache = {}
+            self._last_monitor_sync = float("-inf")
             self._subscribe_command_topics()
             self.publish_all_state()
             self._publish("monitor/availability", "online")
@@ -183,6 +187,17 @@ class MQTTBridge:
         topic = str(msg.topic or "")
         topic_suffix = self._extract_suffix(topic)
         if not topic_suffix:
+            return
+
+        if topic_suffix == self._MONITOR_SYNC_TOPIC:
+            if msg.payload == b"sync":
+                now = time.monotonic()
+                self._last_mqtt_panel_rx = now
+                if now - self._last_monitor_sync >= self._MONITOR_SYNC_INTERVAL:
+                    self._last_monitor_sync = now
+                    self.publish_all_state()
+                    self.publish_monitor_health(self.health(), force=True)
+                    self._publish("monitor/availability", "online")
             return
 
         mode = self._PHONE_TEXT_TOPICS.get(topic_suffix)
@@ -281,11 +296,11 @@ class MQTTBridge:
         except Exception:
             pass
 
-    def publish_monitor_health(self, health: dict):
+    def publish_monitor_health(self, health: dict, *, force: bool = False):
         if not self.enabled or not self._connected:
             return
         for suffix, payload in health_monitor_updates(health).items():
-            if self._monitor_health_cache.get(suffix) != payload:
+            if force or self._monitor_health_cache.get(suffix) != payload:
                 self._publish(suffix, payload)
                 self._monitor_health_cache[suffix] = payload
 
@@ -298,6 +313,7 @@ class MQTTBridge:
                 self.client.subscribe(self._topic(suffix), qos=1)
         for suffix in self._PHONE_TEXT_TOPICS:
             self.client.subscribe(self._topic(suffix), qos=0)
+        self.client.subscribe(self._topic(self._MONITOR_SYNC_TOPIC), qos=1)
 
     def set_mobile_text_handler(self, handler: Optional[Callable[[str, str], None]]):
         self._mobile_text_handler = handler

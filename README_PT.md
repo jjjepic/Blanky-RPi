@@ -73,7 +73,7 @@ Em **Comunicações e IA**, o switch **Modo de controlo** alterna entre **PLC si
 
 No teste, os pedidos de avanço de C/D e de recolha do robô usam um impulso local/MQTT de 2 segundos: depois, o botão regressa a inativo para permitir novo pedido. Isto **não confirma o recuo físico**. A escrita OPC UA mantém o impulso normal de 0,3 s e C/D continuam sem nó de recuo dedicado. No modo sincronizado, C/D mostram `OFF` quando o PLC comunica um sinal de avanço válido mas inativo, e `? Incerto` quando não há leitura válida. `OFF` não comprova recuo.
 
-Em **Eventos**, a vista simples mostra uma linha por pedido e atualiza-a com o resultado. **Ver detalhes** abre todas as etapas técnicas, que também continuam disponíveis nas exportações e não são lidas individualmente em voz alta.
+Em **Eventos**, a vista simples mostra uma linha por pedido e atualiza-a com o resultado. Ativa **Eventos detalhados** em **Aparência e acessibilidade** para ver o registo técnico com os títulos fixos. Ambas as vistas usam o mesmo histórico da sessão. Todas as etapas continuam disponíveis nas exportações e não são lidas individualmente em voz alta.
 
 Os campos que podem alterar uma ligação começam bloqueados. Use o ícone de lápis para os desbloquear e aplique as alterações quando terminar. MQTT reconecta automaticamente; ao mudar o endereço OPC UA, a ligação persistente é restabelecida no novo servidor.
 

@@ -116,6 +116,7 @@ class MonitorBridgeTests(unittest.TestCase):
         bridge._next_event_id = 1
         bridge._event_generation = 0
         bridge._last_mqtt_panel_rx = 0.0
+        bridge._last_monitor_sync = float("-inf")
         bridge._control_mode = "plc"
         bridge._test_pulses = {}
         bridge._opcua = types.SimpleNamespace(health=lambda: {"connected": False}, enqueue_command=lambda *a, **k: None)
@@ -148,7 +149,7 @@ class MonitorBridgeTests(unittest.TestCase):
         self.assertIn("colocado na fila", published["blanky/monitor/pt/last_message"])
         self.assertEqual(published["blanky/monitor/last_event_status"], "ok")
 
-    def test_connect_publishes_presence_and_only_subscribes_commands(self):
+    def test_connect_publishes_presence_and_subscribes_to_monitor_sync(self):
         bridge = self._bridge()
         bridge._connected = False
         bridge._on_connect(bridge.client, None, None, 0)
@@ -157,9 +158,43 @@ class MonitorBridgeTests(unittest.TestCase):
         self.assertEqual(published["blanky/monitor/pt/last_message"], "Sem atividade.")
         self.assertEqual(published["blanky/monitor/last_event_status"], "none")
         self.assertEqual(published["blanky/monitor/opcua"], "disconnected")
-        self.assertTrue(all(topic.startswith(("blanky/mqtt_", "blanky/textbot/")) for topic in bridge.client.subscriptions))
+        self.assertTrue(all(topic.startswith(("blanky/mqtt_", "blanky/textbot/")) or topic == "blanky/monitor/sync"
+                            for topic in bridge.client.subscriptions))
         self.assertIn("blanky/textbot/online", bridge.client.subscriptions)
         self.assertIn("blanky/textbot/offline", bridge.client.subscriptions)
+        self.assertIn("blanky/monitor/sync", bridge.client.subscriptions)
+
+    def test_late_phone_sync_republishes_current_retained_state_without_commands(self):
+        bridge = self._bridge()
+        bridge.state.update(start=1, mode_manual=1, motor_1=1, cyl_a=None)
+        bridge.state_quality["cyl_a"] = "unavailable"
+        bridge.process_command = lambda *args, **kwargs: self.fail("Sync must never dispatch a command")
+        bridge.publish_monitor_health(bridge.health())
+        bridge.client.messages.clear()
+        message = types.SimpleNamespace(topic="blanky/monitor/sync", payload=b"sync", retain=False)
+        bridge._on_message(bridge.client, None, message)
+        published = {topic: value for topic, value, _ in bridge.client.messages}
+        self.assertEqual(published["blanky/state/start"], "1")
+        self.assertEqual(published["blanky/state/motor_1"], "1")
+        self.assertEqual(published["blanky/state/cyl_a"], "unknown")
+        self.assertEqual(published["blanky/state_quality/cyl_a"], "unavailable")
+        self.assertEqual(published["blanky/monitor/mode"], "manual")
+        self.assertEqual(published["blanky/monitor/pt/motor_1"], "Ligado")
+        self.assertEqual(published["blanky/monitor/opcua"], "disconnected")
+        self.assertEqual(published["blanky/monitor/availability"], "online")
+        self.assertTrue(all(options["retain"] for _, _, options in bridge.client.messages))
+        self.assertFalse(any(topic.startswith("blanky/mqtt_") for topic in published))
+
+        bridge.client.messages.clear()
+        bridge._on_message(bridge.client, None, message)
+        self.assertEqual(bridge.client.messages, [])
+        bridge._last_monitor_sync = float("-inf")
+        message.retain = True
+        bridge._on_message(bridge.client, None, message)
+        message.retain = False
+        message.payload = b"1"
+        bridge._on_message(bridge.client, None, message)
+        self.assertEqual(bridge.client.messages, [])
 
     def test_phone_text_is_dispatched_without_replaying_retained_requests(self):
         bridge = self._bridge()

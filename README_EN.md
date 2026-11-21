@@ -68,7 +68,7 @@ In **Communications and AI**, the **Control mode** switch selects **Synchronized
 
 In test mode, C/D extension and robot pickup requests use a two-second local/MQTT pulse, after which the button becomes inactive so another request can be made. This **does not confirm physical retraction**. OPC UA keeps its normal 0.3-second pulse, and C/D still have no dedicated retract node. In synchronized mode, C/D show `OFF` when the PLC reports a valid but inactive extension signal, and `? Unknown` when no valid reading is available. `OFF` does not prove retraction.
 
-In **Events**, the simple view shows one row per request and updates it with the result. **View details** opens all technical stages, which remain available in exports and are not read out one by one.
+In **Events**, the simple view shows one row per request and updates it with the result. Enable **Detailed events** in **Appearance and accessibility** for the technical log with fixed column headings. Both views use the same session history. All stages remain available in exports and are not read out one by one.
 
 Connection fields start locked. Use the pencil icon to unlock them, then apply your changes. MQTT reconnects automatically; changing the OPC UA endpoint reconnects the persistent client to the new server.
 

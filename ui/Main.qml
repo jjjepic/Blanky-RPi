@@ -71,7 +71,7 @@ ApplicationWindow {
     property var ttsVoiceModel: blanky.ttsVoiceOptions ? blanky.ttsVoiceOptions.split("|") : []
     property var stateMap: ({})
     property var commStateMap: ({})
-    property bool technicalEvents: false
+    readonly property bool technicalEvents: blanky.technicalEventsEnabled
     property bool popupBackdropVisible: false
     property bool systemTransitionActive: false
     property string systemTransitionAction: ""
@@ -427,8 +427,20 @@ ApplicationWindow {
         return I18n.voiceDescription(blanky.language, voice)
     }
 
-    function scrollEventsToBottom() {
-        eventsScroll.contentItem.contentY = Math.max(0, eventsContent.height - eventsScroll.availableHeight)
+    function restoreEventsScroll() {
+        if (!eventsScroll.visible || eventsScroll.height <= 0 || eventsScroll.width <= 0)
+            return
+        const bottom = Math.max(0, eventsScroll.contentHeight - eventsScroll.height)
+        eventsScroll.contentY = eventsScroll.followTail ? bottom : Math.max(0, Math.min(eventsScroll.contentY, bottom))
+        eventsScroll.contentX = Math.max(0, Math.min(eventsScroll.contentX, eventsScroll.contentWidth - eventsScroll.width))
+    }
+
+    onTechnicalEventsChanged: {
+        if (!eventsScroll)
+            return
+        eventsScroll.followTail = true
+        eventsScroll.contentX = 0
+        eventsAutoscrollTimer.restart()
     }
 
     Connections {
@@ -454,7 +466,7 @@ ApplicationWindow {
         id: eventsAutoscrollTimer
         interval: 1
         repeat: false
-        onTriggered: root.scrollEventsToBottom()
+        onTriggered: root.restoreEventsScroll()
     }
 
     Timer {
@@ -950,27 +962,6 @@ ApplicationWindow {
                                 Item { Layout.fillWidth: true; Layout.minimumWidth: 0 }
 
                                 MenuActionButton {
-                                    text: t(root.technicalEvents ? "hideEventDetails" : "showEventDetails")
-                                    Layout.preferredWidth: Math.round(116 * root.controlScale)
-                                    Layout.preferredHeight: Math.round(38 * root.controlScale)
-                                    accentColor: root.accentColor
-                                    textColor: root.textColor
-                                    mutedText: root.mutedText
-                                    borderColor: root.borderColor
-                                    panelColor: root.panelAltColor
-                                    activeFocusOnTab: true
-                                    Accessible.role: Accessible.Button
-                                    Accessible.name: text
-                                    Accessible.onPressAction: clicked()
-                                    Keys.onSpacePressed: clicked()
-                                    Keys.onReturnPressed: clicked()
-                                    onClicked: {
-                                        root.technicalEvents = !root.technicalEvents
-                                        eventsAutoscrollTimer.restart()
-                                    }
-                                }
-
-                                MenuActionButton {
                                     text: t("exportData")
                                     toolTip: t("tooltipExportData")
                                     Layout.preferredWidth: 130
@@ -998,19 +989,60 @@ ApplicationWindow {
                             }
                         }
 
-                        ScrollView {
+                        Item {
+                            objectName: "eventColumnHeader"
+                            visible: root.technicalEvents && !root.systemTransitionActive
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: eventColumnTitles.implicitHeight
+                            clip: true
+
+                            Text {
+                                id: eventColumnTitles
+                                x: -eventsScroll.contentX
+                                text: blanky.monitorEventsHeader
+                                textFormat: Text.PlainText
+                                font.family: "DejaVu Sans Mono"
+                                font.pixelSize: Math.round(12 * root.textScale)
+                                font.bold: true
+                                color: root.mutedText
+                            }
+                        }
+
+                        Flickable {
                             id: eventsScroll
+                            objectName: "eventsViewport"
+                            property bool followTail: true
                             visible: !root.systemTransitionActive
                             Layout.fillWidth: true
                             Layout.fillHeight: true
                             clip: true
-                            ScrollBar.horizontal.policy: root.technicalEvents ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
-                            ScrollBar.vertical.policy: ScrollBar.AlwaysOn
+                            contentWidth: Math.max(width, eventsContent.width + 12)
+                            contentHeight: eventsContent.height
+                            flickableDirection: root.technicalEvents ? Flickable.AutoFlickIfNeeded : Flickable.VerticalFlick
+                            boundsBehavior: Flickable.StopAtBounds
+                            onVisibleChanged: if (visible) eventsAutoscrollTimer.restart()
+                            onHeightChanged: if (visible) eventsAutoscrollTimer.restart()
+                            onWidthChanged: if (visible) eventsAutoscrollTimer.restart()
+                            onContentHeightChanged: if (visible) eventsAutoscrollTimer.restart()
+                            onMovementEnded: updateFollowTail()
+
+                            function updateFollowTail() {
+                                followTail = contentY >= Math.max(0, contentHeight - height) - 12
+                            }
+
+                            ScrollBar.horizontal: ScrollBar {
+                                policy: root.technicalEvents ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
+                            }
+                            ScrollBar.vertical: ScrollBar {
+                                policy: ScrollBar.AlwaysOn
+                                onPressedChanged: if (!pressed) eventsScroll.updateFollowTail()
+                            }
 
                             TextEdit {
                                 id: eventsContent
-                                width: root.technicalEvents ? Math.max(eventsScroll.availableWidth, contentWidth + 4) : eventsScroll.availableWidth
-                                height: Math.max(eventsScroll.availableHeight, contentHeight + 6)
+                                objectName: "eventsHistory"
+                                width: root.technicalEvents ? Math.max(eventsScroll.width - 12, contentWidth + 4) : Math.max(0, eventsScroll.width - 12)
+                                height: Math.max(eventsScroll.height, contentHeight + 6)
                                 text: root.technicalEvents ? blanky.monitorEventsRichText : blanky.monitorEventsSummary
                                 readOnly: true
                                 selectByMouse: true
@@ -2530,7 +2562,23 @@ ApplicationWindow {
 
                         Switch {
                             checked: blanky.hoverAnimationsEnabled
+                            Accessible.name: t("hoverAnimations")
                             onToggled: blanky.setHoverAnimationsEnabled(checked)
+                        }
+
+                        Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: 24; color: root.borderColor }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 2
+                            Label { text: t("technicalEvents"); color: root.textColor; font.bold: true; font.pixelSize: Math.round(12 * root.textScale); Layout.fillWidth: true }
+                            Label { text: t("technicalEventsDescription"); color: root.mutedText; font.pixelSize: Math.round(10 * root.textScale); Layout.fillWidth: true; elide: Text.ElideRight }
+                        }
+
+                        Switch {
+                            checked: blanky.technicalEventsEnabled
+                            Accessible.name: t("technicalEvents")
+                            onToggled: blanky.setTechnicalEventsEnabled(checked)
                         }
                     }
                 }

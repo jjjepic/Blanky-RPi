@@ -67,6 +67,7 @@ class BlankyController(QObject):
     appearanceTextScaleChanged = Signal()
     displayScaleProfileChanged = Signal()
     hoverAnimationsEnabledChanged = Signal()
+    technicalEventsEnabledChanged = Signal()
     customAppearanceChanged = Signal()
     monitorEventsTextChanged = Signal()
     listeningChanged = Signal()
@@ -259,6 +260,7 @@ class BlankyController(QObject):
         self._hover_animations_enabled = bool(
             self._settings.value("hoverAnimationsEnabled", True, type=bool)
         )
+        self._technical_events_enabled = self._settings.value("technicalEventsEnabled", False, type=bool)
         self._custom_hue = self._saved_appearance_value("customHue", 205.0, 0.0, 360.0)
         self._custom_brightness = self._saved_appearance_value("customBrightness", 46.0, 20.0, 80.0)
         self._custom_contrast = self._saved_appearance_value("customContrast", 88.0, 60.0, 100.0)
@@ -399,6 +401,10 @@ class BlankyController(QObject):
     @Property(bool, notify=hoverAnimationsEnabledChanged)
     def hoverAnimationsEnabled(self):
         return self._hover_animations_enabled
+
+    @Property(bool, notify=technicalEventsEnabledChanged)
+    def technicalEventsEnabled(self):
+        return self._technical_events_enabled
 
     @Property(float, notify=customAppearanceChanged)
     def customHue(self):
@@ -708,6 +714,14 @@ class BlankyController(QObject):
         self._settings.setValue("hoverAnimationsEnabled", enabled)
         self._settings.sync()
         self.hoverAnimationsEnabledChanged.emit()
+
+    @Slot(bool)
+    def setTechnicalEventsEnabled(self, enabled: bool):
+        if self._technical_events_enabled != enabled:
+            self._technical_events_enabled = enabled
+            self._settings.setValue("technicalEventsEnabled", enabled)
+            self._settings.sync()
+            self.technicalEventsEnabledChanged.emit()
 
     @Slot(float)
     def setCustomHue(self, value: float):
@@ -1617,7 +1631,7 @@ class BlankyController(QObject):
 
     def _build_monitor_events_rich_text(self, snapshot: dict) -> str:
         current_generation = int(snapshot.get("event_generation", 0) or 0)
-        rich_rows = [f"<b>{html.escape(event_header(self._language))}\n{html.escape(event_divider())}</b>"]
+        rich_rows = []
         for ev in snapshot.get("events", []):
             event_id = int(ev.get("id", 0) or 0)
             event_label = f"[{event_id:03d}]"

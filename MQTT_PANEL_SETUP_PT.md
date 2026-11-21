@@ -118,7 +118,21 @@ Configure o prefixo do dashboard como `blanky` e introduza apenas o sufixo indic
 | Último evento: estado | Multi-State Indicator | `monitor/last_event_status` | `none` = Sem eventos; `ok` = Aceite (OK); `rejected` = Recusado (REJECT). Não significa confirmação de atuação pelo PLC. |
 | Última etapa | Text Output | `monitor/last_event_stage` | `queued`, `written`, `state_observed`, `timeout` ou erro; distinguir pedido de retorno. |
 
-Os equivalentes em inglês estão em `monitor/en/...`. Todos os tópicos `monitor/*` são retidos, salvo se o broker ainda não tiver recebido a primeira publicação. Use texto, símbolo e posição além da cor; evite usar só vermelho/verde para estados críticos. **Não use o widget Node Status** com `monitor/availability`: a versão da app que pede `Payload sync request` publica um pedido, mas o Blanky não implementa esse protocolo de pedido/resposta. Nunca publique nesse tópico, pois pode substituir o valor retido. O Multi-State Indicator subscreve a disponibilidade do **processo Blanky no broker**, não o arranque do sistema ou a ligação ao PLC. O valor `offline` é publicado ao sair normalmente e pelo Last Will se a ligação cair inesperadamente; pode haver um pequeno atraso até o broker detetar a perda. Ignore os últimos estados retidos quando a disponibilidade estiver `offline`.
+Os equivalentes em inglês estão em `monitor/en/...`. Os tópicos de saída `monitor/*` são retidos. Use texto, símbolo e posição além da cor; evite usar só vermelho/verde para estados críticos. `monitor/availability` indica a disponibilidade do **processo Blanky no broker**, não o arranque do sistema ou a ligação ao PLC. O valor `offline` é publicado ao sair normalmente e pelo Last Will se a ligação cair inesperadamente; pode haver um pequeno atraso até o broker detetar a perda. Ignore os últimos estados retidos quando a disponibilidade estiver `offline`.
+
+### Atualizar ao abrir o painel
+
+Para além dos valores retidos de `state/*` e `monitor/*`, podes configurar **um painel Node Status** para pedir os estados atuais ao abrir o dashboard. Com o prefixo `blanky` no dashboard, usa:
+
+| Campo | Valor |
+| --- | --- |
+| Topic | `monitor/sync` |
+| Subscribe Topic | `monitor/availability` |
+| Payload sync request | `sync` |
+| Payload online / offline | `online` / `offline` |
+| Auto sync on load | Ativado |
+
+Mantém **Retain desativado** no pedido, se a app disponibilizar essa opção. Sem prefixo no dashboard, usa `blanky/monitor/sync` e `blanky/monitor/availability`. O Blanky responde nos tópicos existentes: republica `state/*`, `state_quality/*`, textos de estado e saúde. O pedido não aciona nada nem altera o estado; nunca publiques em `monitor/availability` ou em tópicos de comando para sincronizar. Nos painéis de leitura, subscreve `state/*` ou `monitor/*`, não `mqtt_*` (tópicos de comando).
 
 Os tópicos `state/*` e `monitor/*` representam o estado interno do Blanky. A ligação OPC UA e o feedback indicam comunicação, **não confirmam individualmente a posição física de cada atuador**. Os sensores/estados recebidos do PLC ainda não são publicados em MQTT como estados físicos por componente.
 
